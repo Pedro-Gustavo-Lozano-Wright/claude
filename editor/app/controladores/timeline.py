@@ -189,8 +189,10 @@ def arrastrar(sesion: Sesion, elemento: Elemento, zona: str, original: Elemento,
                 izquierdo, derecho = (vecino, elemento) if zona == INICIO else (elemento, vecino)
                 return sesion.ejecutar(Roll(capitulo, izquierdo.id, derecho.id, nuevo))
         if herramienta == "ripple":
-            delta = (nuevo - borde) if zona == INICIO else (borde - nuevo)
-            return sesion.ejecutar(RippleRecorte(capitulo, elemento.id, zona, delta))
+            # Duración final absoluta: cada paso del arrastre corrige desde el estado actual.
+            acortar = (nuevo - borde) if zona == INICIO else (borde - nuevo)
+            return sesion.ejecutar(RippleRecorte(capitulo, elemento.id, zona,
+                                                 duracion_final=original.duracion - acortar))
         grupo = originales_grupo if herramienta == "seleccion" and originales_grupo and len(originales_grupo) > 1 else None
         if grupo is not None and original.id in grupo:
             # Recorte en grupo: el mismo lado de todos los seleccionados, lo mismo que el arrastrado.

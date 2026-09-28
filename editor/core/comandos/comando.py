@@ -263,8 +263,12 @@ class EdicionCapitulo(Comando):
         # Conserva el estado previo del primer paso y adopta los parámetros finales:
         # rehacer desde ese estado con valores absolutos da el resultado final.
         antes = self._antes
+        despues_previos = getattr(self, "_despues", set())
         afectados = self._afectados
         self.__dict__.update({k: v for k, v in siguiente.__dict__.items() if k != "_antes"})
-        self._antes = antes
+        # Lo que solo tocaron los pasos siguientes también se restaura al deshacer: su estado
+        # previo es el de antes del gesto, porque los pasos anteriores no lo habían cambiado.
+        self._antes = {**siguiente._antes, **antes}
+        self._despues = self._despues | despues_previos
         self._afectados = afectados.unir(siguiente._afectados)
         return True
