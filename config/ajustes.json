@@ -1,0 +1,12 @@
+{
+  "cache_fotogramas_mb": 512,
+  "autosave_segundos": 120,
+  "historial_pasos": 100,
+  "vista_previa_fps": 12,
+  "vista_previa_calidad_jpeg": 80,
+  "monitor_calidad_pausa_jpeg": 90,
+  "trabajadores_fondo": 2,
+  "nivel_registro": "INFO",
+  "proyectos_recientes": [],
+  "maximo_recientes": 10
+}

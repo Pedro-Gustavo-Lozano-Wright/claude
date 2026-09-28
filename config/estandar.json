@@ -1,0 +1,42 @@
+{
+  "lienzo_ancho": 1280,
+  "lienzo_alto": 720,
+  "fps": 24,
+  "audio_frecuencia": 48000,
+  "audio_canales": 2,
+  "render": {
+    "codec_video": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "formato_pixel": "yuv420p",
+    "codec_audio": "aac",
+    "bitrate_audio": "192k",
+    "contenedor": "mp4",
+    "aceleracion": "ninguna"
+  },
+  "pieza": {
+    "codec_opaco": "libx264",
+    "crf_opaco": 14,
+    "contenedor_opaco": "mp4",
+    "codec_alfa": "prores_ks",
+    "perfil_alfa": "4444",
+    "contenedor_alfa": "mov",
+    "ancho_maximo": 2560,
+    "alto_maximo": 1440
+  },
+  "banco": {
+    "ancho": 256,
+    "alto": 144,
+    "fps": 10,
+    "calidad_jpeg": 75,
+    "formato_opaco": "jpg",
+    "formato_alfa": "webp"
+  },
+  "prerender": {
+    "ancho": 960,
+    "alto": 540,
+    "codec_video": "libx264",
+    "preset": "ultrafast",
+    "crf": 23
+  }
+}

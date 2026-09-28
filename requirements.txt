@@ -1,0 +1,7 @@
+# Python 3.12 o superior. Solo Linux (dependencias de sistema en PROJECT.md, 15.4).
+flet==1.0.1
+flet-video==1.0.1
+av==18.1.0
+numpy==2.5.3
+opencv-python-headless==5.0.0.93
+Pillow==12.3.0

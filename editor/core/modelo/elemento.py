@@ -1,0 +1,227 @@
+"""El Elemento: bloque fundamental del editor (PROJECT.md, sección 8).
+
+Una ventana de tiempo sobre un archivo, colocada en el lienzo y en la
+timeline, cuyas propiedades son parámetros animables.
+
+El Elemento sabe responder qué aporta en un fotograma (activo o no, qué
+fotograma de su fuente, con qué transformación y volumen). La obtención de la
+imagen y la mezcla son del motor (E7).
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+
+from editor.core.espacio.transform import PROPIEDADES_ANIMABLES, Transform
+from editor.core.estandar import ASAS_FOTOGRAMAS, FOTOGRAMAS_POR_CAPITULO
+from editor.core.modelo.capa import Capa, TipoCapa
+from editor.core.modelo.efecto import Efecto
+from editor.core.modelo.keyframe import Animacion
+from editor.core.modelo.texto import ContenidoTexto
+from editor.core.modelo.transicion import Transicion
+from editor.core.tiempo import granularidad
+from editor.core.tiempo.granularidad import Duracion, Instante
+from editor.core.tiempo.nomenclatura import NombreElemento
+
+PROPIEDADES_AUDIO_ANIMABLES = ("volumen", "paneo")
+
+
+class TipoFuente(Enum):
+    PIEZA = "pieza"
+    BRUTO = "bruto"   # solo para imágenes y audio colocados sin pasar por una Pieza de video
+    TEXTO = "texto"
+
+
+@dataclass(frozen=True)
+class ReferenciaFuente:
+    tipo: TipoFuente
+    ref: str = ""       # ID de la Pieza o del Bruto; vacío para texto
+    version: int = 0    # versión de la Pieza con la que se materializó la copia
+
+
+@dataclass
+class TiempoElemento:
+    inicio: int                      # fotograma del capítulo
+    duracion: int                    # fotogramas
+    fuente_entrada: int = ASAS_FOTOGRAMAS  # fotograma de la fuente (24 fps) donde empieza; incluye asas
+    velocidad: float = 1.0           # negativa = reversa
+
+    def __post_init__(self) -> None:
+        if self.inicio < 0:
+            raise ValueError("El inicio no puede ser negativo.")
+        if self.duracion <= 0:
+            raise ValueError("La duración debe ser positiva.")
+        if self.fuente_entrada < 0:
+            raise ValueError("La entrada de la fuente no puede ser negativa.")
+        if self.velocidad == 0:
+            raise ValueError("La velocidad no puede ser cero.")
+
+    @property
+    def fin(self) -> int:
+        """Primer fotograma después del Elemento (exclusivo)."""
+        return self.inicio + self.duracion
+
+    @property
+    def fotogramas_fuente_usados(self) -> int:
+        """Cuántos fotogramas de la fuente consume el Elemento."""
+        return max(1, math.ceil(self.duracion * abs(self.velocidad)))
+
+
+@dataclass
+class AudioElemento:
+    volumen: float = 1.0          # 0.0 – 2.0
+    paneo: float = 0.0            # -1.0 izquierda … 1.0 derecha
+    silenciado: bool = False
+    fundido_entrada: int = 0      # fotogramas
+    fundido_salida: int = 0
+
+
+@dataclass
+class EstadoElemento:
+    activo: bool = True
+    bloqueado: bool = False
+
+
+@dataclass
+class Elemento:
+    id: str
+    nombre: str
+    capa: Capa
+    tiempo: TiempoElemento
+    fuente: ReferenciaFuente
+    extension: str = "json"
+    ancho: int = 0                 # tamaño natural del archivo (0 para audio)
+    alto: int = 0
+    tiene_alfa: bool = False
+    tiene_audio: bool = False
+    espacio: Transform = field(default_factory=Transform)
+    animacion: Animacion = field(default_factory=Animacion)
+    efectos: list[Efecto] = field(default_factory=list)
+    transicion_entrada: Transicion | None = None
+    audio: AudioElemento = field(default_factory=AudioElemento)
+    estado: EstadoElemento = field(default_factory=EstadoElemento)
+    texto: ContenidoTexto | None = None
+    en_global: bool = False
+    # Ruta del archivo materializado en disco; la asigna proyecto_fs (E5).
+    archivo: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.capa.tipo is TipoCapa.TEXTO:
+            if self.texto is None:
+                self.texto = ContenidoTexto()
+            self.fuente = ReferenciaFuente(TipoFuente.TEXTO)
+            self.extension = "json"
+
+    # --- Tiempo ----------------------------------------------------------------
+
+    @property
+    def inicio(self) -> int:
+        return self.tiempo.inicio
+
+    @property
+    def fin(self) -> int:
+        return self.tiempo.fin
+
+    @property
+    def duracion(self) -> int:
+        return self.tiempo.duracion
+
+    @property
+    def minuto_inicio(self) -> int:
+        return granularidad.minuto_de(self.inicio)
+
+    @property
+    def minutos_cruzados(self) -> range:
+        return granularidad.minutos_cruzados(self.inicio, self.fin)
+
+    @property
+    def desborda(self) -> bool:
+        """True si termina en un minuto posterior al de su inicio."""
+        return granularidad.minuto_de(self.fin - 1) != self.minuto_inicio
+
+    @property
+    def excede_capitulo(self) -> bool:
+        """True si una parte queda después de 24:00 (regla del marco temporal)."""
+        return self.fin > FOTOGRAMAS_POR_CAPITULO
+
+    def contiene(self, f: int) -> bool:
+        return self.inicio <= f < self.fin
+
+    def activo_en(self, f: int) -> bool:
+        return self.estado.activo and self.contiene(f) and granularidad.dentro_del_capitulo(f)
+
+    def local(self, f: float) -> float:
+        """Fotograma relativo al inicio del Elemento (el que usan los keyframes)."""
+        return f - self.inicio
+
+    def fotograma_fuente(self, f: int) -> int:
+        """Fotograma de la fuente (Pieza a 24 fps) que se ve en el fotograma f del capítulo."""
+        desplazamiento = math.floor((f - self.inicio) * abs(self.tiempo.velocidad))
+        if self.tiempo.velocidad > 0:
+            return self.tiempo.fuente_entrada + desplazamiento
+        ultimo = self.tiempo.fuente_entrada + self.tiempo.fotogramas_fuente_usados - 1
+        return max(self.tiempo.fuente_entrada, ultimo - desplazamiento)
+
+    # --- Espacio y audio animados ----------------------------------------------
+
+    def transform_en(self, f: float) -> Transform:
+        bases = {propiedad: float(getattr(self.espacio, propiedad)) for propiedad in PROPIEDADES_ANIMABLES}
+        return self.espacio.con_valores(self.animacion.valores(self.local(f), bases))
+
+    def volumen_en(self, f: float) -> float:
+        if self.audio.silenciado:
+            return 0.0
+        volumen = self.animacion.valor("volumen", self.local(f), self.audio.volumen)
+        return volumen * self._fundido(f)
+
+    def paneo_en(self, f: float) -> float:
+        return self.animacion.valor("paneo", self.local(f), self.audio.paneo)
+
+    def _fundido(self, f: float) -> float:
+        local = self.local(f)
+        factor = 1.0
+        if self.audio.fundido_entrada > 0 and local < self.audio.fundido_entrada:
+            factor = min(factor, max(0.0, local / self.audio.fundido_entrada))
+        restante = self.duracion - local
+        if self.audio.fundido_salida > 0 and restante < self.audio.fundido_salida:
+            factor = min(factor, max(0.0, restante / self.audio.fundido_salida))
+        return factor
+
+    # --- Naturaleza ------------------------------------------------------------
+
+    @property
+    def es_visual(self) -> bool:
+        return self.capa.es_visual
+
+    @property
+    def es_texto(self) -> bool:
+        return self.capa.tipo is TipoCapa.TEXTO
+
+    @property
+    def suena(self) -> bool:
+        """Aporta audio a la mezcla: capas A, o V con audio y sin silenciar (PROJECT.md, 8.4)."""
+        if self.audio.silenciado or self.es_texto:
+            return False
+        return self.capa.tipo is TipoCapa.AUDIO or self.tiene_audio
+
+    @property
+    def orden_apilado(self) -> int | None:
+        return self.capa.orden_apilado
+
+    # --- Nombre en disco -------------------------------------------------------
+
+    def nombre_archivo(self) -> NombreElemento:
+        return NombreElemento(
+            inicio=Instante(self.inicio),
+            duracion=Duracion(self.duracion),
+            capa=self.capa.codigo,
+            nombre=self.nombre,
+            id=self.id,
+            extension=self.extension,
+        )
+
+    def __repr__(self) -> str:
+        return f"Elemento({self.id} {self.capa} {Instante(self.inicio)} +{self.duracion} '{self.nombre}')"

@@ -1,0 +1,66 @@
+{
+  "espacio_activo": "minuto",
+  "espacios": {
+    "taller": {
+      "navegador": 260,
+      "inspector": 300,
+      "mapa": 0,
+      "timeline": 260,
+      "visibles": [
+        "navegador",
+        "monitor",
+        "inspector",
+        "timeline"
+      ]
+    },
+    "minuto": {
+      "navegador": 240,
+      "inspector": 300,
+      "mapa": 48,
+      "timeline": 300,
+      "visibles": [
+        "navegador",
+        "monitor",
+        "inspector",
+        "mapa",
+        "timeline"
+      ]
+    },
+    "capitulo": {
+      "navegador": 240,
+      "inspector": 0,
+      "mapa": 96,
+      "timeline": 420,
+      "visibles": [
+        "navegador",
+        "monitor",
+        "mapa",
+        "timeline"
+      ]
+    },
+    "shorts": {
+      "navegador": 240,
+      "inspector": 280,
+      "mapa": 48,
+      "timeline": 240,
+      "visibles": [
+        "navegador",
+        "monitor",
+        "inspector",
+        "timeline"
+      ]
+    },
+    "render": {
+      "navegador": 240,
+      "inspector": 0,
+      "mapa": 96,
+      "timeline": 0,
+      "visibles": [
+        "navegador",
+        "monitor",
+        "mapa",
+        "cola_render"
+      ]
+    }
+  }
+}

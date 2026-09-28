@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** planificación cerrada (revisión 3). Todavía no hay código funcional.
+- **Estado:** revisión 3. Fase A (E0–E4) implementada: base transversal, tiempo, espacio y modelo.
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -1231,7 +1231,7 @@ con los keyframes de la ventana.
 - Imán a bordes, centro, otros Elementos y guías.
 - Márgenes seguros: acción 5 %, títulos 10 %.
 - Guía 9:16 activable, para ver qué entra en un Short.
-- Flechas = 1 px, Shift + flechas = 10 px.
+- Alt + flechas = 1 px, Alt + Shift + flechas = 10 px (las flechas solas avanzan fotogramas).
 - Al arrastrar, recuadro y asas se dibujan en el canvas de Flet al instante; la
   imagen se refresca ~10 veces por segundo y a calidad completa al soltar.
 
@@ -1275,6 +1275,7 @@ con los keyframes de la ventana.
     ├── __init__.py
     ├── core/
     │   ├── estandar.py                  N0
+    │   ├── ajustes.py                   N0 · ajustes de la aplicación (config/ y ~/.config/editor/)
     │   ├── eventos.py                   N0 · BusEventos y tipos de evento
     │   ├── utiles/                      N0
     │   │   ├── interpolacion.py  matematicas.py  registro.py
@@ -1284,7 +1285,8 @@ con los keyframes de la ventana.
     │   ├── espacio/                     N1
     │   │   ├── transform.py  lienzo.py  geometria.py
     │   ├── modelo/                      N2
-    │   │   ├── composicion.py           base recursiva
+    │   │   ├── errores.py               ErrorModelo, Solapamiento, NoEncontrado
+    │   │   ├── composicion.py           base de Minuto y Global
     │   │   ├── proyecto.py  capitulo.py  minuto.py  global_.py
     │   │   ├── bruto.py  pieza.py  taller.py
     │   │   ├── elemento.py  capa.py  keyframe.py
@@ -1347,15 +1349,15 @@ con los keyframes de la ventana.
 `requirements.txt`:
 
 ```
-flet
-flet-video          # control de video; verificar el nombre del paquete según la versión de Flet
-av
-numpy
-opencv-python-headless
-Pillow
+flet==1.0.1
+flet-video==1.0.1
+av==18.1.0
+numpy==2.5.3
+opencv-python-headless==5.0.0.93
+Pillow==12.3.0
 ```
 
-Las versiones se fijan en E0. Las dependencias de sistema de Linux están en 15.4.
+Versiones fijadas en E0. Las dependencias de sistema de Linux están en 15.4.
 
 ---
 
@@ -1523,6 +1525,17 @@ puede ejecutar con `main.py` en modo sin interfaz.
 
 **E22. Documentación final**
 - README completo y actualización de este documento con lo implementado.
+
+### Estado de implementación
+
+| Épica | Estado | Notas |
+|---|---|---|
+| E0 | ✅ | qwen y deep eliminados; árbol `editor/` con módulos pendientes marcados con su épica; `main.py`, `requirements.txt`, `config/`, README |
+| E1 | ✅ | `estandar`, `ajustes`, `eventos`, `utiles/` (registro, matemáticas, interpolación con curvas CSS y bezier) |
+| E2 | ✅ | `granularidad` (Instante, Duración, minutos, fps de fuentes) y `nomenclatura` (Elementos, Shorts, Brutos, Piezas, capítulos, minutos, renders, IDs) |
+| E3 | ✅ | `geometria` (Rect, imán), `transform` (Afin, Transform, recorte, compensación de ancla, ajuste inicial), `lienzo` (visibilidad, región de interés, márgenes, ventana vertical) |
+| E4 | ✅ | Modelo completo. La Pieza es por ahora una secuencia lineal de tramos; las capas dentro de una Pieza quedan para más adelante |
+| E5 en adelante | Pendiente | |
 
 ### Dependencias entre épicas
 
