@@ -4,17 +4,20 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** planificación. Todavía no hay código funcional.
-- **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` (base) y
-  `deep_video_editor/` (capacidades avanzadas), que se fusionan en `editor/`.
+- **Estado:** planificación cerrada (revisión 2). Todavía no hay código funcional.
+- **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
+  `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
+- **Modo de trabajo:** solo código. Sin tests ni pruebas automatizadas por ahora.
+  Un único punto de entrada: `main.py`.
 
 ---
 
 ## Índice
 
+0. [Cambios de la revisión 2](#0-cambios-de-la-revisión-2)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
-3. [Nomenclatura única (glosario)](#3-nomenclatura-única-glosario)
+3. [Nomenclatura única](#3-nomenclatura-única)
 4. [Estándar objetivo HD720-24](#4-estándar-objetivo-hd720-24)
 5. [Paradigma: composiciones anidadas sobre una rejilla de tiempo](#5-paradigma-composiciones-anidadas-sobre-una-rejilla-de-tiempo)
 6. [Sistema de tiempo y granularidad](#6-sistema-de-tiempo-y-granularidad)
@@ -22,15 +25,51 @@ documento, se corrige uno de los dos de forma explícita.
 8. [El Elemento: bloque fundamental](#8-el-elemento-bloque-fundamental)
 9. [Estructura del proyecto en disco](#9-estructura-del-proyecto-en-disco)
 10. [Sincronización disco–modelo](#10-sincronización-discomodelo)
-11. [Motor de composición y transparencias](#11-motor-de-composición-y-transparencias)
+11. [Motor de composición, transparencias y audio](#11-motor-de-composición-transparencias-y-audio)
 12. [Vista previa híbrida en 4 niveles](#12-vista-previa-híbrida-en-4-niveles)
 13. [Render por minuto y ensamblado del capítulo](#13-render-por-minuto-y-ensamblado-del-capítulo)
-14. [Interfaz de usuario](#14-interfaz-de-usuario)
-15. [Arquitectura del código](#15-arquitectura-del-código)
-16. [Qué se aprovecha de qwen y deep](#16-qué-se-aprovecha-de-qwen-y-deep)
-17. [Épicas en orden sistemático](#17-épicas-en-orden-sistemático)
-18. [Especificaciones aspirables](#18-especificaciones-aspirables)
-19. [Riesgos y preguntas abiertas](#19-riesgos-y-preguntas-abiertas)
+14. [Flujo de dependencias](#14-flujo-de-dependencias)
+15. [El main principal](#15-el-main-principal)
+16. [Interfaz de usuario](#16-interfaz-de-usuario)
+17. [Arquitectura del código](#17-arquitectura-del-código)
+18. [Unificación de qwen y deep](#18-unificación-de-qwen-y-deep)
+19. [Épicas en orden sistemático](#19-épicas-en-orden-sistemático)
+20. [Especificaciones aspirables](#20-especificaciones-aspirables)
+21. [Riesgos y decisiones abiertas](#21-riesgos-y-decisiones-abiertas)
+
+---
+
+## 0. Cambios de la revisión 2
+
+Cabos sueltos detectados en la revisión 1 y cómo quedan resueltos:
+
+| # | Cabo suelto | Resolución | Sección |
+|---|---|---|---|
+| R1 | Sin punto de entrada definido | `main.py` único en la raíz, con modo interfaz y modo render sin interfaz | 15 |
+| R2 | El núcleo no tenía cómo avisar hacia arriba sin importar la interfaz | **Bus de eventos** en `core/eventos.py`: flujo inverso sin dependencias inversas | 14.3 |
+| R3 | Un mismo ID para la Pieza y su Elemento | IDs distintos; el gemelo apunta a la Pieza con `fuente.ref` | 3, 8.3 |
+| R4 | Contradicción: "la carpeta solo contiene archivos con prefijo" frente a `minuto.json` | **Archivos de control con prefijo `_`** (`_minuto.json`, `_guion.txt`), que además quedan primeros al ordenar | 3.2 |
+| R5 | ¿El minuto copia la Pieza o la referencia? | **Materialización**: el minuto guarda una copia; reutilizar una Pieza = varias copias sincronizadas por el índice de referencias | 5.5, 10.4 |
+| R6 | Al cambiar una Pieza, nadie sabía qué minutos invalidar | **Índice de referencias** Pieza → Elementos → Minutos | 10.4 |
+| R7 | Fuentes con otros fps (30, 60, variable) | **Las Piezas se hornean normalizadas**: 24 fps constantes, 48 kHz | 4.2 |
+| R8 | Trim y slip sin material de sobra | **Asas**: la Pieza horneada guarda 1 s extra antes y después | 5.5 |
+| R9 | Autosave provocaba renombres cada 2 minutos | Autosave = **instantánea** en `.autosave/`, sin renombres; solo "Guardar" reconcilia | 10.3 |
+| R10 | Tareas en segundo plano leyendo el modelo mientras se edita | **Instantáneas inmutables** para los trabajadores; el modelo solo se modifica en el hilo principal | 14.4 |
+| R11 | Ripple en un minuto desplazaba los 23 siguientes (renombres en cascada) | **Alcance del ripple**: "minuto" (por defecto) o "capítulo" | 6.5 |
+| R12 | Solapamiento de Elementos en la misma capa | **Prohibido**, salvo durante una transición | 6.6 |
+| R13 | Dónde se guardan las transiciones | En el gemelo del Elemento **entrante** (`transicion_entrada`) | 8.3 |
+| R14 | Audio de los Elementos de video | Un Elemento V suena salvo que se silencie; el comando "separar audio" crea un Elemento A | 8.4 |
+| R15 | Los textos no tienen archivo de medios | Un Elemento T es **solo su `.json`**: contenido y gemelo coinciden | 8.5 |
+| R16 | Elementos más allá del final del capítulo | **Regla del marco temporal**, simétrica a la del lienzo | 6.4 |
+| R17 | ¿Qué estándar manda: el global o el del proyecto? | `config/estandar.json` solo sirve para proyectos nuevos; cada proyecto guarda **su copia** en `_proyecto.json` | 4.3 |
+| R18 | Hornear una Pieza no es una edición del modelo | Hornear es un **servicio** (produce un archivo) + un comando (actualiza la referencia) | 14.2 |
+| R19 | Faltaba el mezclador de audio | `core/motor/mezclador_audio.py` | 11.6 |
+| R20 | Medios desaparecidos | Estado **fuera de línea**: marco rojo en vista previa, aviso en el navegador | 8.6 |
+| R21 | Fuentes tipográficas y LUT no viajaban con el proyecto | Carpeta `recursos/` dentro del proyecto | 9 |
+| R22 | Estado de un minuto mezclaba lo manual y lo automático | Dos ejes: **estado de trabajo** (manual) y **estado de render** (automático) | 13.3 |
+| R23 | qwen y deep conservados hasta el final generaban confusión | Se **eliminan en E0**; su mapeo queda documentado aquí | 18 |
+| R24 | pydantic duplicaba el modelo | Modelo en `dataclasses`; serialización explícita en `proyecto_fs`; se retira pydantic | 2 |
+| R25 | Prioridad entre tareas de fondo | Cola de tareas con prioridades: interacción > banco visible > pre-render > render final | 14.4 |
 
 ---
 
@@ -41,22 +80,21 @@ por contexto**:
 
 - Un **proyecto** contiene **capítulos**. Cada capítulo mide hasta **24
   minutos** y tiene una **carpeta por minuto**.
-- Cada archivo (video, imagen, audio, texto) vive en la carpeta del minuto
-  donde empieza, y **su nombre indica el instante exacto en que aparece**.
-  Con el programa apagado, los nombres de los archivos ya cuentan la historia.
-- Se edita en **secciones pequeñas**: un minuto a la vez para el trabajo fino
-  de calidad, o el capítulo completo para el ritmo general.
-- El render final puede ser **de 1 minuto, de un rango de minutos o de los 24
-  minutos juntos**, y solo se re-renderizan los minutos que cambiaron.
-- Antes de llegar a la timeline, el material se prepara en un **Taller**
-  (sandbox), con su propia línea de tiempo, donde se hacen cortes,
-  transformaciones y efectos.
+- Cada archivo vive en la carpeta del minuto donde empieza, y **su nombre
+  indica el instante exacto en que aparece**. Con el programa apagado, los
+  nombres ya cuentan la historia.
+- Se edita en **secciones pequeñas**: un minuto a la vez para el trabajo fino,
+  o el capítulo completo para el ritmo general.
+- El render puede ser **de 1 minuto, de un rango o del capítulo completo**, y
+  solo se re-renderizan los minutos que cambiaron.
+- El material se prepara en un **Taller** (sandbox) antes de llegar a la
+  timeline.
 - Composición espacial en **píxeles sobre un lienzo 1280×720**, con capas
   apiladas y transparencias.
 
-Referencia de experiencia: un editor tipo **CapCut / Clipchamp**, con mejor
-calidad de exportación, precisión de fotograma y una organización de archivos
-legible por humanos.
+Referencia de experiencia: **CapCut / Clipchamp**, con mejor calidad de
+exportación, precisión de fotograma y una organización de archivos legible por
+humanos.
 
 ---
 
@@ -64,101 +102,157 @@ legible por humanos.
 
 | # | Decisión | Motivo |
 |---|---|---|
-| D1 | **Interfaz en Flet** con vista previa híbrida (sección 12) | Diseño moderno, multiplataforma y posible versión web. Sus límites de video se compensan con el banco de fotogramas y el pre-render |
-| D2 | **`core/` en Python puro, sin ninguna librería de interfaz** | Testeable sin ventanas; permite una futura interfaz PySide6 sin tocar el núcleo |
-| D3 | **Base de qwen + capacidades de deep** | qwen tiene la mejor organización (estado, controladores, serialización, tests); deep aporta la edición avanzada, el editor de curvas, la cola de render y los plugins |
-| D4 | **Motor PyAV** (MLT queda fuera por ahora) | PyAV se instala fácil en todos los sistemas; `motor_base` deja la puerta abierta a otros motores |
-| D5 | **Tiempo interno en fotogramas enteros** del capítulo | Precisión exacta, sin errores de redondeo |
+| D1 | **Interfaz en Flet** con vista previa híbrida | Diseño moderno y multiplataforma; sus límites de video se compensan con el banco de fotogramas y el pre-render |
+| D2 | **`core/` en Python puro, sin librería de interfaz** | Desacople total; permite un modo sin interfaz y una futura interfaz PySide6 sin tocar el núcleo |
+| D3 | **Una sola arquitectura unificada** con lo mejor de qwen y deep | Sin código duplicado ni dos caminos paralelos |
+| D4 | **Motor PyAV** (sin MLT por ahora) | Instalación sencilla en todos los sistemas; `motor_base` permite agregar otros |
+| D5 | **Tiempo interno en fotogramas enteros** del capítulo | Precisión exacta |
 | D6 | **Espacio en píxeles del lienzo 1280×720**, origen (0,0) arriba a la izquierda | Intuitivo; otras resoluciones solo multiplican por un factor |
-| D7 | **El nombre del archivo cuenta la historia (tiempo); un archivo gemelo `.json` cuenta la puesta en escena (espacio)** | El nombre sigue corto y siempre verdadero; el detalle queda completo y animable |
+| D7 | **Nombre = historia (tiempo); gemelo `.json` = puesta en escena (espacio)** | Nombres cortos y siempre verdaderos; detalle completo y animable |
 | D8 | **Todo cambio del modelo pasa por un Comando** | Deshacer y rehacer funcionan siempre |
-| D9 | **El disco se sincroniza al guardar**, no en cada arrastre | Evita renombres masivos y archivos bloqueados |
-| D10 | **Español en todo el dominio**: carpetas, archivos, JSON, clases y pantalla | Un concepto, un nombre, en todas partes |
-| D11 | **Las piezas del Taller se hornean** a un archivo | Reproducción rápida; lo pesado se calcula una sola vez |
+| D9 | **El disco se reconcilia al guardar**, no en cada arrastre | Sin renombres masivos ni archivos bloqueados |
+| D10 | **Español en todo el dominio** | Un concepto, un nombre, en todas partes |
+| D11 | **Piezas horneadas, normalizadas y con asas** | Reproducción rápida, fps uniformes, margen para trim y slip |
+| D12 | **Materialización**: cada minuto contiene copias reales de sus medios | La carpeta es autosuficiente y legible con el programa apagado |
+| D13 | **Flujo inverso por eventos** | El núcleo nunca importa capas superiores |
+| D14 | **Modelo en `dataclasses`**, serialización explícita | Un solo modelo, sin duplicar tipos |
+| D15 | **Un único `main.py`** | Un solo punto de entrada para interfaz y render sin interfaz |
+| D16 | **Solo código, sin tests** en esta etapa | Prioridad a construir la arquitectura completa |
 
-Alternativa futura documentada: una interfaz profesional en **PySide6 (Qt)**
-sobre el mismo `core/`, si se necesita reproducción multicapa a 720p en tiempo
-real.
+Alternativa futura documentada: interfaz **PySide6** sobre el mismo `core/`
+si se necesita reproducción multicapa a 720p en tiempo real.
 
 ---
 
-## 3. Nomenclatura única (glosario)
+## 3. Nomenclatura única
 
-Regla: **cada concepto se llama igual en todas partes**. Sin tildes en el
-código ni en los archivos; con tildes solo en la interfaz.
+### 3.1 Glosario
 
-| Concepto | Carpeta | Archivo / prefijo | Clave JSON | Clase Python | En pantalla |
+Regla: **cada concepto se llama igual en todas partes**. Sin tildes en código
+y archivos; con tildes solo en la interfaz.
+
+| Concepto | Carpeta | Archivos | Clave JSON | Clase | En pantalla |
 |---|---|---|---|---|---|
-| Proyecto | `MiSerie/` | `proyecto.json` | `proyecto` | `Proyecto` | Proyecto |
-| Capítulo | `cap01/` | `capitulo.json` | `capitulo` | `Capitulo` | Capítulo 01 |
-| Minuto | `cap01/min00/` | `minuto.json`, prefijo `min00_` | `minuto` | `Minuto` | Minuto 00 |
-| Global (pistas de todo el capítulo) | `cap01/global/` | mismo formato de nombre que un Elemento | `global` | `Global` | Global |
-| Bruto (original importado) | `brutos/` | `bru0001_nombre__id.ext` | `bruto` | `Bruto` | Bruto |
-| Taller (sandbox) | `taller/` | — | `taller` | `Taller` | Taller |
-| Pieza (clip preparado en el Taller) | `taller/pie0001_nombre__id/` | `pieza.json`, `pieza.mp4` / `pieza.mov` | `pieza` | `Pieza` | Pieza |
-| Elemento (algo colocado en el tiempo) | — | `min02_seg12f08_dur05s00_V2_nombre__id.ext` + gemelo `.json` | `elemento` | `Elemento` | Elemento |
-| Capa | — | `V1`…`V9`, `A1`…`A9`, `T1`…`T9` | `capa` | `Capa` | V1, A1, T1 |
-| Lienzo (cuadro 1280×720) | — | — | `lienzo` | `Lienzo` | Lienzo |
+| Proyecto | `MiSerie/` | `_proyecto.json` | `proyecto` | `Proyecto` | Proyecto |
+| Capítulo | `cap01/` | `_capitulo.json` | `capitulo` | `Capitulo` | Capítulo 01 |
+| Minuto | `cap01/min00/` | `_minuto.json`, `_guion.txt` | `minuto` | `Minuto` | Minuto 00 |
+| Global | `cap01/global/` | formato de Elemento | `global` | `Global` | Global |
+| Bruto | `brutos/video\|audio\|imagen/` | `bru0001_nombre__id.ext` | `bruto` | `Bruto` | Bruto |
+| Taller | `taller/` | — | `taller` | `Taller` | Taller |
+| Pieza | `taller/pie0001_nombre__id/` | `_pieza.json`, `pie0001_nombre__id.ext` | `pieza` | `Pieza` | Pieza |
+| Elemento | dentro de `minNN/` o `global/` | `minNN_segSSfFF_dur…_CAPA_nombre__id.ext` + gemelo `.json` | `elemento` | `Elemento` | Elemento |
+| Capa | — | `V1`–`V9`, `A1`–`A9`, `T1`–`T9` | `capa` | `Capa` | V1, A1, T1 |
+| Lienzo | — | — | `lienzo` | `Lienzo` | Lienzo |
 | Keyframe | — | — | `keyframes` | `Keyframe` | Keyframe |
-| Render (entregable) | `cap01/render/` | `cap01_min00_v003.mp4` | `render` | `Render` | Render |
-| Guion (reflejo legible) | `cap01/min00/` | `min00_guion.txt` | — | `Guion` | Guion |
+| Transición | — | — | `transicion_entrada` | `Transicion` | Transición |
+| Efecto | — | — | `efectos` | `Efecto` | Efecto |
+| Render | `cap01/render/` | `cap01_min00_v003.mp4` | `render` | `Render` | Render |
+| Recursos | `recursos/fuentes\|luts/` | — | `recursos` | — | Recursos |
 
-### 3.1 Gramática del nombre de un Elemento
+### 3.2 Reglas de archivos
+
+1. **Archivos de Elemento**: empiezan con el prefijo de su carpeta
+   (`cap01/min02/` → `min02_…`). Excepción: en `global/` el prefijo expresa el
+   minuto de inicio dentro del capítulo.
+2. **Archivos de control**: empiezan con `_` (`_proyecto.json`,
+   `_capitulo.json`, `_minuto.json`, `_guion.txt`, `_pieza.json`). Quedan
+   primeros al ordenar y nunca se confunden con Elementos.
+3. **Ceros a la izquierda en todo**: orden alfabético = orden cronológico.
+4. **Minutos del 00 al 23, como un reloj**: `min02_seg12` es `02:12` en el
+   reproductor.
+5. **IDs**: 4 caracteres hexadecimales, **únicos en todo el proyecto**
+   (Brutos, Piezas y Elementos comparten el mismo espacio de IDs). Nunca
+   cambian.
+6. **Nombre descriptivo**: minúsculas, números y guiones; máximo 32 caracteres.
+
+### 3.3 Gramática del nombre de un Elemento
 
 ```
 min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov
  │     │    │    │        │   │            │    │
- │     │    │    │        │   │            │    └ extensión (.mov si tiene transparencia)
- │     │    │    │        │   │            └ ID estable (4 caracteres hex, único en el proyecto)
- │     │    │    │        │   └ nombre descriptivo en minúsculas-con-guiones
- │     │    │    │        └ capa: V video/imagen · A audio · T texto
- │     │    │    └ duración: segundos + fotogramas
+ │     │    │    │        │   │            │    └ extensión (.mov si tiene alfa)
+ │     │    │    │        │   │            └ ID del Elemento
+ │     │    │    │        │   └ nombre descriptivo
+ │     │    │    │        └ capa: V video/imagen · A audio · T texto (1–9)
+ │     │    │    └ duración: segundos + fotogramas (dur01m05s00 si ≥ 1 min)
  │     │    └ fotograma de inicio (f00–f23)
  │     └ segundo de inicio (seg00–seg59)
  └ minuto de inicio (min00–min23)
 ```
 
-Reglas:
+Expresión regular de referencia:
 
-- **Ceros a la izquierda en todo**: el orden alfabético es el orden
-  cronológico.
-- Duración de un minuto o más: `dur01m05s00`.
-- El **ID** nunca cambia, aunque el archivo se renombre o se mueva. Es lo que
-  identifica al Elemento.
-- Los minutos van del **00 al 23, como un reloj**: `min02_seg12` es
-  exactamente `02:12` en el reproductor.
-- **La carpeta y el prefijo son idénticos**: `cap01/min02/` solo contiene
-  archivos que empiezan con `min02_`.
-- Los nombres de los Renders: `cap01_min00_v003.mp4` (un minuto),
-  `cap01_min05-08_v001.mp4` (rango), `cap01_completo_v002.mp4` (capítulo).
+```
+^min(\d{2})_seg(\d{2})f(\d{2})_dur(?:(\d{2})m)?(\d{2})s(\d{2})_([VAT][1-9])_([a-z0-9-]{1,32})__([0-9a-f]{4})\.(\w+)$
+```
+
+Otros nombres:
+
+| Objeto | Formato | Ejemplo |
+|---|---|---|
+| Bruto | `bruNNNN_nombre__id.ext` | `bru0001_toma-calle__7c21.mp4` |
+| Pieza (carpeta y archivo) | `pieNNNN_nombre__id` | `pie0001_puerta-abre__5e1c.mov` |
+| Render de un minuto | `capCC_minMM_vNNN.mp4` | `cap01_min00_v003.mp4` |
+| Render de un rango | `capCC_minMM-MM_vNNN.mp4` | `cap01_min05-08_v001.mp4` |
+| Render del capítulo | `capCC_completo_vNNN.mp4` | `cap01_completo_v002.mp4` |
+
+### 3.4 Convenciones de código
+
+| Aspecto | Convención |
+|---|---|
+| Python | 3.12 o superior, con anotaciones de tipo |
+| Módulos y funciones | `snake_case` en español sin tildes (`nomenclatura.py`, `evaluar()`) |
+| Clases | `PascalCase` en español sin tildes (`Capitulo`, `Elemento`) |
+| Constantes | `MAYUSCULAS` (`LIENZO_ANCHO`) |
+| Modelo | `dataclasses` |
+| Comandos | verbo + sustantivo (`MoverElemento`, `RecortarElemento`) |
+| Eventos | sustantivo + participio (`ElementoCambiado`, `MinutoInvalidado`) |
+| Imports | absolutos desde `editor.` y solo hacia capas inferiores (sección 14) |
 
 ---
 
 ## 4. Estándar objetivo HD720-24
 
-Un único estándar para toda la cadena, definido en un solo lugar
-(`core/estandar.py` + `config/estandar.json`).
+### 4.1 Valores
 
 | Parámetro | Valor |
 |---|---|
 | Lienzo | **1280 × 720 px** |
-| Origen | **(0, 0) = esquina superior izquierda** |
-| Ejes | X hacia la derecha, **Y hacia abajo** |
-| Fotogramas por segundo | **24 fps** (coincide con `f00`–`f23`) |
-| Píxel | Cuadrado (1:1) |
+| Origen | **(0, 0) = esquina superior izquierda**; X a la derecha, **Y hacia abajo** |
+| Fotogramas por segundo | **24 fps constantes** |
+| Píxel | Cuadrado |
 | Color | sRGB / BT.709, 8 bits por canal |
 | Composición interna | **RGBA con alfa premultiplicado** |
 | Audio | 48 kHz, estéreo |
 | Render final | H.264, CRF 18, yuv420p, AAC 192 kbps, `.mp4` |
-| Piezas con transparencia | ProRes 4444, `.mov` |
-| Piezas opacas | H.264 alta calidad, `.mp4` |
-| Banco de vista previa | 20 % = **256 × 144 px**, 10 fps; JPEG (opaco) o WebP (con alfa) |
-| Vista previa pre-renderizada | 960 × 540 (hasta 1280 × 720), 24 fps, H.264 `ultrafast` |
+| Banco de vista previa | 256 × 144 px, 10 fps; JPEG (opaco) o WebP (con alfa) |
+| Vista previa pre-renderizada | 960 × 540, 24 fps, H.264 `ultrafast` |
 
-**Regla del marco:** lo que está dentro del lienzo se ve. Lo que está fuera
-existe, se guarda y se puede animar, pero no aparece ni en la vista previa ni
-en el render. Un elemento parcialmente dentro se recorta en el borde; uno
-totalmente fuera no se procesa.
+**Regla del marco espacial:** lo que está dentro del lienzo se ve; lo que está
+fuera existe, se guarda y se anima, pero no se muestra ni se renderiza.
+
+### 4.2 Normalización de Piezas
+
+Al hornear, toda Pieza queda en un formato uniforme:
+
+| Parámetro | Valor |
+|---|---|
+| Fotogramas por segundo | 24 constantes (se convierten 25, 30, 60 y variables) |
+| Resolución | La original, limitada a **2560 × 1440** (margen para ampliar sin perder calidad) |
+| Video opaco | H.264 alta calidad (CRF 14), `.mp4` |
+| Video con alfa | ProRes 4444, `.mov` |
+| Imagen | PNG (o WebP), sin horneado de video |
+| Audio | WAV 48 kHz estéreo (dentro del video o suelto) |
+| Asas | **1 s extra** antes y después del tramo usado, si el Bruto lo permite |
+
+Así el motor solo trabaja con fuentes de 24 fps y 48 kHz.
+
+### 4.3 Dónde vive el estándar
+
+- `editor/core/estandar.py`: la clase `Estandar` y los valores por defecto.
+- `config/estandar.json`: valores para **proyectos nuevos**.
+- `_proyecto.json`: **copia propia de cada proyecto**. Es la que manda al
+  editar y renderizar ese proyecto.
 
 ---
 
@@ -167,67 +261,58 @@ totalmente fuera no se procesa.
 ### 5.1 Todo es una Composición
 
 Una **Pieza**, un **Minuto** y un **Capítulo** son el mismo tipo de objeto:
-una línea de tiempo con Elementos. Un Elemento puede apuntar a un archivo **o
-a otra composición** (el concepto de pre-composición de After Effects o de
-clip compuesto de Final Cut y DaVinci, llevado a todo el sistema).
+una línea de tiempo con Elementos. Un solo motor, un solo compositor y un solo
+historial para todos los niveles.
 
 ```
 CAPÍTULO  (composición de hasta 24 min)
  ├── Global: música, narración, títulos generales
- └── MINUTO 00 … MINUTO 23  (composiciones de 60 s)
-       └── Elementos que apuntan a PIEZAS  (composiciones cortas del Taller)
-             └── Elementos que apuntan a BRUTOS  (archivos originales)
+ └── MINUTO 00 … MINUTO 23  (ventanas de 60 s)
+       └── Elementos (copias de Piezas horneadas)
+             └── Pieza (composición corta del Taller)
+                   └── Brutos (originales)
 ```
-
-Consecuencia: **un solo motor**. El mismo editor, compositor, render e
-historial de deshacer funcionan en todos los niveles; solo cambia la escala de
-tiempo.
 
 ### 5.2 Los minutos son ventanas sobre un capítulo continuo
 
 - El **capítulo es la línea de tiempo real y continua**.
-- Cada **minuto es una ventana de 60 s** sobre ella, con su carpeta, sus
-  archivos y su editor.
-- Un Elemento **vive en la carpeta del minuto donde empieza**, pero puede
-  **desbordarse** al siguiente. El minuto siguiente lo muestra como "entra
-  desde min02" (referencia fantasma, sin copiar el archivo).
+- Cada **minuto es una ventana de 60 s** con su carpeta y su editor.
+- Un Elemento **vive en la carpeta del minuto donde empieza** y puede
+  **desbordarse** al siguiente, que lo muestra como referencia fantasma
+  ("entra desde min02").
 - Las transiciones que cruzan el límite de un minuto funcionan, porque el
   render de un minuto recorta la ventana del capítulo continuo.
-- Lo que abarca todo el capítulo (música, narración) vive en `global/`.
 
 ### 5.3 Capas de trabajo (tiers)
 
 ```
-DESARROLLO (abstracto)                    REPRODUCCIÓN (lo que se ve)
-─────────────────────────                 ─────────────────────────────
-T0  BRUTOS                                T2  MINUTO
-    originales importados,                    60 s, composición de Piezas,
-    nunca se modifican                        capas V1..V9 / A1..A9 / T1..T9
-        │                                         │
-        ▼                                         ▼
-T1  TALLER (sandbox)                      T3  CAPÍTULO
-    Piezas: recortes, color,                  24 minutos + Global
-    velocidad, estabilizar,                       │
-    transform, efectos.                           ▼
-    Cada Pieza tiene su propia            T4  RENDER
-    mini-timeline                             1 minuto, un rango
-        │                                     o el capítulo completo
-        └──── se coloca en ──────────►
+DESARROLLO                                REPRODUCCIÓN
+T0  BRUTOS    originales, intocables      T2  MINUTO     60 s, capas V/A/T
+T1  TALLER    Piezas con mini-timeline    T3  CAPÍTULO   24 minutos + Global
+              → horneado normalizado      T4  RENDER     1 min, rango o capítulo
 ```
 
-Cada tier consume el resultado del anterior.
-
-### 5.4 Por qué el Taller va separado de la timeline
+### 5.4 Por qué el Taller va separado
 
 | | Todo en la timeline | Taller separado |
 |---|---|---|
-| Timeline limpia | ❌ | ✅ Solo lo que va en el video |
-| Reutilizar una pieza en varios minutos | ❌ Copiar | ✅ Una Pieza, muchas apariciones |
-| Operaciones pesadas | ❌ Se recalculan en cada vista previa | ✅ Se hornean una vez |
-| Experimentar sin miedo | ❌ | ✅ |
+| Timeline limpia | ❌ | ✅ |
+| Reutilizar una Pieza en varios minutos | ❌ | ✅ |
+| Operaciones pesadas | ❌ Se recalculan | ✅ Se hornean una vez |
+| Experimentar sin riesgo | ❌ | ✅ |
 
-Ida y vuelta: doble clic en un Elemento del minuto abre su Pieza en el
-Taller; al guardar la Pieza, el minuto se actualiza.
+Ida y vuelta: doble clic en un Elemento abre su Pieza en el Taller; al volver a
+hornearla, todas sus copias se actualizan.
+
+### 5.5 Materialización y asas
+
+- Colocar una Pieza en un minuto **copia su archivo horneado** a la carpeta del
+  minuto con el nombre del Elemento. La carpeta queda autosuficiente.
+- La misma Pieza en tres minutos = tres copias. El **índice de referencias**
+  (10.4) las mantiene sincronizadas cuando la Pieza se vuelve a hornear.
+- Las Piezas son cortas, así que el costo en disco es acotado.
+- Las **asas** (1 s extra a cada lado) permiten trim y slip sin volver al Taller.
+- Imágenes y audio siguen la misma regla: se copian al minuto (o a `global/`).
 
 ---
 
@@ -236,53 +321,61 @@ Taller; al guardar la Pieza, el minuto se actualiza.
 ### 6.1 Jerarquía
 
 ```
-Proyecto
- └── Capítulo  ── hasta 24 minutos
-      └── Minuto  ── 60 segundos
-           └── Segundo  ── 24 fotogramas
-                └── Fotograma  ← unidad mínima e indivisible
+Proyecto → Capítulo (≤ 24 min) → Minuto (60 s) → Segundo (24 f) → Fotograma
 ```
 
 ### 6.2 Reglas
 
 - Internamente **todo es un número entero de fotogramas del capítulo**.
-- Minuto, segundo, fotograma y el nombre del archivo son **vistas calculadas**
-  de ese número:
+- Minuto, segundo, fotograma y nombre son **vistas calculadas**:
+  `3176 = minuto 02, segundo 12, fotograma 08 = "min02_seg12f08"`.
+- fps como fracción exacta (`Fraction(24, 1)`).
+- Conversión **reversible**: nombre → fotograma → nombre devuelve el mismo texto.
+- **Keyframes relativos al inicio del Elemento**, en fotogramas.
 
-  ```
-  fotograma 3176 del capítulo (24 fps)
-    = minuto 02, segundo 12, fotograma 08
-    = "min02_seg12f08"
-  ```
+### 6.3 Tiempo de un Elemento
 
-- La tasa de fotogramas es una fracción exacta (`Fraction(24, 1)`), nunca un
-  decimal.
-- La conversión es **reversible**: nombre → fotograma → nombre devuelve
-  exactamente el mismo texto.
-- Los keyframes se guardan **relativos al inicio del Elemento**, en
-  fotogramas. Mover el Elemento no obliga a reescribirlos.
+| Propiedad | Unidad | Significado |
+|---|---|---|
+| `inicio` | fotograma del capítulo | Sale del nombre |
+| `duracion` | fotogramas | Sale del nombre |
+| `fuente_entrada` | fotograma de la Pieza (24 fps) | Desde dónde se usa la Pieza (incluye las asas) |
+| `velocidad` | factor | 1.0 normal; negativo = reversa |
 
-### 6.3 Dimensiones de tiempo de un Elemento
+Como las Piezas están normalizadas a 24 fps, `fuente_entrada` siempre está en
+la misma unidad que el capítulo.
 
-| Propiedad | Significado |
-|---|---|
-| `inicio` | Fotograma del capítulo donde empieza (sale del nombre) |
-| `duracion` | Fotogramas que dura (sale del nombre) |
-| `fuente_entrada` | Desde qué fotograma del archivo se empieza a usar |
-| `velocidad` | 1.0 normal, 2.0 rápido, 0.5 lento, negativo = reversa |
+### 6.4 Regla del marco temporal
 
-### 6.4 Ediciones de tiempo (de deep)
+Simétrica a la del lienzo: lo que queda **después del final del capítulo**
+existe y se guarda, pero no se reproduce ni se renderiza. El capítulo define
+su `duracion` (por defecto 24:00, máximo 24:00). Las 24 carpetas `min00`–`min23`
+se crean siempre; las que quedan después del final se muestran atenuadas.
+
+### 6.5 Ediciones de tiempo
 
 | Edición | Qué cambia | Qué queda fijo |
 |---|---|---|
-| Trim | Entrada o salida del Elemento | Todo lo demás; queda un hueco |
-| Ripple | Entrada o salida | Los Elementos siguientes se corren para no dejar hueco |
+| Trim | Entrada o salida | Todo lo demás; queda un hueco |
+| Ripple | Entrada o salida | Los siguientes se corren para no dejar hueco |
 | Roll | El corte entre dos Elementos | La duración total |
-| Slip | El contenido (`fuente_entrada`) | La posición en la timeline |
-| Slide | La posición del Elemento | Su contenido; los vecinos se ajustan |
+| Slip | `fuente_entrada` | La posición en la timeline |
+| Slide | La posición | El contenido; los vecinos se ajustan |
 
-Ripple, Roll y Slide tocan varios Elementos a la vez; se implementan como
-**comandos compuestos** para deshacerse en un solo paso.
+**Alcance del ripple** (R11):
+- **Minuto** (por defecto): solo se desplazan los Elementos del mismo minuto.
+  Si algo empuja más allá del segundo 59, se desborda al siguiente.
+- **Capítulo**: se desplaza todo lo posterior en el capítulo. Provoca renombres
+  y movimientos de carpeta en cascada al guardar; la interfaz lo avisa.
+
+Ripple, Roll y Slide tocan varios Elementos: se implementan como **comandos
+compuestos**.
+
+### 6.6 Reglas de capa
+
+- **Dos Elementos no se solapan en la misma capa**, salvo durante su transición.
+- Orden de apilado: V1 (fondo) … V9, luego T1 … T9 (textos siempre encima).
+- Las capas A no tienen orden visual; se mezclan todas.
 
 ---
 
@@ -297,106 +390,96 @@ Ripple, Roll y Slide tocan varios Elementos a la vez; se implementan como
   Y   │     (200,150)                            │
   ↓   │        ┌────────────┐                    │
   │   │        │ Elemento   │ ← ancla en (0,0)   │
-  │   │        │ 400 × 300  │   de sí mismo      │
-  │   │        └────────────┘                    │
+  │   │        └────────────┘   de sí mismo      │
   │   └──────────────────────────────────────────┘ ┌────┐
 (0,720)                                   (1280,720)│    │ ← fuera: existe,
                                                     └────┘   no se ve
 ```
 
-### 7.2 Propiedades espaciales de un Elemento
+### 7.2 Propiedades espaciales
 
 | Propiedad | Unidad | Por defecto | Significado |
 |---|---|---|---|
-| `x`, `y` | px del lienzo | `0, 0` | Dónde cae el ancla del Elemento en el lienzo |
-| `ancla_x`, `ancla_y` | px del propio Elemento | `0, 0` | Punto que se coloca en (x, y); centro de giro y escala |
-| `ancho`, `alto` | px | tamaño original | Tamaño natural del archivo (solo lectura) |
-| `escala_x`, `escala_y` | factor | `1.0` | 0.5 = mitad, 2.0 = doble; negativo = espejo |
+| `x`, `y` | px del lienzo | `0, 0` | Dónde cae el ancla |
+| `ancla_x`, `ancla_y` | px del Elemento | `0, 0` | Punto de colocación, giro y escala |
+| `ancho`, `alto` | px | tamaño original | Solo lectura |
+| `escala_x`, `escala_y` | factor | `1.0` | Negativo = espejo |
 | `rotacion` | grados | `0` | Sentido horario |
-| `recorte` | px (izq, arr, der, abj) | `0,0,0,0` | Recorta el Elemento antes de colocarlo |
-| `opacidad` | 0.0 – 1.0 | `1.0` | Transparencia global |
+| `recorte` | px (izq, arr, der, abj) | `0,0,0,0` | Antes de colocar |
+| `opacidad` | 0.0–1.0 | `1.0` | |
 | `mezcla` | modo | `normal` | normal, multiplicar, pantalla, superponer, sumar |
-| `ajuste_inicial` | modo | `original` | Al colocarlo: original, encajar, llenar, estirar |
+| `ajuste_inicial` | modo | `original` | original, encajar, llenar, estirar (solo al colocar) |
 
-- Con el ancla por defecto, **`x, y` es la esquina superior izquierda**.
+- Con el ancla por defecto, `x, y` es la esquina superior izquierda.
 - Al mover el ancla, el editor compensa `x, y` para que el Elemento no salte.
-- Se permiten coordenadas negativas y mayores que el lienzo (animaciones de
-  entrada y salida).
-- **Todas las propiedades son animables con keyframes**.
+- Coordenadas negativas y mayores que el lienzo permitidas.
+- **Todas las propiedades son animables.**
 
 ### 7.3 Cálculo
-
-Todas las propiedades se combinan en una matriz afín 2×3:
 
 ```
 M = Trasladar(x, y) · Rotar(rotacion) · Escalar(escala_x, escala_y) · Trasladar(-ancla_x, -ancla_y)
 ```
 
-Proceso por Elemento y por fotograma:
-
-1. Rectángulo que ocupa en el lienzo (sus 4 esquinas transformadas).
-2. **Descarte**: si no toca el lienzo, se salta sin decodificar.
+1. Rectángulo transformado (4 esquinas).
+2. **Descarte** si no toca el lienzo: ni se decodifica.
 3. **Región de interés**: intersección con el lienzo.
 4. `cv2.warpAffine` solo sobre esa región.
-5. Mezcla sobre el lienzo con opacidad y modo de mezcla.
+5. Mezcla con opacidad y modo.
 
-Para cualquier otra resolución (vista previa al 20 %, exportación distinta) se
-multiplica la matriz por un factor de escala. Lo que se ve es lo que se
-exporta.
+Para otra resolución se multiplica la matriz por un factor. Lo que se ve es lo
+que se exporta.
 
 ---
 
 ## 8. El Elemento: bloque fundamental
 
-El Elemento es **una ventana de tiempo sobre un archivo, colocada en el
-lienzo y en la timeline, cuyas propiedades son parámetros animables**.
+**Una ventana de tiempo sobre un archivo, colocada en el lienzo y en la
+timeline, cuyas propiedades son parámetros animables.**
 
 ### 8.1 Dimensiones
 
 | Dimensión | Contenido |
 |---|---|
-| Identidad | `id`, nombre, capa, estado (activo, bloqueado, silenciado), vínculos |
-| Fuente | Referencia a un Bruto o a una Pieza; nunca contiene el video |
+| Identidad | `id`, nombre, capa, estado (activo, bloqueado, silenciado) |
+| Fuente | Pieza de origen (`fuente.ref`) y archivo materializado |
 | Tiempo | `inicio`, `duracion`, `fuente_entrada`, `velocidad` |
 | Espacio | Sección 7.2 |
 | Apariencia | Pila ordenada de efectos |
-| Audio | `volumen`, `paneo`, fundidos |
-| Animación | Keyframes sobre cualquier parámetro |
-| Relaciones | Capa, transiciones con vecinos, desborde a otro minuto |
+| Audio | `volumen`, `paneo`, `silenciado`, fundidos |
+| Animación | Keyframes sobre cualquier parámetro numérico |
+| Relaciones | Capa, `transicion_entrada`, desborde |
 
-### 8.2 Capacidad central: evaluarse
+### 8.2 Evaluación
 
 ```
 elemento.evaluar(fotograma N)
-  1. ¿Estoy activo en N?                 → si no, no aporto nada
-  2. ¿Toco el lienzo?                    → si no, no aporto nada
-  3. N → fotograma de la fuente          → tiempo (fuente_entrada, velocidad)
-  4. Pido ese fotograma al motor         → PyAV + caché
-  5. Evalúo mis parámetros en N          → keyframes interpolados
-  6. Aplico efectos en orden
-  7. Devuelvo imagen RGBA + matriz       → al compositor
+  1. ¿Activo en N (y dentro del marco temporal)?   → si no, nada
+  2. ¿Toca el lienzo?                               → si no, nada
+  3. N → fotograma de la fuente                     (fuente_entrada, velocidad)
+  4. Fotograma al motor                             (PyAV + caché)
+  5. Parámetros en N                                (keyframes interpolados)
+  6. Efectos en orden
+  7. Imagen RGBA + matriz                           → compositor
 ```
 
-El monitor, las miniaturas, la vista previa y el render usan exactamente este
-mismo proceso; solo cambia el destino y la resolución.
+Monitor, miniaturas, vista previa y render usan este mismo proceso.
 
 ### 8.3 Archivo gemelo
 
-Cada Elemento son **dos archivos con el mismo nombre base**:
-
 ```
-min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov    ← contenido (qué se ve)
-min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.json   ← gemelo (cómo y dónde)
+min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov    ← contenido
+min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.json   ← gemelo
 ```
 
 ```json
 {
   "id": "a3f9",
-  "fuente": { "tipo": "pieza", "ref": "pie0001_puerta-abre__a3f9" },
+  "fuente": { "tipo": "pieza", "ref": "5e1c", "version": 3 },
   "tiempo": {
     "inicio": "min02_seg12f08",
     "duracion": "dur05s00",
-    "fuente_entrada": 0,
+    "fuente_entrada": 24,
     "velocidad": 1.0
   },
   "espacio": {
@@ -415,32 +498,64 @@ min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.json   ← gemelo (cómo y dónde)
     ]
   },
   "efectos": [],
-  "audio": { "volumen": 1.0, "paneo": 0.0 }
+  "transicion_entrada": { "tipo": "fundido", "duracion": 12 },
+  "audio": { "volumen": 1.0, "paneo": 0.0, "silenciado": false },
+  "estado": { "activo": true, "bloqueado": false }
 }
 ```
 
-### 8.4 Reparto de la información
+- `fuente_entrada: 24` = empieza tras el segundo de asa inicial.
+- `fuente.version` permite detectar copias desactualizadas de una Pieza.
+- `transicion_entrada` va en el Elemento entrante; su duración es el solape
+  permitido con el anterior en la misma capa.
+
+### 8.4 Audio de los Elementos de video
+
+- Un Elemento V con audio **suena** salvo que esté silenciado.
+- **Separar audio** crea un Elemento A que referencia la misma Pieza y silencia
+  el V. Ambos quedan independientes.
+
+### 8.5 Elementos de texto
+
+Un Elemento T **no tiene archivo de medios**: su `.json` es a la vez contenido y
+gemelo:
+
+```
+min02_seg14f00_dur03s00_T1_titulo-capitulo__d4e2.json
+```
+
+Añade al gemelo la sección `texto`: contenido, fuente (de `recursos/fuentes/`),
+tamaño, color, contorno, sombra, alineación y animación de entrada y salida.
+
+### 8.6 Medios fuera de línea
+
+Si falta el archivo de un Elemento:
+- En la vista previa se muestra un **marco rojo** con su nombre.
+- El navegador marca el minuto con un aviso.
+- Si la Pieza de origen existe, se ofrece **rematerializar** la copia.
+- El render se bloquea hasta resolverlo (o se renderiza con el marco, a elección).
+
+### 8.7 Reparto de la información
 
 | Dónde | Qué guarda |
 |---|---|
-| Carpeta (`cap01/min02/`) | Capítulo y minuto: contexto grueso |
+| Carpeta | Capítulo y minuto |
 | Nombre | Inicio, duración, capa, nombre, ID: **la historia** |
-| Gemelo `.json` | Espacio, keyframes, efectos, detalle de tiempo: **la puesta en escena** |
-| `minuto.json` | Solo datos del minuto: notas, estado, huella de render |
-| `min02_guion.txt` | Reflejo legible generado al guardar; nunca se edita ni se lee |
+| Gemelo `.json` | Espacio, keyframes, efectos, transición, audio: **la puesta en escena** |
+| `_minuto.json` | Estado de trabajo, notas, huella y último render |
+| `_guion.txt` | Reflejo legible generado al guardar; nunca se lee |
 
 La posición espacial **no va en el nombre**: tiene muchas dimensiones, suele
-estar animada y cambia constantemente. En el nombre sería incompleta y
-obligaría a renombrar en cada ajuste.
+estar animada y cambia constantemente.
 
-Ejemplo de guion generado:
+Ejemplo de `_guion.txt`:
 
 ```
 MINUTO 02 · cap01 · lienzo 1280×720 · 24 fps
 ───────────────────────────────────────────────────────────────────
 02:00.00  V1  ciudad-amanece   12s08  pos (0,0)       esc 1.00  pantalla completa
 02:12.08  V2  puerta-abre       5s00  pos (-400,150)→(200,150)  entra desde izquierda
-02:14.00  V3  logo              3s00  pos (1080,20)   esc 0.50  esquina sup. derecha
+02:14.00  T1  titulo-capitulo   3s00  pos (440,600)             texto
 02:17.08  A1  dialogo-juan     40s00  —               vol 100 %
 ```
 
@@ -450,86 +565,113 @@ MINUTO 02 · cap01 · lienzo 1280×720 · 24 fps
 
 ```
 MiSerie/                                    ← PROYECTO
-├── proyecto.json                           estándar, lista de capítulos
+├── _proyecto.json                          estándar propio, capítulos, contador de IDs
 ├── brutos/                                 T0 · originales, nunca se modifican
 │   ├── video/   bru0001_toma-calle__7c21.mp4
 │   ├── audio/   bru0002_entrevista__91be.wav
 │   └── imagen/  bru0003_logo__0f3a.png
 ├── taller/                                 T1 · sandbox
-│   └── pie0001_puerta-abre__a3f9/
-│       ├── pieza.json                      receta: fuente, recortes, efectos, transform
-│       └── pieza.mov                       resultado horneado (.mp4 si es opaca)
+│   └── pie0001_puerta-abre__5e1c/
+│       ├── _pieza.json                     receta + versión + referencias
+│       └── pie0001_puerta-abre__5e1c.mov   horneado normalizado (.mp4 si es opaco)
+├── recursos/
+│   ├── fuentes/                            .ttf / .otf usados por los textos
+│   └── luts/                               .cube
 ├── cap01/                                  ← CAPÍTULO
-│   ├── capitulo.json
+│   ├── _capitulo.json                      título, duración, registro de renders
 │   ├── global/
 │   │   ├── min00_seg00f00_dur24m00s00_A1_musica-tema__c810.wav
 │   │   └── min00_seg00f00_dur24m00s00_A1_musica-tema__c810.json
 │   ├── min00/                              ← MINUTO 00:00–00:59
-│   │   ├── minuto.json
-│   │   ├── min00_guion.txt
+│   │   ├── _minuto.json
+│   │   ├── _guion.txt
 │   │   ├── min00_seg00f00_dur12s08_V1_ciudad-amanece__4b7e.mp4
 │   │   ├── min00_seg00f00_dur12s08_V1_ciudad-amanece__4b7e.json
 │   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov
-│   │   └── min00_seg12f08_dur05s00_V2_puerta-abre__a3f9.json
+│   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f9.json
+│   │   └── min00_seg14f00_dur03s00_T1_titulo-capitulo__d4e2.json
 │   ├── min01/ … min23/
 │   └── render/
 │       ├── cap01_min00_v003.mp4
-│       ├── cap01_min05-08_v001.mp4
 │       └── cap01_completo_v002.mp4
 ├── cap02/ …
 ├── .diario/                                operaciones de disco pendientes
-└── .cache/                                 BORRABLE: bancos, vistas previas, formas de onda
+├── .autosave/                              instantáneas del modelo
+└── .cache/                                 BORRABLE: bancos, pre-renders, ondas, audio de vista previa
 ```
 
-Con el programa cerrado, abrir `cap01/min00/` ya cuenta el minuto en orden.
+Importar un archivo **lo copia a `brutos/`** (el proyecto es autosuficiente).
 
 ---
 
 ## 10. Sincronización disco–modelo
 
-**Principio:** el modelo en memoria es la verdad mientras se edita. Al
-guardar, el disco se convierte en su reflejo legible. Con el programa
-apagado, el disco cuenta la historia completa.
+**Principio:** el modelo en memoria es la verdad mientras se edita. Al guardar,
+el disco pasa a ser su reflejo legible. Con el programa apagado, el disco
+cuenta la historia completa.
+
+### 10.1 Problemas y soluciones
 
 | Problema | Solución |
 |---|---|
-| Renombrar en cada arrastre | El modelo cambia al instante; **los archivos se renombran al guardar** |
-| Archivo en uso (Windows) | El reconciliador libera el archivo, renombra y reintenta |
-| Corte a mitad de operación | **Diario** en `.diario/`: primero se escribe el plan y luego se ejecuta; al reabrir se completa o se revierte |
-| Deshacer | Solo cambia el modelo; el reconciliador vuelve a sincronizar los nombres |
-| El nombre no cabe todo | El gemelo `.json` guarda el detalle |
-| Se pierde un gemelo | El **escáner** rescata tiempo y capa desde el nombre y coloca el Elemento en (0,0), escala 1: se pierde la puesta en escena, nunca la historia |
-| Duplicar archivos pesados | Los Brutos quedan en `brutos/`; en los minutos van Piezas horneadas cortas |
-| Renombres manuales | El ID estable permite reconocer el archivo |
+| Renombrar en cada arrastre | Se reconcilia **al guardar** |
+| Elemento que cambia de minuto | El reconciliador **mueve** los archivos de carpeta, no solo los renombra |
+| Archivo en uso (Windows) | Liberar recursos del motor, renombrar, reintentar |
+| Corte a mitad de operación | **Diario** en `.diario/`: plan escrito antes de ejecutar; al abrir se completa o se revierte |
+| Deshacer | Solo cambia el modelo; el siguiente guardado reconcilia |
+| Se pierde un gemelo | El **escáner** rescata tiempo y capa del nombre; espacio por defecto |
+| Renombre manual | El ID permite reconocer el archivo |
+| Rutas largas en Windows | Nombre descriptivo ≤ 32 caracteres; aviso si la ruta supera 240 |
 
-Componentes:
+### 10.2 Componentes
 
-- **`estructura`**: crea el proyecto, los capítulos y las carpetas `min00`–`min23`.
-- **`reconciliador`**: compara modelo y disco, calcula el plan de renombres,
-  lo escribe en el diario y lo ejecuta. El contenido y su gemelo se renombran
-  siempre juntos.
+- **`estructura`**: crea proyecto, capítulos y `min00`–`min23`.
+- **`gemelo`**: lee y escribe el `.json` de cada Elemento.
+- **`diario`**: registra y ejecuta operaciones atómicas (copiar, mover, renombrar, borrar).
+- **`reconciliador`**: compara modelo y disco, genera el plan y lo pasa al diario.
+  Contenido y gemelo siempre juntos.
 - **`escaner`**: reconstruye el modelo leyendo carpetas, nombres y gemelos.
+- **`guion`**: genera `_guion.txt`.
+
+### 10.3 Guardar frente a autosave
+
+| | Guardar | Autosave |
+|---|---|---|
+| Cuándo | El usuario lo pide | Cada 120 s si hay cambios |
+| Qué escribe | Renombres, movimientos, gemelos, manifiestos, guion | Una **instantánea** del modelo en `.autosave/` |
+| Renombra archivos | ✅ | ❌ |
+| Al abrir el proyecto | — | Si la instantánea es más reciente que el disco, se ofrece restaurarla |
+
+### 10.4 Índice de referencias
+
+El Proyecto mantiene en memoria (y reconstruye al abrir):
+
+```
+Bruto  → Piezas que lo usan
+Pieza  → Elementos que son copias suyas
+Elemento → Minuto donde vive (y minutos donde se desborda)
+```
+
+Usos:
+- **Volver a hornear una Pieza** → se actualizan todas sus copias y se invalidan
+  sus minutos.
+- **Borrar un Bruto o una Pieza** → se avisa qué depende de ellos.
+- **Huella de un minuto** → sabe qué Elementos le afectan.
 
 ---
 
-## 11. Motor de composición y transparencias
+## 11. Motor de composición, transparencias y audio
 
 ### 11.1 Apilado
 
-```
-V1 (fondo)   ciudad.mp4           → lienzo
-V2           personaje.mov (alfa) → encima de V1
-V3           logo.png (alfa)      → encima de V2
-T1           título (texto)       → encima de todo
-```
-
-Mezcla "sobre" con alfa premultiplicado, que evita halos oscuros en los bordes:
+Mezcla "sobre" con alfa premultiplicado:
 
 ```
 resultado = frente + fondo × (1 − alfa_frente)
 ```
 
-Las capas se procesan de abajo hacia arriba: V1…V9 y después T1…T9.
+Orden: V1 … V9, luego T1 … T9, más los Elementos desbordados del minuto
+anterior y los de `global/`.
 
 ### 11.2 Formatos con transparencia
 
@@ -538,146 +680,303 @@ Las capas se procesan de abajo hacia arriba: V1…V9 y después T1…T9.
 | PNG, WebP, GIF | ✅ | Imágenes |
 | ProRes 4444 `.mov` | ✅ | **Formato de las Piezas con alfa** |
 | QuickTime Animation / PNG en `.mov` | ✅ | Sin pérdida, pesado |
-| VP9 `.webm` | ⚠️ | Solo con el decodificador libvpx |
-| Secuencia de PNG | ✅ | |
-| MP4 H.264 / H.265 | ❌ | Siempre opaco |
+| VP9 `.webm` | ⚠️ | Solo con libvpx; al hornear se convierte a ProRes 4444 |
+| MP4 H.264 / H.265 | ❌ | Opaco |
 
 Sin alfa de origen, la transparencia se crea en el Taller (croma, máscaras,
-recortes) y se hornea con alfa.
+recortes) y se hornea.
 
 ### 11.3 Librerías
 
 | Librería | Uso |
 |---|---|
-| PyAV | Decodificar video y audio (alfa incluido); codificar el render |
-| Pillow | Imágenes, PNG con alfa, texto con fuentes TTF |
+| PyAV | Decodificar y codificar video y audio |
+| Pillow | Imágenes, texto con fuentes TTF |
 | OpenCV | `warpAffine`, escalado, color, croma |
-| numpy | Mezcla, opacidad, modos de mezcla |
+| numpy | Mezcla, opacidad, modos de mezcla, audio |
 | numba (opcional) | Acelerar bucles de píxeles |
-| moderngl (futuro) | Composición por GPU si hace falta más potencia |
+| moderngl (futuro) | Composición por GPU |
 
-Interpolación: `INTER_AREA` para reducir, `INTER_LINEAR` al arrastrar en vivo,
+Interpolación: `INTER_AREA` para reducir, `INTER_LINEAR` al arrastrar,
 `INTER_CUBIC` / `INTER_LANCZOS4` para ampliar y para el render final.
 
 ### 11.4 Optimizaciones
 
-- **Descarte** de Elementos fuera del lienzo: costo cero.
-- **Región de interés**: solo se transforma la zona visible.
-- **Caché** de imágenes fijas ya transformadas mientras sus parámetros no cambien.
-- **Caché de fotogramas** decodificados (LRU, 512 MB por defecto).
-- Decodificar al tamaño necesario, no siempre a resolución completa.
+- Descarte fuera del lienzo y fuera del marco temporal.
+- Región de interés.
+- Caché de imágenes fijas transformadas.
+- Caché LRU de fotogramas decodificados (512 MB por defecto).
+- Decodificar al tamaño necesario.
 
-### 11.5 Escalabilidad estimada (a validar en la épica E6)
+### 11.5 Escalabilidad estimada
 
 | Escenario | Límite práctico estimado |
 |---|---|
 | Imágenes fijas | Decenas de capas |
-| Video 720p por capa | ~5–8 capas simultáneas en vista previa a 720p |
+| Video 720p por capa | ~5–8 capas en vista previa a 720p |
 | Vista previa al 20 % | ~10–15 capas a 10 fps |
 | Render final | Sin límite; solo tarda más |
+
+Estimaciones a confirmar con el propio programa durante E7.
+
+### 11.6 Mezclador de audio
+
+- Suma todos los Elementos A, el audio de los V no silenciados y `global/`.
+- Aplica volumen, paneo, fundidos y keyframes de volumen.
+- Salidas: audio de vista previa del minuto o del capítulo (en `.cache/`) y
+  audio final del capítulo en una sola pasada (sección 13).
+- Limitador suave para evitar saturación.
 
 ---
 
 ## 12. Vista previa híbrida en 4 niveles
 
-Flet no está pensado para enviar 24 imágenes grandes por segundo desde Python.
-La solución combina cuatro niveles:
-
 ```
                        ┌──────────────────────────────────────┐
   AL IMPORTAR ────────►│ NIVEL 0: BANCO DE FOTOGRAMAS          │
-  (segundo plano)      │ 256×144 · 10 fps · JPEG / WebP alfa  │
+                       │ 256×144 · 10 fps · JPEG / WebP alfa  │
                        │ + tira de miniaturas + forma de onda │
                        └──────────────┬───────────────────────┘
           ┌─────────────────┬─────────┴────────┬───────────────────┐
           ▼                 ▼                  ▼                   ▼
    SCRUBBING         EDITANDO + PLAY     PLAY FLUIDO          EN PAUSA
    Nivel 1           Nivel 2             Nivel 3              Nivel 4
-   imagen del banco  composición en      video pre-renderizado fotograma exacto
-   < 50 ms           vivo desde el banco control Video         desde el original
-                     10–15 fps + audio   960×540 · 24 fps     ~150–300 ms
+   imagen del banco  composición en      pre-render del       fotograma exacto
+   < 50 ms           vivo · 10–15 fps    minuto · 24 fps      desde la copia
+                     + audio             control Video        ~150–300 ms
 ```
 
-### 12.1 Nivel 0 — Banco de fotogramas
+### 12.1 Nivel 0 — Banco
 
 ```
 .cache/banco/<id>/
-├── f000000.jpg …      256×144, 10 fps (WebP si el Elemento tiene alfa)
-├── indice.json        fotograma del banco ↔ fotograma del original
-├── tira.jpg           miniaturas para dibujar el clip en la timeline
+├── f000000.jpg …      256×144, 10 fps (WebP si hay alfa)
+├── _indice.json       fotograma del banco ↔ fotograma de la fuente + firma del archivo
+├── tira.jpg           miniaturas para la timeline
 └── onda.json          picos de audio
 ```
 
-Aproximadamente 6 MB por minuto de video. Se genera en segundo plano al
-importar, más rápido que el tiempo real.
+Se genera en segundo plano para cada Pieza horneada. La **firma** (tamaño +
+fecha de modificación) invalida el banco si el archivo cambia.
 
 ### 12.2 Nivel 1 — Scrubbing
 Imagen del banco más cercana, sin composición.
 
 ### 12.3 Nivel 2 — Composición en vivo
-En cada tic (10–15 por segundo): Elementos activos → imágenes del banco →
-transform → mezcla → JPEG → `ft.Image`. Muestra la edición real sin esperar
-render.
+Cada tic (10–15 por segundo): Elementos activos → banco → transform → mezcla →
+JPEG → `ft.Image`.
 
 ### 12.4 Nivel 3 — Pre-render por minuto
-- Cada minuto tiene una **huella** (hash de todo lo que contiene).
-- Al dejar de editar, se renderiza en segundo plano cada minuto cuya huella
-  cambió: 960×540, 24 fps, H.264 `ultrafast`.
-- El control Video de Flet lo reproduce con aceleración por hardware.
-- En el mapa del capítulo: **verde** = listo, **rojo** = pendiente. En zona
-  roja se usa el nivel 2.
+- **Huella** del minuto (13.2). Si cambió, se re-renderiza en segundo plano a
+  960×540, 24 fps, H.264 `ultrafast`.
+- Se reproduce con el control Video de Flet como **lista de reproducción de
+  minutos**. Al cruzar de minuto puede haber un micro-corte; si molesta, se une
+  el rango en un solo archivo sin recodificar.
+- Mapa del capítulo: **verde** listo, **rojo** pendiente (se usa el nivel 2).
 
-### 12.5 Nivel 4 — Fotograma exacto en pausa
-Decodifica del original y compone a la resolución real del monitor; JPEG
-calidad 90.
+### 12.5 Nivel 4 — Fotograma exacto
+Decodifica de la copia materializada a resolución completa y compone al tamaño
+real del monitor; JPEG calidad 90.
 
 ### 12.6 Audio como reloj maestro
-- Mezcla de audio de vista previa generada en segundo plano.
-- El nivel 2 pregunta en cada tic en qué instante va el audio y muestra la
-  imagen de ese momento; si se retrasa, **salta fotogramas** en vez de
-  desincronizarse.
+El nivel 2 consulta la posición del audio de vista previa en cada tic y muestra
+la imagen de ese instante; si se retrasa, **salta fotogramas**.
 
 ---
 
 ## 13. Render por minuto y ensamblado del capítulo
 
+### 13.1 Proceso
+
 ```
 Capítulo:  [00✅][01✅][02🔴][03✅] … [23✅]
-                        │
-            solo se re-renderiza el minuto 02
-                        │
+                        │  solo se re-renderiza el minuto 02
                         ▼
-   Capítulo completo = unir minutos SIN recodificar
+   Video del capítulo = unir minutos SIN recodificar
+   Audio del capítulo = una sola pasada del mezclador
+   Entregable        = video unido + audio
 ```
 
-- **Render de un minuto**: recorta la ventana del capítulo continuo
-  (incluye desbordes y Global), a resolución y calidad finales, desde los
-  **originales**.
-- Se fuerza un **fotograma clave al inicio de cada minuto** para poder unir
-  sin recodificar.
-- **El audio del capítulo se renderiza en una sola pasada** y se une al video
-  concatenado, para evitar clics en los límites.
-- Entregables: un minuto, un rango de minutos o el capítulo completo.
-- Versionado en el nombre: `_v001`, `_v002`…
+- **Render de un minuto**: recorta la ventana del capítulo continuo (incluye
+  desbordes y `global/`), a calidad final, desde las copias materializadas.
+- **Fotograma clave al inicio** de cada minuto y parámetros de codificación
+  idénticos, para unir sin recodificar.
+- Entregables: un minuto, un rango o el capítulo; versionados `_vNNN`.
 
-Calidad por encima de CapCut / Clipchamp:
+### 13.2 Huella de un minuto
 
-1. Exportación siempre desde los originales, nunca desde proxies.
+Hash de:
+- Todos los Elementos del minuto (gemelo completo + firma del archivo).
+- Los Elementos del minuto anterior que se desbordan en él.
+- Los Elementos de `global/` que lo cruzan.
+- El estándar del proyecto.
+
+### 13.3 Estados de un minuto
+
+| Eje | Valores | Quién lo cambia |
+|---|---|---|
+| **Trabajo** | vacío · en progreso · listo | vacío es automático; el resto lo marca el usuario |
+| **Render** | sin render · desactualizado · al día | automático, comparando la huella con la del último render |
+
+Se guardan en `_minuto.json`, así que sobreviven al cierre del programa.
+
+### 13.4 Calidad
+
+1. Render desde las copias materializadas (normalizadas a partir de los originales), nunca desde el banco.
 2. Escalado Lanczos.
 3. CRF 16–18.
 4. Opción H.265 y 10 bits.
-5. Codificación por hardware (NVENC, QuickSync, VideoToolbox) cuando exista.
-6. Sin marca de agua, sin nube.
+5. Codificación por hardware (NVENC, QuickSync, VideoToolbox) si existe.
+6. Sin marca de agua ni nube.
 
 ---
 
-## 14. Interfaz de usuario
+## 14. Flujo de dependencias
 
-### 14.1 Secciones ajustables
+### 14.1 Niveles
 
-Componente propio **`Divisor`** (barra arrastrable que redimensiona los paneles
-vecinos). Todas las secciones cambian de tamaño, se pueden plegar y la
-distribución se guarda en `config/distribucion.json`.
+```
+ N7  main.py                         punto de entrada único
+ N6  editor/app/ui                   Flet: solo muestra y captura
+ N5  editor/app                      estado, controladores
+ N4  editor/core/servicios           orquestación: importar, hornear, pre-render,
+     editor/core/tareas              render, autosave · cola de tareas de fondo
+ N3  editor/core/comandos            ediciones con deshacer
+     editor/core/proyecto_fs         disco: estructura, gemelos, diario, escáner
+     editor/core/motor               decodificar, componer, mezclar, codificar
+ N2  editor/core/modelo              Proyecto → Capítulo → Minuto → Elemento
+ N1  editor/core/tiempo              granularidad, nomenclatura
+     editor/core/espacio             lienzo, transform, geometría
+ N0  editor/core/estandar            HD720-24
+     editor/core/eventos             bus de eventos
+     editor/core/utiles              interpolación, matemáticas, registro
+```
+
+### 14.2 Flujo directo: qué puede importar cada nivel
+
+| Módulo | Puede importar | Nunca importa |
+|---|---|---|
+| `estandar`, `eventos`, `utiles` | biblioteca estándar | nada del proyecto |
+| `tiempo`, `espacio` | N0 | modelo y superiores |
+| `modelo` | N0, N1 | comandos, disco, motor |
+| `comandos` | N0–N2 | disco, motor, servicios |
+| `proyecto_fs` | N0–N2 | comandos, motor |
+| `motor` | N0–N2 | comandos, disco |
+| `servicios`, `tareas` | N0–N3 | app, ui |
+| `app` | N0–N4 | ui |
+| `ui` | `app` y los tipos de N0–N2 para mostrarlos | comandos directamente |
+| `main.py` | todo | — |
+
+Los tres módulos de N3 **no se conocen entre sí**. Cuando una operación
+necesita varios (por ejemplo hornear: motor + disco + comando), la orquesta un
+**servicio** en N4.
+
+### 14.3 Flujo inverso: eventos
+
+El núcleo necesita avisar hacia arriba (un render terminó, un minuto quedó
+desactualizado) sin importar capas superiores. Para eso existe
+`core/eventos.py`:
+
+```
+N3/N4 publica ──► BusEventos (N0) ──► N5 suscrito ──► actualiza la UI
+```
+
+Eventos principales:
+
+| Evento | Lo publica | Reaccionan |
+|---|---|---|
+| `ElementoCambiado` | historial (tras un comando) | timeline, inspector, monitor, huella |
+| `MinutoInvalidado` | servicio de huellas | mapa del capítulo, planificador de pre-render |
+| `PiezaHorneada` | servicio de horneado | índice de referencias, banco |
+| `BancoListo` | servicio de banco | timeline (miniaturas), monitor |
+| `RenderProgreso` / `RenderTerminado` | servicio de render | cola de render, mapa |
+| `ProyectoGuardado` | servicio de guardado | barra de estado |
+| `MedioFueraDeLinea` | escáner / motor | navegador, monitor |
+
+### 14.4 Hilos y tareas
+
+- **El modelo solo se modifica en el hilo principal**, siempre mediante comandos.
+- Las tareas de fondo trabajan sobre **instantáneas inmutables** (copia del
+  minuto y su huella). Si la huella cambió al terminar, el resultado se descarta.
+- Los trabajadores **nunca tocan la interfaz**: publican eventos; `app` los
+  pasa al hilo de Flet.
+- Cola con prioridades:
+
+| Prioridad | Tarea |
+|---|---|
+| 1 | Fotograma del monitor (niveles 1, 2, 4) |
+| 2 | Banco de las Piezas visibles |
+| 3 | Pre-render del minuto actual y vecinos |
+| 4 | Banco del resto |
+| 5 | Pre-render del resto del capítulo |
+| 6 | Render final (cuando el usuario lo pide sube a prioridad 3) |
+
+### 14.5 Ciclo completo de una edición
+
+```
+Usuario arrastra un Elemento
+  → ui/timeline captura el gesto
+  → app/controladores/timeline crea MoverElemento
+  → core/comandos/historial ejecuta y guarda para deshacer
+  → modelo cambia
+  → eventos: ElementoCambiado
+       ├─ app/estado → ui redibuja timeline e inspector
+       ├─ servicio de huellas → MinutoInvalidado → mapa en rojo
+       │                                          → tareas: pre-render (prioridad 3)
+       └─ app/estado → proyecto "sin guardar"
+  → (Guardar) servicio de guardado → reconciliador → diario → disco
+```
+
+---
+
+## 15. El main principal
+
+Un solo archivo en la raíz: **`main.py`**.
+
+### 15.1 Modos
+
+```
+python main.py                               abre la interfaz (último proyecto o pantalla de inicio)
+python main.py RUTA_PROYECTO                 abre la interfaz con ese proyecto
+python main.py --nuevo RUTA_PROYECTO         crea un proyecto y lo abre
+python main.py --render RUTA_PROYECTO --capitulo 1 [--minutos 00-05]
+                                             renderiza sin interfaz
+python main.py --escanear RUTA_PROYECTO      reconstruye el modelo desde el disco y reporta
+```
+
+### 15.2 Arranque
+
+```
+main.py
+  1. Leer argumentos y config/ajustes.json
+  2. Configurar el registro (utiles/registro)
+  3. Crear el BusEventos
+  4. Abrir o crear el Proyecto (proyecto_fs: escaner / estructura)
+     └─ ¿Autosave más reciente? → ofrecer restaurar
+  5. Crear Historial, índice de referencias y servicios
+  6. Arrancar la cola de tareas de fondo
+  7a. Modo interfaz: ft.app(...) con app/estado y controladores
+  7b. Modo render: servicio de render → salir
+```
+
+### 15.3 Cierre
+
+1. Si hay cambios sin guardar: guardar, descartar o cancelar.
+2. Detener la cola de tareas (las tareas en curso terminan o se cancelan).
+3. Completar el diario pendiente.
+4. Liberar decodificadores y cachés.
+
+El `main.py` **crece por épicas**: en E0 solo interpreta argumentos; cada épica
+conecta su parte.
+
+---
+
+## 16. Interfaz de usuario
+
+### 16.1 Secciones ajustables
+
+Componente propio **`Divisor`** (barra arrastrable). Todas las secciones cambian
+de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json`.
 
 ```
 ┌──────────────┬────────────────────────────────────────┬──────────────┐
@@ -704,29 +1003,27 @@ distribución se guarda en `config/distribucion.json`.
 
 | Sección | Contenido |
 |---|---|
-| Navegador | Árbol Proyecto → Capítulos → Minutos (con estado), Brutos, Taller |
+| Navegador | Proyecto → Capítulos → Minutos (estados de trabajo y render), Brutos, Taller |
 | Monitor / Lienzo | Vista previa y control espacial |
 | Inspector | Propiedades del Elemento, keyframes |
-| Mapa del capítulo | 24 celdas de minuto con color de estado |
-| Timeline | Capas del minuto, alto de capa ajustable, zoom por niveles |
-| Cola de render | Minutos pendientes y entregables |
+| Mapa del capítulo | 24 celdas con estado |
+| Timeline | Capas del minuto, desbordes fantasma, pistas Global |
+| Cola de render | Tareas y entregables |
 
-### 14.2 Espacios de trabajo
-Distribuciones guardadas: **Taller**, **Minuto**, **Capítulo**, **Render**.
+### 16.2 Espacios de trabajo
+**Taller**, **Minuto**, **Capítulo**, **Render**: distribuciones guardadas.
 
-### 14.3 Monitor como control espacial
-- **Mesa de trabajo** gris alrededor del lienzo: lo que queda fuera se ve
-  semitransparente al editar y no aparece en el render.
-- **Reglas en píxeles** y coordenada del cursor en vivo.
-- **Asas**: mover, escalar (esquinas), girar; punto de ancla visible.
-- **Imán** a bordes y centro del lienzo, a otros Elementos y a guías.
-- **Márgenes seguros**: acción 5 %, títulos 10 %.
-- Teclado: flechas = 1 px, Shift + flechas = 10 px.
-- Al arrastrar, el recuadro y las asas se dibujan en el canvas de Flet al
-  instante; la imagen compuesta se refresca ~10 veces por segundo y a calidad
-  completa al soltar.
+### 16.3 Monitor como control espacial
+- Mesa de trabajo gris: lo que queda fuera se ve semitransparente al editar.
+- Reglas en píxeles y coordenada del cursor.
+- Asas: mover, escalar, girar; ancla visible.
+- Imán a bordes, centro, otros Elementos y guías.
+- Márgenes seguros: acción 5 %, títulos 10 %.
+- Flechas = 1 px, Shift + flechas = 10 px.
+- Al arrastrar, recuadro y asas se dibujan en el canvas de Flet al instante; la
+  imagen se refresca ~10 veces por segundo y a calidad completa al soltar.
 
-### 14.4 Zoom de la timeline por granularidad
+### 16.4 Zoom de la timeline
 
 | Nivel | Muestra | Regla |
 |---|---|---|
@@ -735,314 +1032,321 @@ Distribuciones guardadas: **Taller**, **Minuto**, **Capítulo**, **Render**.
 | Segundos | ~10 segundos | Fotogramas |
 | Fotograma | ~1 segundo | Cada fotograma |
 
-### 14.5 Flujo del usuario
-1. Crear proyecto y capítulo → se generan `cap01/min00`…`min23`.
-2. Importar Brutos → banco, miniaturas y forma de onda en segundo plano.
-3. Preparar Piezas en el Taller → hornear.
-4. Colocar Piezas en un minuto → nace el Elemento.
-5. Editar tiempo (trim, ripple, roll, slip, slide).
-6. Posicionar y animar en el lienzo.
-7. Efectos, transiciones, texto, audio.
-8. Guardar → renombres, gemelos y guion.
-9. Renderizar un minuto, un rango o el capítulo.
+### 16.5 Flujo del usuario
+1. Crear proyecto y capítulo → `cap01/min00`…`min23`.
+2. Importar Brutos (se copian a `brutos/`).
+3. Preparar Piezas en el Taller → hornear (normalizadas, con asas) → banco.
+4. Colocar Piezas en un minuto → copia materializada + gemelo.
+5. Editar tiempo, posicionar y animar, efectos, transiciones, texto, audio.
+6. Guardar → reconciliar, gemelos, guion.
+7. Marcar el minuto como "listo".
+8. Renderizar un minuto, un rango o el capítulo.
 
 ---
 
-## 15. Arquitectura del código
-
-### 15.1 Capas
+## 17. Arquitectura del código
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ 4. INTERFAZ (app/ui) – Flet                              │
-│    Solo muestra y captura acciones                       │
-├──────────────────────────────────────────────────────────┤
-│ 3. APLICACIÓN (app/controladores + app/estado)           │
-│    Traduce acciones en comandos; emite cambios           │
-├──────────────────────────────────────────────────────────┤
-│ 2. OPERACIONES (core/comandos + core/proyecto_fs)        │
-│    Comandos con deshacer; sincronización con el disco    │
-├──────────────────────────────────────────────────────────┤
-│ 1. NÚCLEO (core/tiempo, espacio, modelo, motor)          │
-│    Proyecto → Capítulo → Minuto → Elemento → Keyframe    │
-└──────────────────────────────────────────────────────────┘
-   Cada capa conoce solo a la de abajo. core/ no importa Flet.
-```
-
-Reglas de oro:
-
-1. Nada modifica el modelo excepto un Comando.
-2. El núcleo no sabe que existe una interfaz.
-3. La interfaz no calcula nada; solo muestra y reacciona a cambios.
-
-### 15.2 Árbol
-
-```
-editor/
-├── core/
-│   ├── estandar.py                 HD720-24 en un solo lugar
-│   ├── tiempo/
-│   │   ├── granularidad.py         fotograma ↔ (min, seg, f)
-│   │   └── nomenclatura.py         nombre de archivo ↔ datos del Elemento
-│   ├── espacio/
-│   │   ├── lienzo.py               límites, recorte, descarte
-│   │   ├── transform.py            propiedades → matriz afín
-│   │   └── geometria.py            rectángulos, intersección, imán
-│   ├── modelo/
-│   │   ├── composicion.py          base recursiva
-│   │   ├── proyecto.py  capitulo.py  minuto.py  global_.py
-│   │   ├── bruto.py  pieza.py  taller.py
-│   │   ├── elemento.py             bloque fundamental
-│   │   ├── capa.py
-│   │   ├── keyframe.py             interpolación
-│   │   └── efecto.py  transicion.py
-│   ├── proyecto_fs/
-│   │   ├── estructura.py           crear carpetas
-│   │   ├── gemelo.py               leer/escribir el .json del Elemento
-│   │   ├── guion.py                generar minNN_guion.txt
-│   │   ├── diario.py               operaciones atómicas
-│   │   ├── reconciliador.py        renombrar al guardar
-│   │   └── escaner.py              reconstruir desde el disco
-│   ├── comandos/
-│   │   ├── comando.py  compuesto.py  historial.py
-│   │   ├── agregar_elemento.py  mover_elemento.py  recortar_elemento.py
-│   │   ├── dividir_elemento.py  cambiar_propiedad.py  transformar_elemento.py
-│   │   ├── agregar_keyframe.py  agregar_efecto.py  quitar_efecto.py
-│   │   ├── ripple.py  roll.py  slip.py  slide.py
-│   │   └── hornear_pieza.py  mover_minuto.py
-│   ├── motor/
-│   │   ├── motor_base.py
-│   │   ├── decodificador.py        PyAV, alfa incluido
-│   │   ├── cache_fotogramas.py     LRU
-│   │   ├── banco.py                nivel 0
-│   │   ├── compositor.py           descarte → región → warpAffine → mezcla
-│   │   ├── texto.py                Pillow + fuentes
-│   │   ├── efectos/                biblioteca de efectos
-│   │   ├── render_minuto.py
-│   │   ├── ensamblador.py          unir minutos + audio en una pasada
-│   │   └── trabajo_render.py       cola de trabajos
-│   ├── servicios/
-│   │   ├── analizador_medios.py  miniaturas.py  forma_onda.py
-│   │   └── exportacion.py
-│   ├── plugins/
-│   │   └── gestor_plugins.py
-│   └── utiles/
-│       ├── interpolacion.py  matematicas.py  registro.py
-├── app/
-│   ├── main.py
-│   ├── estado.py
-│   ├── controladores/
-│   │   ├── proyecto.py  medios.py  timeline.py  reproduccion.py  render.py
-│   ├── ui/
-│   │   ├── divisor.py  distribucion.py
-│   │   ├── navegador.py  monitor.py  asas.py  inspector.py
-│   │   ├── mapa_capitulo.py  timeline.py  taller.py
-│   │   ├── editor_curvas.py  cola_render.py
-│   │   └── widgets/  (timecode, transporte, deslizador, rueda de color)
-│   └── recursos/  (iconos, temas)
+.
+├── main.py                              punto de entrada único
+├── requirements.txt
+├── PROJECT.md
+├── README.md
 ├── config/
-│   ├── estandar.json  distribucion.json  atajos.json  ajustes.json
-└── tests/
+│   ├── estandar.json                    valores para proyectos nuevos
+│   ├── ajustes.json                     caché, autosave, historial, rutas recientes
+│   ├── distribucion.json                espacios de trabajo
+│   └── atajos.json                      atajos de teclado
+└── editor/
+    ├── __init__.py
+    ├── core/
+    │   ├── estandar.py                  N0
+    │   ├── eventos.py                   N0 · BusEventos y tipos de evento
+    │   ├── utiles/                      N0
+    │   │   ├── interpolacion.py  matematicas.py  registro.py
+    │   ├── tiempo/                      N1
+    │   │   ├── granularidad.py          fotograma ↔ (min, seg, f)
+    │   │   └── nomenclatura.py          nombres ↔ datos, IDs
+    │   ├── espacio/                     N1
+    │   │   ├── transform.py  lienzo.py  geometria.py
+    │   ├── modelo/                      N2
+    │   │   ├── composicion.py           base recursiva
+    │   │   ├── proyecto.py  capitulo.py  minuto.py  global_.py
+    │   │   ├── bruto.py  pieza.py  taller.py
+    │   │   ├── elemento.py  capa.py  keyframe.py
+    │   │   ├── efecto.py  transicion.py  texto.py
+    │   │   └── referencias.py           índice Bruto → Pieza → Elemento → Minuto
+    │   ├── comandos/                    N3
+    │   │   ├── comando.py  compuesto.py  historial.py
+    │   │   ├── agregar_elemento.py  quitar_elemento.py  mover_elemento.py
+    │   │   ├── recortar_elemento.py  dividir_elemento.py  separar_audio.py
+    │   │   ├── cambiar_propiedad.py  transformar_elemento.py
+    │   │   ├── agregar_keyframe.py  quitar_keyframe.py
+    │   │   ├── agregar_efecto.py  quitar_efecto.py  cambiar_transicion.py
+    │   │   ├── ripple.py  roll.py  slip.py  slide.py
+    │   │   ├── actualizar_fuente.py     tras hornear una Pieza
+    │   │   └── mover_minuto.py
+    │   ├── proyecto_fs/                 N3
+    │   │   ├── estructura.py  gemelo.py  manifiestos.py
+    │   │   ├── diario.py  reconciliador.py  escaner.py
+    │   │   ├── guion.py  autosave.py
+    │   ├── motor/                       N3
+    │   │   ├── motor_base.py
+    │   │   ├── decodificador.py  codificador.py
+    │   │   ├── cache_fotogramas.py
+    │   │   ├── compositor.py  texto.py
+    │   │   ├── mezclador_audio.py
+    │   │   └── efectos/                 biblioteca de efectos
+    │   ├── servicios/                   N4
+    │   │   ├── importacion.py           copiar a brutos + análisis
+    │   │   ├── horneado.py              Pieza → archivo normalizado → comando
+    │   │   ├── banco.py  miniaturas.py  forma_onda.py
+    │   │   ├── huellas.py               huella y estado de render por minuto
+    │   │   ├── vista_previa.py          niveles 1–4 y reloj de audio
+    │   │   ├── render.py                minuto, rango, capítulo
+    │   │   ├── ensamblado.py            unir minutos + audio
+    │   │   └── guardado.py              guardar y autosave
+    │   ├── tareas/                      N4
+    │   │   └── cola.py                  prioridades, instantáneas, cancelación
+    │   └── plugins/                     N4
+    │       └── gestor_plugins.py        efectos y exportadores externos
+    └── app/                             N5–N6
+        ├── estado.py                    puente eventos → Flet
+        ├── controladores/
+        │   ├── proyecto.py  medios.py  taller.py
+        │   ├── timeline.py  reproduccion.py  render.py
+        └── ui/
+            ├── ventana.py               composición de secciones
+            ├── divisor.py  distribucion.py
+            ├── inicio.py                pantalla de inicio / proyectos recientes
+            ├── navegador.py  monitor.py  asas.py  inspector.py
+            ├── mapa_capitulo.py  timeline.py  taller.py
+            ├── editor_curvas.py  cola_render.py
+            ├── widgets/                 timecode, transporte, deslizador, rueda de color
+            └── recursos/                iconos, temas
 ```
 
+`requirements.txt`:
+
+```
+flet
+flet-video          # control de video; verificar el nombre del paquete según la versión de Flet
+av
+numpy
+opencv-python-headless
+Pillow
+```
+
+Las versiones se fijan en E0.
+
 ---
 
-## 16. Qué se aprovecha de qwen y deep
+## 18. Unificación de qwen y deep
 
-| Origen | Módulo original | Destino en `editor/` |
+### 18.1 Qué aporta cada uno
+
+| Fortaleza | Origen | Dónde queda |
 |---|---|---|
-| qwen | `app/state/app_state.py` | `app/estado.py` |
-| qwen | `app/controllers/*` | `app/controladores/*` |
-| qwen | `app/ui/monitors`, `timeline`, `panels`, `widgets` | `app/ui/*` (adaptados a Flet híbrido) |
-| qwen | `core/time/*` | `core/tiempo/*` |
-| qwen | `core/model/*` | `core/modelo/*` |
-| qwen | `core/commands/base_command`, `compound_command`, `history` | `core/comandos/comando`, `compuesto`, `historial` |
-| qwen | `core/serialization/*` | `core/proyecto_fs/gemelo` + manifiestos |
-| qwen | `core/services/*` | `core/servicios/*`, `core/motor/banco` |
-| qwen | `config/settings.json` | `config/ajustes.json` |
-| deep | `core/model/timebase.py` | `core/tiempo/granularidad.py` |
-| deep | `core/commands/ripple_delete`, `roll_edit`, `slide_edit`, `slip_edit` | `core/comandos/ripple`, `roll`, `slide`, `slip` |
-| deep | `core/utils/interpolation.py` | `core/utiles/interpolacion.py` |
-| deep | `app/ui/graph_editor.py` | `app/ui/editor_curvas.py` |
-| deep | `app/ui/timeline_tools.py` | herramientas de `app/ui/timeline.py` |
-| deep | `core/engines/spatial_compositor.py` | `core/motor/compositor.py` |
-| deep | `core/engines/effects_library.py` | `core/motor/efectos/` |
-| deep | `core/engines/render_job.py`, `render_in_place.py` | `core/motor/trabajo_render.py` |
-| deep | `core/plugins/plugin_manager.py` | `core/plugins/gestor_plugins.py` |
-| — | MLT (`mlt_engine`) | Fuera por ahora; `motor_base` permite agregarlo |
+| Estado central reactivo | qwen | `app/estado.py` + `core/eventos.py` |
+| Controladores separados | qwen | `app/controladores/` |
+| UI por carpetas: monitores, timeline, paneles, widgets | qwen | `app/ui/` |
+| Paquete de tiempo dedicado | qwen | `core/tiempo/` |
+| Comando base, compuesto e historial | qwen | `core/comandos/` |
+| Comandos split, change_property, transform, add_keyframe | qwen | `dividir_elemento`, `cambiar_propiedad`, `transformar_elemento`, `agregar_keyframe` |
+| Serialización del proyecto | qwen | `core/proyecto_fs/` |
+| Servicios de medios, proxies, miniaturas, forma de onda | qwen | `core/servicios/` |
+| Configuración rica y atajos | qwen | `config/` |
+| Timebase exacto | deep | `core/tiempo/granularidad.py` |
+| Ripple, roll, slide, slip | deep | `core/comandos/` |
+| Interpolación de keyframes | deep | `core/utiles/interpolacion.py` |
+| Editor de curvas | deep | `app/ui/editor_curvas.py` |
+| Herramientas de timeline | deep | `app/ui/timeline.py` |
+| Compositor espacial | deep | `core/motor/compositor.py` |
+| Biblioteca de efectos | deep | `core/motor/efectos/` |
+| Trabajos de render y render in-place | deep | `core/servicios/render.py`, `core/tareas/cola.py` |
+| Gestor de plugins | deep | `core/plugins/` |
+| Controles de audio | deep | `core/motor/mezclador_audio.py` + inspector |
 
-`qwen_video_editor/` y `deep_video_editor/` se conservan como referencia hasta
-la épica E19 y luego se eliminan.
+### 18.2 Qué se descarta
+
+| Elemento | Motivo |
+|---|---|
+| `mlt_engine` (ambos) | Instalación difícil; `motor_base` permite volver a agregarlo |
+| pydantic | Se usa `dataclasses` + serialización explícita |
+| `tests/` | Fuera del alcance de esta etapa |
+| Directorio `project_workspace/` de qwen | Reemplazado por la estructura de proyecto de la sección 9 |
+| Nombres en inglés | Se homologan al español (sección 3) |
+
+### 18.3 Homologación
+
+Todo módulo, clase, archivo y clave JSON sigue el glosario de la sección 3.
+Ningún nombre de qwen o deep sobrevive tal cual: se traduce según las tablas
+anteriores. Las carpetas `qwen_video_editor/` y `deep_video_editor/` se
+eliminan en E0.
 
 ---
 
-## 17. Épicas en orden sistemático
+## 19. Épicas en orden sistemático
 
-Cada épica depende de las anteriores. Hasta la E9 todo está en `core/` y se
-puede trabajar sin interfaz.
+Cada épica depende de las anteriores. Hasta la E11 todo vive en `core/` y se
+puede ejecutar con `main.py` en modo sin interfaz.
 
 ### Fase A — Fundamentos
 
-**E0. Fundación del repositorio**
-- Crear `editor/` con el árbol de la sección 15.2 (módulos vacíos).
-- `requirements.txt`: `flet`, `flet-video`, `av`, `numpy`, `opencv-python-headless`, `Pillow`, `pydantic`.
-- `core/estandar.py` y `config/estandar.json` con HD720-24.
+**E0. Fundación**
+- Eliminar `qwen_video_editor/` y `deep_video_editor/`.
+- Crear el árbol de la sección 17 con módulos vacíos o mínimos.
+- `main.py` con el análisis de argumentos (sección 15.1).
+- `requirements.txt` con versiones fijadas y archivos de `config/`.
 - Actualizar `README.md` para apuntar a este documento.
-- *Resultado:* estructura lista y estándar definido en un solo lugar.
 
-**E1. Tiempo y nomenclatura**
-- `granularidad.py`: fotograma ↔ (min, seg, f), duraciones, `Fraction`.
-- `nomenclatura.py`: nombre ↔ datos (inicio, duración, capa, nombre, ID, extensión); validación; generación de IDs únicos; nombres de Brutos, Piezas y Renders.
-- *Resultado:* conversión reversible y exacta entre fotogramas y nombres.
+**E1. Base transversal (N0)**
+- `estandar.py`, `eventos.py`, `utiles/` (registro, matemáticas, interpolación).
 
-**E2. Espacio**
-- `transform.py`: propiedades → matriz afín; compensación al mover el ancla.
-- `lienzo.py`: rectángulo transformado, descarte, región de interés.
-- `geometria.py`: intersecciones e imán.
-- *Resultado:* posición en píxeles exacta y cálculo de visibilidad.
+**E2. Tiempo y nomenclatura (N1)**
+- `granularidad.py` y `nomenclatura.py`: conversión reversible, validación con
+  la expresión regular, IDs únicos, nombres de Brutos, Piezas y Renders.
 
-**E3. Modelo**
-- `composicion`, `elemento`, `capa`, `keyframe`, `minuto`, `capitulo`, `global_`, `proyecto`, `bruto`, `pieza`, `taller`, `efecto`, `transicion`.
-- Desborde de Elementos entre minutos (referencia fantasma).
-- Evaluación de parámetros con keyframes relativos al inicio.
-- *Resultado:* el proyecto completo representado en memoria.
+**E3. Espacio (N1)**
+- `transform.py`, `lienzo.py`, `geometria.py`: matriz, compensación de ancla,
+  descarte, región de interés, imán.
+
+**E4. Modelo (N2)**
+- Composición recursiva, Elemento, Capa, Keyframe, Minuto, Capítulo, Global,
+  Proyecto, Bruto, Pieza, Taller, Efecto, Transición, Texto.
+- Reglas: no solapamiento, marco temporal, desbordes.
+- `referencias.py`.
 
 ### Fase B — Persistencia y edición
 
-**E4. Sistema de archivos del proyecto**
-- `estructura`: crear proyecto, capítulo y `min00`–`min23`.
-- `gemelo`: leer y escribir el `.json` de cada Elemento.
-- `diario` + `reconciliador`: renombres atómicos al guardar.
-- `escaner`: reconstruir el modelo desde el disco, incluso sin gemelos.
-- `guion`: generar `minNN_guion.txt`.
-- *Resultado:* un proyecto real en disco que se guarda, se reabre y se rescata.
+**E5. Disco (N3)**
+- Estructura, gemelos, manifiestos, diario, reconciliador (mover y renombrar),
+  escáner, guion, autosave.
+- `main.py --nuevo` y `--escanear` operativos.
 
-**E5. Comandos e historial**
-- `comando`, `compuesto`, `historial` (límite de 100 pasos, fusión de arrastres).
-- Edición básica: agregar, mover, recortar, dividir, cambiar propiedad, transformar, keyframes, efectos.
-- Edición avanzada: ripple, roll, slip, slide.
-- Comandos de nivel: mover un minuto, hornear una Pieza.
-- *Resultado:* toda la edición con deshacer, sin interfaz.
+**E6. Comandos (N3)**
+- Comando, compuesto, historial (100 pasos, fusión de arrastres).
+- Edición básica, avanzada (ripple con alcance, roll, slip, slide), separar
+  audio, actualizar fuente, mover minuto.
 
-### Fase C — Motor
+### Fase C — Motor y servicios
 
-**E6. Decodificación y compositor** ← **hito de validación**
-- `decodificador` (PyAV, alfa), `cache_fotogramas`.
-- `compositor`: descarte → región → `warpAffine` → mezcla premultiplicada; modos de mezcla.
-- `texto` con Pillow.
-- Exportar un fotograma de prueba con videos y PNG apilados con alfa.
-- *Resultado:* medir cuántas capas soporta el equipo real y ajustar las estimaciones de la sección 11.5.
+**E7. Decodificación y compositor (N3)**
+- Decodificador, codificador, caché, compositor con alfa premultiplicado y
+  modos de mezcla, texto.
+- Exportar un fotograma de prueba con capas apiladas y medir capas soportadas.
 
-**E7. Banco de fotogramas y servicios de medios**
-- `analizador_medios`, `banco` (JPEG / WebP con alfa), `miniaturas`, `forma_onda`.
-- Generación en segundo plano al importar.
-- *Resultado:* nivel 0 de la vista previa listo.
+**E8. Mezclador de audio (N3)**
+- Mezcla, volumen, paneo, fundidos, limitador.
 
-**E8. Render por minuto y ensamblado**
-- `render_minuto` con fotograma clave inicial, desde los originales.
-- `ensamblador`: unir minutos sin recodificar + audio del capítulo en una pasada.
-- Huella por minuto y render incremental; versionado de entregables.
-- *Resultado:* exportar 1 minuto, un rango o el capítulo completo.
+**E9. Cola de tareas y servicios de medios (N4)**
+- `tareas/cola.py` con prioridades e instantáneas.
+- Importación, horneado normalizado con asas, banco, miniaturas, forma de onda.
 
-**E9. Vista previa híbrida**
-- Niveles 1 a 4, pre-render por minuto en segundo plano, audio como reloj maestro.
-- *Resultado:* todo el sistema de vista previa operativo desde `core/`.
+**E10. Render y ensamblado (N4)**
+- Huellas y estados, render por minuto, ensamblado sin recodificar, audio en una
+  pasada, versionado.
+- `main.py --render` operativo.
 
-### Fase D — Interfaz (Flet)
+**E11. Vista previa (N4)**
+- Niveles 1–4, pre-render por minuto, reloj de audio.
+- Servicio de guardado conectado a eventos.
 
-**E10. Interfaz base**
-- `main`, `estado`, controladores.
-- `divisor` y `distribucion`; espacios de trabajo Taller, Minuto, Capítulo, Render.
-- `navegador` del proyecto.
-- *Resultado:* abrir un proyecto y navegar capítulos y minutos.
+### Fase D — Interfaz
 
-**E11. Monitor y control espacial**
-- Monitor con los 4 niveles de vista previa y controles de transporte.
-- Mesa de trabajo, reglas, coordenada del cursor, asas, ancla, imán, márgenes seguros, teclado.
-- *Resultado:* ver y posicionar Elementos en el lienzo.
+**E12. Aplicación base (N5–N6)**
+- `app/estado.py` (eventos → Flet), controladores.
+- `ventana`, `divisor`, `distribucion`, espacios de trabajo, `inicio`, `navegador`.
+- `main.py` abre la interfaz.
 
-**E12. Timeline y mapa del capítulo**
-- Capas con alto ajustable, zoom por granularidad, arrastrar, imán, herramientas (selección, cuchilla, ripple, roll, slip, slide).
-- Mapa de los 24 minutos con estados de render.
-- Pistas Global visibles en la timeline del minuto.
-- *Resultado:* edición visual completa de un minuto.
+**E13. Monitor y control espacial**
+- Monitor con los 4 niveles, transporte, mesa de trabajo, reglas, asas, ancla,
+  imán, márgenes seguros, teclado.
 
-**E13. Taller**
-- Vista de Brutos, mini-timeline de la Pieza, horneado, ida y vuelta con el minuto.
-- *Resultado:* preparar material antes de la timeline.
+**E14. Timeline y mapa del capítulo**
+- Capas, zoom por granularidad, arrastre, herramientas, desbordes fantasma,
+  pistas Global, mapa de 24 minutos con estados.
 
-**E14. Inspector, keyframes y editor de curvas**
-- Inspector de propiedades; keyframes en precisión de fotograma; curvas bezier.
-- *Resultado:* animación completa de posición, escala, rotación y opacidad.
+**E15. Taller**
+- Brutos, mini-timeline de la Pieza, horneado, ida y vuelta con el minuto.
+
+**E16. Inspector, keyframes y curvas**
+- Inspector, keyframes en precisión de fotograma, editor de curvas bezier.
 
 ### Fase E — Capacidades creativas
 
-**E15. Efectos, transiciones y texto**
-- Color (brillo, contraste, saturación, temperatura, LUT `.cube`), desenfoque, nitidez, croma.
-- Transiciones: fundido, deslizamiento, zoom, barrido.
-- Títulos y subtítulos con estilos y animaciones de entrada y salida.
-- Velocidad: cámara lenta, rápida, reversa, rampas.
+**E17. Efectos, transiciones y texto**
+- Color (brillo, contraste, saturación, temperatura, LUT), desenfoque, nitidez,
+  croma; transiciones (fundido, deslizamiento, zoom, barrido); títulos y
+  subtítulos; velocidad y rampas.
 
-**E16. Audio**
-- Volumen, paneo, fundidos, mezcla de capas y Global, reducción automática de la música cuando hay voz.
+**E18. Audio avanzado**
+- Keyframes de volumen, reducción automática de la música con voz, medidores.
 
-**E17. Cola de render y exportación**
-- `cola_render` en la interfaz, perfiles de exportación, H.265 / 10 bits, codificación por hardware.
+**E19. Cola de render y exportación**
+- Panel de cola de render, perfiles, H.265 / 10 bits, codificación por hardware.
 
 ### Fase F — Cierre
 
-**E18. Extras**
-- Autosave (cada 120 s), atajos de teclado configurables, plugins, formatos de lienzo adicionales (9:16, 1:1, 4:5), subtítulos automáticos.
+**E20. Extras**
+- Atajos configurables, plugins, formatos de lienzo adicionales (9:16, 1:1, 4:5),
+  subtítulos automáticos.
 
-**E19. Limpieza**
-- Eliminar `qwen_video_editor/` y `deep_video_editor/`.
-- README final.
+**E21. Documentación final**
+- README completo y actualización de este documento con lo implementado.
 
-### Resumen de dependencias
+### Dependencias entre épicas
 
 ```
-E0 → E1 → E2 → E3 → E4 → E5
-                 └──────────→ E6 → E7 → E8 → E9
-                                              └→ E10 → E11 → E12 → E13 → E14
-                                                                          └→ E15 → E16 → E17 → E18 → E19
+E0 → E1 → E2 → E3 → E4 ─┬→ E5 ─┐
+                        ├→ E6 ─┼→ E9 → E10 → E11 → E12 → E13 → E14 → E15 → E16
+                        └→ E7 → E8 ─┘                                        │
+                                                          E17 ← ─ ─ ─ ─ ─ ─ ─┘
+                                                           └→ E18 → E19 → E20 → E21
 ```
+
+E5, E6 y E7 dependen solo de E4 y pueden avanzar en paralelo; E9 necesita las
+tres (y E8).
 
 ---
 
-## 18. Especificaciones aspirables
+## 20. Especificaciones aspirables
 
-Metas a validar con prototipos, no garantías.
+Metas, no garantías.
 
 | Aspecto | Objetivo |
 |---|---|
-| Banco al importar | Más rápido que el tiempo real |
+| Banco al hornear | Más rápido que el tiempo real |
 | Scrubbing | < 50 ms |
-| Vista previa en vivo (nivel 2) | 256×144 a 640×360 · 10–15 fps · 3–4 capas de video · audio sincronizado |
-| Vista previa fluida (nivel 3) | 960×540 (hasta 1280×720) · 24 fps |
-| Re-render de un minuto (vista previa) | Segundos, según el equipo |
-| Fotograma exacto en pausa | Resolución del monitor · ~150–300 ms |
-| Timeline | 200–300 Elementos fluidos, dibujando solo lo visible |
-| Render final | 720p por defecto, hasta 4K · H.264 / H.265 · por hardware si hay GPU |
+| Vista previa en vivo | 256×144 a 640×360 · 10–15 fps · 3–4 capas de video · audio sincronizado |
+| Vista previa fluida | 960×540 · 24 fps |
+| Fotograma exacto en pausa | ~150–300 ms |
+| Timeline | 200–300 Elementos fluidos |
+| Render final | 720p por defecto, hasta 4K · H.264 / H.265 · hardware si hay GPU |
 | Deshacer | 100 pasos |
 | Autosave | Cada 120 s |
 | Plataformas | Windows, macOS, Linux |
 
 ---
 
-## 19. Riesgos y preguntas abiertas
+## 21. Riesgos y decisiones abiertas
+
+### 21.1 Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
-| Rendimiento del nivel 2 en Flet | Validar en E6/E9; bajar resolución o fps del banco; alternativa PySide6 sobre el mismo `core/` |
-| Alfa en VP9 `.webm` | Preferir ProRes 4444 para Piezas con alfa |
+| Rendimiento del nivel 2 en Flet | Medir en E7/E11; bajar resolución o fps del banco; alternativa PySide6 sobre el mismo `core/` |
+| Micro-cortes al cruzar minutos en el nivel 3 | Unir el rango sin recodificar antes de reproducir |
+| Disco por materialización | Piezas cortas; aviso de espacio; posible modo de enlaces en el futuro |
 | Renombres en Windows con archivos abiertos | Liberar recursos antes de reconciliar; reintentos; diario |
-| Rutas largas en Windows (260 caracteres) | Nombres descriptivos cortos; advertencia al superar un umbral |
-| Concatenación sin recodificar | Mismos parámetros de codificación y fotograma clave al inicio de cada minuto |
-| API de Flet cambiante (0.x) | Fijar versión en `requirements.txt`; aislar Flet en `app/ui` |
+| Cascadas de renombres (ripple de capítulo, mover minuto) | Alcance por minuto por defecto; aviso previo; diario |
+| API de Flet cambiante | Versión fijada; Flet aislado en `app/ui` |
+| Sin tests | Los modos `--escanear` y `--render` de `main.py` sirven como verificación manual; la arquitectura por niveles permite agregar tests más adelante sin reestructurar |
 
-Preguntas abiertas:
+### 21.2 Decisiones abiertas
 
-1. ¿Capítulos siempre de hasta 24 minutos o con duración variable (por ejemplo 22–26)?
-2. ¿Se necesita 30 fps además de 24? Cambiaría el rango `f00`–`f29`.
-3. ¿Formatos de lienzo verticales (9:16) desde el inicio o en E18?
-4. ¿Versión web o móvil de la interfaz en el alcance?
+1. ¿Capítulos siempre de hasta 24 minutos o con duración variable mayor?
+2. ¿30 fps además de 24? Cambiaría el rango `f00`–`f29`.
+3. ¿Formatos verticales (9:16) desde el inicio o en E20?
+4. ¿Versión web de la interfaz dentro del alcance?
+5. ¿Duración de las asas: 1 s fijo o configurable?
