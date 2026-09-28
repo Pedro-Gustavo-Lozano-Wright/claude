@@ -4,7 +4,8 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** planificación cerrada (revisión 2). Todavía no hay código funcional.
+- **Estado:** planificación cerrada (revisión 3). Todavía no hay código funcional.
+- **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
 - **Modo de trabajo:** solo código. Sin tests ni pruebas automatizadas por ahora.
@@ -14,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de la revisión 2](#0-cambios-de-la-revisión-2)
+0. [Cambios de las revisiones 2 y 3](#0-cambios-de-las-revisiones-2-y-3)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -39,7 +40,22 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de la revisión 2
+## 0. Cambios de las revisiones 2 y 3
+
+### Revisión 3: decisiones del usuario
+
+| # | Decisión | Consecuencia | Sección |
+|---|---|---|---|
+| U1 | **24 fps** como único estándar | Fotograma del nombre siempre `f00`–`f23` | 4 |
+| U2 | **Capítulo = exactamente 24 minutos** (24 bloques de 1 min) | 34 560 fotogramas fijos; sin duración variable; el tiempo vacío se renderiza en negro y silencio | 6.4 |
+| U3 | **Capítulos del 1 al 1000** | Código de 4 dígitos: `cap0001`–`cap1000` | 3 |
+| U4 | **Solo formato panorámico 16:9** (1280×720) | Un único lienzo | 4 |
+| U5 | **Shorts verticales 9:16 como recorte** del 16:9, en su propia carpeta | Ventana vertical animable sobre el lienzo, render nítido a 720×1280 | 13.5 |
+| U6 | **Solo Linux**, ejecución desde PyCharm | Se eliminan las consideraciones de Windows y macOS; dependencias de sistema documentadas | 15.4 |
+| U7 | **Asas de 1 segundo** fijas | Sin configuración | 4.2 |
+| U8 | **Elegir el fps correcto al recortar** | Interpretación de fps por Bruto y método de conversión por Pieza; el Taller trabaja en los fotogramas nativos de la fuente | 6.7 |
+
+### Revisión 2: cabos sueltos
 
 Cabos sueltos detectados en la revisión 1 y cómo quedan resueltos:
 
@@ -78,8 +94,8 @@ Cabos sueltos detectados en la revisión 1 y cómo quedan resueltos:
 Un editor de video de escritorio en Python que organiza **todo por tiempo y
 por contexto**:
 
-- Un **proyecto** contiene **capítulos**. Cada capítulo mide hasta **24
-  minutos** y tiene una **carpeta por minuto**.
+- Un **proyecto** contiene hasta **1000 capítulos**. Cada capítulo mide
+  **exactamente 24 minutos** y tiene una **carpeta por minuto**.
 - Cada archivo vive en la carpeta del minuto donde empieza, y **su nombre
   indica el instante exacto en que aparece**. Con el programa apagado, los
   nombres ya cuentan la historia.
@@ -89,8 +105,10 @@ por contexto**:
   solo se re-renderizan los minutos que cambiaron.
 - El material se prepara en un **Taller** (sandbox) antes de llegar a la
   timeline.
-- Composición espacial en **píxeles sobre un lienzo 1280×720**, con capas
-  apiladas y transparencias.
+- Composición espacial en **píxeles sobre un lienzo 1280×720 (16:9)**, con
+  capas apiladas y transparencias.
+- Función extra: **Shorts verticales 9:16** recortados del capítulo 16:9, en su
+  propia carpeta.
 
 Referencia de experiencia: **CapCut / Clipchamp**, con mejor calidad de
 exportación, precisión de fotograma y una organización de archivos legible por
@@ -102,7 +120,7 @@ humanos.
 
 | # | Decisión | Motivo |
 |---|---|---|
-| D1 | **Interfaz en Flet** con vista previa híbrida | Diseño moderno y multiplataforma; sus límites de video se compensan con el banco de fotogramas y el pre-render |
+| D1 | **Interfaz en Flet** con vista previa híbrida | Diseño moderno y rápido de construir; sus límites de video se compensan con el banco de fotogramas y el pre-render |
 | D2 | **`core/` en Python puro, sin librería de interfaz** | Desacople total; permite un modo sin interfaz y una futura interfaz PySide6 sin tocar el núcleo |
 | D3 | **Una sola arquitectura unificada** con lo mejor de qwen y deep | Sin código duplicado ni dos caminos paralelos |
 | D4 | **Motor PyAV** (sin MLT por ahora) | Instalación sencilla en todos los sistemas; `motor_base` permite agregar otros |
@@ -118,6 +136,10 @@ humanos.
 | D14 | **Modelo en `dataclasses`**, serialización explícita | Un solo modelo, sin duplicar tipos |
 | D15 | **Un único `main.py`** | Un solo punto de entrada para interfaz y render sin interfaz |
 | D16 | **Solo código, sin tests** en esta etapa | Prioridad a construir la arquitectura completa |
+| D17 | **Solo Linux** | Un solo sistema: rutas, renombres atómicos, codificación por hardware y dependencias de Linux |
+| D18 | **Capítulo fijo de 24 minutos exactos** | Rejilla idéntica en todos los capítulos; render y ensamblado predecibles |
+| D19 | **Un único lienzo 16:9**; el 9:16 es un recorte (Short) | Un solo flujo de edición; los verticales no duplican trabajo |
+| D20 | **El Taller trabaja en el fps nativo de la fuente**; la conversión a 24 fps ocurre al hornear | Cortes exactos sobre los fotogramas reales; una sola frontera de normalización |
 
 Alternativa futura documentada: interfaz **PySide6** sobre el mismo `core/`
 si se necesita reproducción multicapa a 720p en tiempo real.
@@ -134,9 +156,9 @@ y archivos; con tildes solo en la interfaz.
 | Concepto | Carpeta | Archivos | Clave JSON | Clase | En pantalla |
 |---|---|---|---|---|---|
 | Proyecto | `MiSerie/` | `_proyecto.json` | `proyecto` | `Proyecto` | Proyecto |
-| Capítulo | `cap01/` | `_capitulo.json` | `capitulo` | `Capitulo` | Capítulo 01 |
-| Minuto | `cap01/min00/` | `_minuto.json`, `_guion.txt` | `minuto` | `Minuto` | Minuto 00 |
-| Global | `cap01/global/` | formato de Elemento | `global` | `Global` | Global |
+| Capítulo | `cap0001/` | `_capitulo.json` | `capitulo` | `Capitulo` | Capítulo 1 |
+| Minuto | `cap0001/min00/` | `_minuto.json`, `_guion.txt` | `minuto` | `Minuto` | Minuto 00 |
+| Global | `cap0001/global/` | formato de Elemento | `global` | `Global` | Global |
 | Bruto | `brutos/video\|audio\|imagen/` | `bru0001_nombre__id.ext` | `bruto` | `Bruto` | Bruto |
 | Taller | `taller/` | — | `taller` | `Taller` | Taller |
 | Pieza | `taller/pie0001_nombre__id/` | `_pieza.json`, `pie0001_nombre__id.ext` | `pieza` | `Pieza` | Pieza |
@@ -146,13 +168,15 @@ y archivos; con tildes solo en la interfaz.
 | Keyframe | — | — | `keyframes` | `Keyframe` | Keyframe |
 | Transición | — | — | `transicion_entrada` | `Transicion` | Transición |
 | Efecto | — | — | `efectos` | `Efecto` | Efecto |
-| Render | `cap01/render/` | `cap01_min00_v003.mp4` | `render` | `Render` | Render |
+| Render | `cap0001/render/` | `cap0001_min00_v003.mp4` | `render` | `Render` | Render |
+| Short | `cap0001/shorts/` | `min02_seg10f00_dur45s00_nombre__id.json` + `.mp4` | `short` | `Short` | Short |
+| Ventana vertical | — | — | `ventana` | `VentanaVertical` | Encuadre 9:16 |
 | Recursos | `recursos/fuentes\|luts/` | — | `recursos` | — | Recursos |
 
 ### 3.2 Reglas de archivos
 
 1. **Archivos de Elemento**: empiezan con el prefijo de su carpeta
-   (`cap01/min02/` → `min02_…`). Excepción: en `global/` el prefijo expresa el
+   (`cap0001/min02/` → `min02_…`). Excepción: en `global/` el prefijo expresa el
    minuto de inicio dentro del capítulo.
 2. **Archivos de control**: empiezan con `_` (`_proyecto.json`,
    `_capitulo.json`, `_minuto.json`, `_guion.txt`, `_pieza.json`). Quedan
@@ -164,6 +188,8 @@ y archivos; con tildes solo en la interfaz.
    (Brutos, Piezas y Elementos comparten el mismo espacio de IDs). Nunca
    cambian.
 6. **Nombre descriptivo**: minúsculas, números y guiones; máximo 32 caracteres.
+7. **Capítulos**: `cap0001` a `cap1000`, siempre con 4 dígitos. En pantalla se
+   muestra sin ceros: "Capítulo 1". El título libre va en `_capitulo.json`.
 
 ### 3.3 Gramática del nombre de un Elemento
 
@@ -192,9 +218,14 @@ Otros nombres:
 |---|---|---|
 | Bruto | `bruNNNN_nombre__id.ext` | `bru0001_toma-calle__7c21.mp4` |
 | Pieza (carpeta y archivo) | `pieNNNN_nombre__id` | `pie0001_puerta-abre__5e1c.mov` |
-| Render de un minuto | `capCC_minMM_vNNN.mp4` | `cap01_min00_v003.mp4` |
-| Render de un rango | `capCC_minMM-MM_vNNN.mp4` | `cap01_min05-08_v001.mp4` |
-| Render del capítulo | `capCC_completo_vNNN.mp4` | `cap01_completo_v002.mp4` |
+| Render de un minuto | `capCCCC_minMM_vNNN.mp4` | `cap0001_min00_v003.mp4` |
+| Render de un rango | `capCCCC_minMM-MM_vNNN.mp4` | `cap0001_min05-08_v001.mp4` |
+| Render del capítulo | `capCCCC_completo_vNNN.mp4` | `cap0001_completo_v002.mp4` |
+| Short (receta) | `minMM_segSSfFF_dur…_nombre__id.json` | `min02_seg10f00_dur45s00_momento-clave__b71c.json` |
+| Short (render) | igual que la receta + `_vNNN.mp4` | `min02_seg10f00_dur45s00_momento-clave__b71c_v001.mp4` |
+
+Un Short usa la misma gramática que un Elemento **sin el campo de capa**: el
+nombre dice en qué instante del capítulo empieza y cuánto dura.
 
 ### 3.4 Convenciones de código
 
@@ -217,9 +248,12 @@ Otros nombres:
 
 | Parámetro | Valor |
 |---|---|
-| Lienzo | **1280 × 720 px** |
+| Lienzo | **1280 × 720 px, 16:9** (único formato de edición) |
 | Origen | **(0, 0) = esquina superior izquierda**; X a la derecha, **Y hacia abajo** |
-| Fotogramas por segundo | **24 fps constantes** |
+| Fotogramas por segundo | **24 fps constantes** (único) |
+| Capítulo | **24 minutos exactos = 34 560 fotogramas** |
+| Minuto | **1440 fotogramas** |
+| Short (derivado) | 720 × 1280 px, 9:16, 24 fps |
 | Píxel | Cuadrado |
 | Color | sRGB / BT.709, 8 bits por canal |
 | Composición interna | **RGBA con alfa premultiplicado** |
@@ -237,13 +271,13 @@ Al hornear, toda Pieza queda en un formato uniforme:
 
 | Parámetro | Valor |
 |---|---|
-| Fotogramas por segundo | 24 constantes (se convierten 25, 30, 60 y variables) |
+| Fotogramas por segundo | 24 constantes, según la interpretación y el método elegidos (6.7) |
 | Resolución | La original, limitada a **2560 × 1440** (margen para ampliar sin perder calidad) |
 | Video opaco | H.264 alta calidad (CRF 14), `.mp4` |
 | Video con alfa | ProRes 4444, `.mov` |
 | Imagen | PNG (o WebP), sin horneado de video |
 | Audio | WAV 48 kHz estéreo (dentro del video o suelto) |
-| Asas | **1 s extra** antes y después del tramo usado, si el Bruto lo permite |
+| Asas | **1 s fijo** antes y después del tramo usado (24 fotogramas), si el Bruto lo permite |
 
 Así el motor solo trabaja con fuentes de 24 fps y 48 kHz.
 
@@ -265,7 +299,7 @@ una línea de tiempo con Elementos. Un solo motor, un solo compositor y un solo
 historial para todos los niveles.
 
 ```
-CAPÍTULO  (composición de hasta 24 min)
+CAPÍTULO  (composición de 24 min exactos)
  ├── Global: música, narración, títulos generales
  └── MINUTO 00 … MINUTO 23  (ventanas de 60 s)
        └── Elementos (copias de Piezas horneadas)
@@ -321,7 +355,8 @@ hornearla, todas sus copias se actualizan.
 ### 6.1 Jerarquía
 
 ```
-Proyecto → Capítulo (≤ 24 min) → Minuto (60 s) → Segundo (24 f) → Fotograma
+Proyecto → Capítulo (24 min exactos) → Minuto (60 s) → Segundo (24 f) → Fotograma
+   ≤ 1000        34 560 f                 1440 f
 ```
 
 ### 6.2 Reglas
@@ -347,10 +382,17 @@ la misma unidad que el capítulo.
 
 ### 6.4 Regla del marco temporal
 
-Simétrica a la del lienzo: lo que queda **después del final del capítulo**
-existe y se guarda, pero no se reproduce ni se renderiza. El capítulo define
-su `duracion` (por defecto 24:00, máximo 24:00). Las 24 carpetas `min00`–`min23`
-se crean siempre; las que quedan después del final se muestran atenuadas.
+Simétrica a la del lienzo:
+
+- El capítulo mide **siempre 24:00 exactos** (fotogramas 0 a 34 559). No hay
+  duración variable.
+- Las 24 carpetas `min00`–`min23` se crean siempre.
+- Lo que un Elemento de `min23` desborde **más allá de 24:00** existe y se
+  guarda, pero no se reproduce ni se renderiza; la timeline lo muestra
+  atenuado.
+- **El tiempo vacío** (ningún Elemento visible) se renderiza en **negro y
+  silencio**. Así cada minuto dura siempre 1440 fotogramas y cada capítulo
+  34 560.
 
 ### 6.5 Ediciones de tiempo
 
@@ -376,6 +418,59 @@ compuestos**.
 - **Dos Elementos no se solapan en la misma capa**, salvo durante su transición.
 - Orden de apilado: V1 (fondo) … V9, luego T1 … T9 (textos siempre encima).
 - Las capas A no tienen orden visual; se mezclan todas.
+
+### 6.7 Interpretación de fps al recortar (Taller)
+
+Las fuentes llegan con fps distintos: 23,976 · 24 · 25 · 29,97 · 30 · 50 ·
+59,94 · 60, o variables (típico de celulares). El proyecto es 24 fps fijo, así
+que la conversión se decide **una sola vez, al hornear la Pieza**.
+
+**Frontera de normalización:**
+
+```
+BRUTO (fps nativo)  ──►  TALLER (se recorta en fotogramas nativos)  ──►  HORNEADO  ──►  PIEZA (24 fps)
+                                                                         ▲
+                                                             aquí se convierte, una vez
+```
+
+**1. En el Bruto: fps detectado y fps interpretado**
+
+| Campo | Significado |
+|---|---|
+| `fps_detectado` | Lo que declara el archivo (metadatos) |
+| `fps_medido` | Calculado a partir de las marcas de tiempo reales de los fotogramas |
+| `vfr` | `true` si el intervalo entre fotogramas varía (fps variable) |
+| `fps_interpretado` | **El que elige el usuario**; por defecto, el medido |
+
+Si el detectado y el medido no coinciden, o si hay `vfr`, el Taller lo avisa.
+El usuario puede corregir el `fps_interpretado` (por ejemplo, un archivo que
+dice 30 pero en realidad es 29,97).
+
+**2. En el Taller: recorte en la rejilla nativa**
+
+- La mini-timeline del Taller muestra la regla **en fotogramas del Bruto**,
+  según su `fps_interpretado`.
+- Entrada y salida se marcan sobre **fotogramas reales de la fuente**, sin
+  redondeos.
+- El timecode del Taller muestra el fps nativo; la timeline del minuto, siempre
+  24.
+
+**3. En la Pieza: método de conversión a 24 fps**
+
+| Método | Qué hace | Duración | Movimiento | Uso típico |
+|---|---|---|---|---|
+| `tiempo` (por defecto) | Conserva el tiempo real: descarta o duplica fotogramas según su marca de tiempo | Igual | Puede haber saltos leves (30 → 24 descarta 1 de cada 5) | Uso general, fps variable |
+| `conformar` | Usa cada fotograma de la fuente como un fotograma de 24 fps | Cambia | Perfecto | 23,976 → 24 (+0,1 %), 25 → 24 (−4 %) |
+| `camara_lenta` | `conformar` aplicado a fuentes rápidas | Más larga | Perfecto y fluido | 60 → 24 = 2,5× más lento; 48 → 24 = 2× |
+| `mezcla` | Fusiona fotogramas vecinos | Igual | Suave, con algo de desenfoque | 30 → 24 sin saltos |
+| `interpolacion` | Genera fotogramas intermedios por flujo óptico | Igual | Suave; puede crear artefactos; lento | Tomas difíciles |
+
+- Con `conformar` y `camara_lenta` el audio cambia de duración: se estira con
+  corrección de tono o se silencia, a elección.
+- Las **asas** de 1 s se calculan después de la conversión: siempre son 24
+  fotogramas de la Pieza.
+- La receta (`_pieza.json`) guarda el `fps_interpretado` y el método, así que
+  volver a hornear da el mismo resultado.
 
 ---
 
@@ -551,7 +646,7 @@ estar animada y cambia constantemente.
 Ejemplo de `_guion.txt`:
 
 ```
-MINUTO 02 · cap01 · lienzo 1280×720 · 24 fps
+MINUTO 02 · cap0001 · lienzo 1280×720 · 24 fps
 ───────────────────────────────────────────────────────────────────
 02:00.00  V1  ciudad-amanece   12s08  pos (0,0)       esc 1.00  pantalla completa
 02:12.08  V2  puerta-abre       5s00  pos (-400,150)→(200,150)  entra desde izquierda
@@ -577,7 +672,7 @@ MiSerie/                                    ← PROYECTO
 ├── recursos/
 │   ├── fuentes/                            .ttf / .otf usados por los textos
 │   └── luts/                               .cube
-├── cap01/                                  ← CAPÍTULO
+├── cap0001/                                  ← CAPÍTULO
 │   ├── _capitulo.json                      título, duración, registro de renders
 │   ├── global/
 │   │   ├── min00_seg00f00_dur24m00s00_A1_musica-tema__c810.wav
@@ -591,10 +686,13 @@ MiSerie/                                    ← PROYECTO
 │   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f9.json
 │   │   └── min00_seg14f00_dur03s00_T1_titulo-capitulo__d4e2.json
 │   ├── min01/ … min23/
-│   └── render/
-│       ├── cap01_min00_v003.mp4
-│       └── cap01_completo_v002.mp4
-├── cap02/ …
+│   ├── render/
+│   │   ├── cap0001_min00_v003.mp4
+│   │   └── cap0001_completo_v002.mp4
+│   └── shorts/                             ← recortes verticales 9:16
+│       ├── min02_seg10f00_dur45s00_momento-clave__b71c.json       receta
+│       └── min02_seg10f00_dur45s00_momento-clave__b71c_v001.mp4   720×1280
+├── cap0002/ … cap1000/
 ├── .diario/                                operaciones de disco pendientes
 ├── .autosave/                              instantáneas del modelo
 └── .cache/                                 BORRABLE: bancos, pre-renders, ondas, audio de vista previa
@@ -616,12 +714,13 @@ cuenta la historia completa.
 |---|---|
 | Renombrar en cada arrastre | Se reconcilia **al guardar** |
 | Elemento que cambia de minuto | El reconciliador **mueve** los archivos de carpeta, no solo los renombra |
-| Archivo en uso (Windows) | Liberar recursos del motor, renombrar, reintentar |
+| Renombre atómico | En Linux, `os.rename` dentro del mismo sistema de archivos es atómico; el diario cubre las secuencias de varias operaciones |
+| Decodificador con el archivo abierto | Linux permite renombrar archivos abiertos; aun así se liberan los decodificadores antes de reconciliar para no leer rutas viejas |
 | Corte a mitad de operación | **Diario** en `.diario/`: plan escrito antes de ejecutar; al abrir se completa o se revierte |
 | Deshacer | Solo cambia el modelo; el siguiente guardado reconcilia |
 | Se pierde un gemelo | El **escáner** rescata tiempo y capa del nombre; espacio por defecto |
 | Renombre manual | El ID permite reconocer el archivo |
-| Rutas largas en Windows | Nombre descriptivo ≤ 32 caracteres; aviso si la ruta supera 240 |
+| Mayúsculas y minúsculas | Linux las distingue: todos los nombres generados van en minúsculas |
 
 ### 10.2 Componentes
 
@@ -826,8 +925,84 @@ Se guardan en `_minuto.json`, así que sobreviven al cierre del programa.
 2. Escalado Lanczos.
 3. CRF 16–18.
 4. Opción H.265 y 10 bits.
-5. Codificación por hardware (NVENC, QuickSync, VideoToolbox) si existe.
+5. Codificación por hardware en Linux si existe: **VAAPI** (Intel/AMD) o
+   **NVENC** (NVIDIA); si no, `libx264` por software.
 6. Sin marca de agua ni nube.
+
+### 13.5 Shorts verticales 9:16
+
+Un Short **no es un video aparte**: es un **recorte vertical del capítulo
+16:9**, en un rango de tiempo, guardado en `cap0001/shorts/`.
+
+**Geometría**
+
+```
+LIENZO 16:9 · 1280×720
+┌──────────────────────────────────────────────┐
+│              ┌─────────┐                     │
+│              │ VENTANA │                     │
+│              │  9:16   │  405 × 720 px       │
+│              │         │  del lienzo         │
+│              │ x = 437 │                     │
+│              └─────────┘                     │
+└──────────────────────────────────────────────┘
+                    │
+                    ▼
+            SHORT · 720 × 1280
+```
+
+- La ventana ocupa **toda la altura** del lienzo (720 px) y **405 px de
+  ancho** (720 × 9/16).
+- Solo se mueve en horizontal: `x` entre 0 y 875. Por defecto, centrada
+  (`x = 437`).
+- `x` es **animable con keyframes**, para seguir la acción (reencuadre).
+- Opcional: `zoom` ≥ 1.0 para una ventana más pequeña (se acerca a la acción),
+  también animable.
+
+**Calidad: por qué no se recorta el video ya renderizado**
+
+Recortar 405×720 del render a 720p y ampliarlo a 720×1280 lo agranda 1,78
+veces y se ve borroso. En su lugar, el Short **se vuelve a componer**:
+
+1. La matriz del compositor se multiplica por `1280 / 720 = 16/9`.
+2. Solo se compone la **región de la ventana** (región de interés), no el
+   lienzo completo.
+3. Los Elementos se toman de las copias materializadas, que conservan hasta
+   2560×1440, y los textos se dibujan nítidos a la nueva escala.
+
+Resultado: un Short de 720×1280 con el detalle real de las fuentes, no una
+ampliación.
+
+**Receta (`.json`)**
+
+```json
+{
+  "id": "b71c",
+  "capitulo": "cap0001",
+  "tiempo": { "inicio": "min02_seg10f00", "duracion": "dur45s00" },
+  "ventana": {
+    "x": 437,
+    "zoom": 1.0,
+    "keyframes": {
+      "x": [
+        { "f": 0,   "valor": 437, "curva": "ease-in-out" },
+        { "f": 240, "valor": 780 }
+      ]
+    }
+  },
+  "audio": "capitulo",
+  "ultimo_render": { "version": 1, "huella": "…" }
+}
+```
+
+**Reglas**
+
+- El rango puede cruzar minutos, pero **no capítulos**.
+- El audio es el del capítulo en ese rango.
+- El nombre sigue la gramática del tiempo: dice dónde empieza y cuánto dura.
+- Si cambia algún minuto que el Short cruza, su render queda **desactualizado**
+  (misma lógica de huellas).
+- El monitor muestra una **guía 9:16** sobre el lienzo para colocar la ventana.
 
 ---
 
@@ -942,6 +1117,8 @@ python main.py --nuevo RUTA_PROYECTO         crea un proyecto y lo abre
 python main.py --render RUTA_PROYECTO --capitulo 1 [--minutos 00-05]
                                              renderiza sin interfaz
 python main.py --escanear RUTA_PROYECTO      reconstruye el modelo desde el disco y reporta
+python main.py --shorts RUTA_PROYECTO --capitulo 1
+                                             renderiza los Shorts desactualizados del capítulo
 ```
 
 ### 15.2 Arranque
@@ -969,6 +1146,35 @@ main.py
 El `main.py` **crece por épicas**: en E0 solo interpreta argumentos; cada épica
 conecta su parte.
 
+### 15.4 Linux y PyCharm
+
+**Entorno**
+
+- Python 3.12 o superior en un entorno virtual (`.venv/`) creado desde PyCharm.
+- Configuración de ejecución de PyCharm: script `main.py`, directorio de
+  trabajo la raíz del repositorio; parámetros opcionales según 15.1 (por
+  ejemplo, la ruta de un proyecto de prueba).
+
+**Dependencias de sistema** (Debian/Ubuntu como referencia):
+
+| Paquete | Para qué |
+|---|---|
+| `libmpv` (`libmpv2` o `libmpv1` según la versión de la distribución) | Control de video de Flet |
+| `libgtk-3-0`, `libgstreamer1.0-0` | Ventana de escritorio de Flet |
+| `vainfo` + controladores VAAPI (opcional) | Codificación por hardware Intel/AMD |
+| Controlador NVIDIA con NVENC (opcional) | Codificación por hardware NVIDIA |
+| `fonts-dejavu` o similares | Fuentes por defecto para los textos |
+
+PyAV trae FFmpeg dentro de su paquete. En E0 se verifica que incluya los
+codificadores necesarios (`libx264`, `prores_ks`); si falta alguno, se
+documenta cómo usar el FFmpeg del sistema.
+
+**Rutas**
+
+- Todo con `pathlib`. Nada de rutas escritas a mano.
+- Configuración de usuario (proyectos recientes, distribución) en
+  `~/.config/editor/`; valores por defecto en `config/` del repositorio.
+
 ---
 
 ## 16. Interfaz de usuario
@@ -982,7 +1188,7 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
 ┌──────────────┬────────────────────────────────────────┬──────────────┐
 │ NAVEGADOR    │  MONITOR / LIENZO                      │ INSPECTOR    │
 │ Proyecto     │ ┌── mesa de trabajo (gris) ──────────┐ │ x    200 px  │
-│  └ cap01     │ │ ┌──────── LIENZO 1280×720 ───────┐ │ │ y    150 px  │
+│  └ cap0001   │ │ ┌──────── LIENZO 1280×720 ───────┐ │ │ y    150 px  │
 │    ├ min00 ● │ │ │    ┌──────┐                    │ │ │ ancla 0,0    │
 │    ├ min01 ◐ │ │ │    │ V2   │ ← asas             │ │ │ escala 1.00  │
 │    └ …       │ │ │    └──────┘                    │ │ │ rotación 0°  │
@@ -1011,7 +1217,12 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
 | Cola de render | Tareas y entregables |
 
 ### 16.2 Espacios de trabajo
-**Taller**, **Minuto**, **Capítulo**, **Render**: distribuciones guardadas.
+**Taller**, **Minuto**, **Capítulo**, **Shorts**, **Render**: distribuciones
+guardadas.
+
+En **Shorts**: lista de Shorts del capítulo, monitor con el lienzo 16:9 y la
+ventana 9:16 arrastrable, vista previa vertical al lado y timeline del rango
+con los keyframes de la ventana.
 
 ### 16.3 Monitor como control espacial
 - Mesa de trabajo gris: lo que queda fuera se ve semitransparente al editar.
@@ -1019,6 +1230,7 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
 - Asas: mover, escalar, girar; ancla visible.
 - Imán a bordes, centro, otros Elementos y guías.
 - Márgenes seguros: acción 5 %, títulos 10 %.
+- Guía 9:16 activable, para ver qué entra en un Short.
 - Flechas = 1 px, Shift + flechas = 10 px.
 - Al arrastrar, recuadro y asas se dibujan en el canvas de Flet al instante; la
   imagen se refresca ~10 veces por segundo y a calidad completa al soltar.
@@ -1033,14 +1245,16 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
 | Fotograma | ~1 segundo | Cada fotograma |
 
 ### 16.5 Flujo del usuario
-1. Crear proyecto y capítulo → `cap01/min00`…`min23`.
-2. Importar Brutos (se copian a `brutos/`).
-3. Preparar Piezas en el Taller → hornear (normalizadas, con asas) → banco.
+1. Crear proyecto y capítulo → `cap0001/min00`…`min23`.
+2. Importar Brutos (se copian a `brutos/`) → revisar el fps detectado.
+3. Preparar Piezas en el Taller: recortar en fotogramas nativos, elegir el
+   método de conversión → hornear (24 fps, con asas) → banco.
 4. Colocar Piezas en un minuto → copia materializada + gemelo.
 5. Editar tiempo, posicionar y animar, efectos, transiciones, texto, audio.
 6. Guardar → reconciliar, gemelos, guion.
 7. Marcar el minuto como "listo".
 8. Renderizar un minuto, un rango o el capítulo.
+9. Opcional: crear Shorts sobre rangos del capítulo y renderizarlos.
 
 ---
 
@@ -1075,6 +1289,7 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
     │   │   ├── bruto.py  pieza.py  taller.py
     │   │   ├── elemento.py  capa.py  keyframe.py
     │   │   ├── efecto.py  transicion.py  texto.py
+    │   │   ├── short.py                 Short + VentanaVertical
     │   │   └── referencias.py           índice Bruto → Pieza → Elemento → Minuto
     │   ├── comandos/                    N3
     │   │   ├── comando.py  compuesto.py  historial.py
@@ -1085,7 +1300,8 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
     │   │   ├── agregar_efecto.py  quitar_efecto.py  cambiar_transicion.py
     │   │   ├── ripple.py  roll.py  slip.py  slide.py
     │   │   ├── actualizar_fuente.py     tras hornear una Pieza
-    │   │   └── mover_minuto.py
+    │   │   ├── mover_minuto.py
+    │   │   └── editar_short.py          crear, cambiar rango, mover ventana
     │   ├── proyecto_fs/                 N3
     │   │   ├── estructura.py  gemelo.py  manifiestos.py
     │   │   ├── diario.py  reconciliador.py  escaner.py
@@ -1095,16 +1311,18 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
     │   │   ├── decodificador.py  codificador.py
     │   │   ├── cache_fotogramas.py
     │   │   ├── compositor.py  texto.py
+    │   │   ├── conversion_fps.py        tiempo, conformar, cámara lenta, mezcla, interpolación
     │   │   ├── mezclador_audio.py
     │   │   └── efectos/                 biblioteca de efectos
     │   ├── servicios/                   N4
-    │   │   ├── importacion.py           copiar a brutos + análisis
-    │   │   ├── horneado.py              Pieza → archivo normalizado → comando
+    │   │   ├── importacion.py           copiar a brutos + análisis (fps detectado, medido, vfr)
+    │   │   ├── horneado.py              Pieza → conversión a 24 fps → archivo normalizado → comando
     │   │   ├── banco.py  miniaturas.py  forma_onda.py
     │   │   ├── huellas.py               huella y estado de render por minuto
     │   │   ├── vista_previa.py          niveles 1–4 y reloj de audio
     │   │   ├── render.py                minuto, rango, capítulo
     │   │   ├── ensamblado.py            unir minutos + audio
+    │   │   ├── shorts.py                recomposición vertical 720×1280
     │   │   └── guardado.py              guardar y autosave
     │   ├── tareas/                      N4
     │   │   └── cola.py                  prioridades, instantáneas, cancelación
@@ -1121,7 +1339,7 @@ de tamaño y se pliegan; la distribución se guarda en `config/distribucion.json
             ├── inicio.py                pantalla de inicio / proyectos recientes
             ├── navegador.py  monitor.py  asas.py  inspector.py
             ├── mapa_capitulo.py  timeline.py  taller.py
-            ├── editor_curvas.py  cola_render.py
+            ├── editor_curvas.py  cola_render.py  shorts.py
             ├── widgets/                 timecode, transporte, deslizador, rueda de color
             └── recursos/                iconos, temas
 ```
@@ -1137,7 +1355,7 @@ opencv-python-headless
 Pillow
 ```
 
-Las versiones se fijan en E0.
+Las versiones se fijan en E0. Las dependencias de sistema de Linux están en 15.4.
 
 ---
 
@@ -1234,6 +1452,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 **E7. Decodificación y compositor (N3)**
 - Decodificador, codificador, caché, compositor con alfa premultiplicado y
   modos de mezcla, texto.
+- `conversion_fps.py`: los cinco métodos de conversión a 24 fps.
 - Exportar un fotograma de prueba con capas apiladas y medir capas soportadas.
 
 **E8. Mezclador de audio (N3)**
@@ -1241,7 +1460,9 @@ puede ejecutar con `main.py` en modo sin interfaz.
 
 **E9. Cola de tareas y servicios de medios (N4)**
 - `tareas/cola.py` con prioridades e instantáneas.
-- Importación, horneado normalizado con asas, banco, miniaturas, forma de onda.
+- Importación con análisis de fps (detectado, medido, variable).
+- Horneado normalizado a 24 fps con el método elegido y asas de 1 s; banco,
+  miniaturas, forma de onda.
 
 **E10. Render y ensamblado (N4)**
 - Huellas y estados, render por minuto, ensamblado sin recodificar, audio en una
@@ -1268,7 +1489,10 @@ puede ejecutar con `main.py` en modo sin interfaz.
   pistas Global, mapa de 24 minutos con estados.
 
 **E15. Taller**
-- Brutos, mini-timeline de la Pieza, horneado, ida y vuelta con el minuto.
+- Brutos con fps detectado, medido y avisos de fps variable.
+- Mini-timeline de la Pieza en **fotogramas nativos** de la fuente, selector de
+  `fps_interpretado` y de método de conversión.
+- Horneado, ida y vuelta con el minuto.
 
 **E16. Inspector, keyframes y curvas**
 - Inspector, keyframes en precisión de fotograma, editor de curvas bezier.
@@ -1286,13 +1510,18 @@ puede ejecutar con `main.py` en modo sin interfaz.
 **E19. Cola de render y exportación**
 - Panel de cola de render, perfiles, H.265 / 10 bits, codificación por hardware.
 
+**E20. Shorts verticales 9:16**
+- Modelo `Short` y `VentanaVertical`, comando `editar_short`.
+- Servicio de recomposición vertical a 720×1280 con huellas.
+- Espacio de trabajo **Shorts** y guía 9:16 en el monitor.
+- `main.py --shorts` operativo.
+
 ### Fase F — Cierre
 
-**E20. Extras**
-- Atajos configurables, plugins, formatos de lienzo adicionales (9:16, 1:1, 4:5),
-  subtítulos automáticos.
+**E21. Extras**
+- Atajos configurables, plugins, subtítulos automáticos.
 
-**E21. Documentación final**
+**E22. Documentación final**
 - README completo y actualización de este documento con lo implementado.
 
 ### Dependencias entre épicas
@@ -1302,7 +1531,7 @@ E0 → E1 → E2 → E3 → E4 ─┬→ E5 ─┐
                         ├→ E6 ─┼→ E9 → E10 → E11 → E12 → E13 → E14 → E15 → E16
                         └→ E7 → E8 ─┘                                        │
                                                           E17 ← ─ ─ ─ ─ ─ ─ ─┘
-                                                           └→ E18 → E19 → E20 → E21
+                                                           └→ E18 → E19 → E20 → E21 → E22
 ```
 
 E5, E6 y E7 dependen solo de E4 y pueden avanzar en paralelo; E9 necesita las
@@ -1325,7 +1554,8 @@ Metas, no garantías.
 | Render final | 720p por defecto, hasta 4K · H.264 / H.265 · hardware si hay GPU |
 | Deshacer | 100 pasos |
 | Autosave | Cada 120 s |
-| Plataformas | Windows, macOS, Linux |
+| Plataforma | Linux (escritorio), ejecución desde PyCharm |
+| Shorts | 720×1280 · 24 fps · recompuestos desde las fuentes, no ampliados |
 
 ---
 
@@ -1338,15 +1568,21 @@ Metas, no garantías.
 | Rendimiento del nivel 2 en Flet | Medir en E7/E11; bajar resolución o fps del banco; alternativa PySide6 sobre el mismo `core/` |
 | Micro-cortes al cruzar minutos en el nivel 3 | Unir el rango sin recodificar antes de reproducir |
 | Disco por materialización | Piezas cortas; aviso de espacio; posible modo de enlaces en el futuro |
-| Renombres en Windows con archivos abiertos | Liberar recursos antes de reconciliar; reintentos; diario |
 | Cascadas de renombres (ripple de capítulo, mover minuto) | Alcance por minuto por defecto; aviso previo; diario |
 | API de Flet cambiante | Versión fijada; Flet aislado en `app/ui` |
+| Dependencias de sistema de Linux (libmpv, VAAPI) | Documentadas en 15.4; verificación en E0 |
+| Fuentes con fps variable | Medición por marcas de tiempo, aviso en el Taller y método `tiempo` por defecto |
 | Sin tests | Los modos `--escanear` y `--render` de `main.py` sirven como verificación manual; la arquitectura por niveles permite agregar tests más adelante sin reestructurar |
 
-### 21.2 Decisiones abiertas
+### 21.2 Decisiones
 
-1. ¿Capítulos siempre de hasta 24 minutos o con duración variable mayor?
-2. ~~¿30 fps además de 24?~~ **Cerrada: solo 24 fps.** Todo se normaliza a 24 fps; el campo de fotograma del nombre es siempre `f00`–`f23`.
-3. ¿Formatos verticales (9:16) desde el inicio o en E20?
-4. ¿Versión web de la interfaz dentro del alcance?
-5. ¿Duración de las asas: 1 s fijo o configurable?
+Todas cerradas en la revisión 3:
+
+| # | Pregunta | Decisión |
+|---|---|---|
+| 1 | Duración del capítulo | **Exactamente 24 minutos**; capítulos del 1 al 1000 (`cap0001`–`cap1000`) |
+| 2 | fps | **Solo 24 fps**; el nombre usa siempre `f00`–`f23` |
+| 3 | Formatos de lienzo | **Solo 16:9**; el 9:16 existe como Short recortado (E20) |
+| 4 | Plataforma y versión web | **Solo Linux de escritorio**; sin versión web |
+| 5 | Asas | **1 segundo fijo** |
+| 6 | fps de las fuentes al recortar | Interpretación por Bruto + método de conversión por Pieza (6.7) |
