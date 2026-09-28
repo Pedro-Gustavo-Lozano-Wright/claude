@@ -41,6 +41,8 @@ class Taller:
     def __init__(self, app: "Ventana") -> None:
         self.app = app
         self.id_bruto: str | None = None
+        self.escenas: dict[str, list[int]] = {}      # resultados del análisis por Bruto
+        self.silencios: dict[str, list] = {}
         self.id_pieza: str | None = None
         self.posicion = 0
         self.entrada: int | None = None
@@ -168,6 +170,7 @@ class Taller:
             if pieza is not None:
                 acciones.append(ft.OutlinedButton(f"Añadir tramo a P{pieza.numero:03d}",
                                                   on_click=lambda _: self._agregar_tramo()))
+            info += self._analisis(bruto)
         self.marcas_texto.value = self._texto_marcas(bruto)
 
         if pieza is not None:
@@ -190,6 +193,66 @@ class Taller:
             ]
         self.info.controls = info
         self.acciones.controls = acciones
+
+    # --- Análisis (E17): escenas, silencios y audio externo -------------------------------
+
+    def _analisis(self, bruto) -> list[ft.Control]:
+        filas: list[ft.Control] = [ft.Divider()]
+        botones: list[ft.Control] = []
+        if bruto.tipo is TipoMedio.VIDEO:
+            botones.append(ft.OutlinedButton("Buscar escenas", icon=ft.Icons.MOVIE_FILTER,
+                                             on_click=lambda _: self._buscar_escenas(bruto.id)))
+        if bruto.tiene_audio or bruto.tipo is TipoMedio.AUDIO:
+            botones.append(ft.OutlinedButton("Buscar silencios", icon=ft.Icons.VOLUME_OFF,
+                                             on_click=lambda _: self._buscar_silencios(bruto.id)))
+        if bruto.tipo is TipoMedio.AUDIO:
+            botones.append(ft.OutlinedButton(
+                "Alinear con el Elemento seleccionado", icon=ft.Icons.SYNC,
+                tooltip="Coloca este audio sincronizado con el sonido del Elemento elegido en la timeline",
+                on_click=lambda _: self._alinear(bruto.id)))
+        if botones:
+            filas.append(ft.Row(botones, wrap=True, spacing=6))
+        fps = bruto.fps or Fraction(FPS)
+        escenas = self.escenas.get(bruto.id)
+        if escenas is not None:
+            filas.append(texto_suave(f"Escenas: {len(escenas)} cortes (clic: ir al corte y marcar entrada)"))
+            filas.append(ft.Row([ft.TextButton(f"f {f}", on_click=lambda _, n=f: self._ir_y_marcar(n, entrada=True))
+                                 for f in escenas[:40]], wrap=True, spacing=0))
+        silencios = self.silencios.get(bruto.id)
+        if silencios is not None:
+            filas.append(texto_suave(f"Silencios: {len(silencios)} (clic: ir al final del silencio y marcar entrada)"))
+            filas.append(ft.Row([
+                ft.TextButton(f"{s.inicio:.1f}–{s.fin:.1f} s",
+                              on_click=lambda _, n=int(s.fin * fps): self._ir_y_marcar(n, entrada=True))
+                for s in silencios[:40]], wrap=True, spacing=0))
+        return filas
+
+    def _buscar_escenas(self, id_bruto: str) -> None:
+        def listo(cortes) -> None:
+            self.escenas[id_bruto] = cortes
+            self.app.refrescar("taller")
+        ctl.detectar_escenas(self.sesion, id_bruto, listo)
+        self.app.aviso_breve("Buscando escenas…")
+
+    def _buscar_silencios(self, id_bruto: str) -> None:
+        def listo(tramos) -> None:
+            self.silencios[id_bruto] = tramos
+            self.app.refrescar("taller")
+        ctl.detectar_silencios(self.sesion, id_bruto, listo)
+        self.app.aviso_breve("Buscando silencios…")
+
+    def _alinear(self, id_bruto: str) -> None:
+        referencia = self.sesion.seleccionado()
+        if referencia is None:
+            self.app.avisar("Elija primero en la timeline el Elemento con el sonido de referencia.")
+            return
+        ctl.sincronizar_audio(self.sesion, referencia.id, id_bruto)
+        self.app.aviso_breve("Comparando audio…")
+
+    def _ir_y_marcar(self, fotograma: int, entrada: bool) -> None:
+        self.posicion = max(0, fotograma)
+        self.marcar_entrada() if entrada else self.marcar_salida()
+        self._pedir_visor()
 
     def _texto_marcas(self, bruto) -> str:
         if bruto is None:

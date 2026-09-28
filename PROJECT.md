@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 10. Fases A–D (E0–E16) implementadas y consolidadas. Siguiente: **Fase E — Completar la edición, empezando por E17** (sección 19). Instalación y uso: [README.md](README.md).
+- **Estado:** revisión 11. Fases A–E (E0–E18) implementadas. Siguiente: **Fase F — Capacidades creativas (E19 Efectos, transiciones y texto)**. Instalación y uso: [README.md](README.md).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 10](#0-cambios-de-las-revisiones-2-a-10)
+0. [Cambios de las revisiones 2 a 11](#0-cambios-de-las-revisiones-2-a-11)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,56 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 10
+## 0. Cambios de las revisiones 2 a 11
+
+### Revisión 11: Fase E (completar la edición) implementada
+
+**Regla nueva: un solo capítulo en memoria.** El capítulo es la unidad de trabajo;
+cambiar de capítulo es cerrar uno y abrir otro:
+
+| Aspecto | Comportamiento |
+|---|---|
+| Cambiar o crear capítulo con cambios | Diálogo "Guardar y continuar" / "Cancelar" |
+| Al cambiar | Se descarga el anterior (y sus Elementos salen del índice de referencias), el historial empieza vacío, el portapapeles se vacía |
+| "¿Algo depende de esto?" en capítulos no cargados | Se lee del disco sin armar el modelo (`proyecto_fs/consultas.py`: fuentes de los gemelos, idiomas de `_capitulo.json`); lo no cargado siempre está guardado |
+| Autosave | Solo el capítulo cargado (el único que puede tener cambios) |
+| `mover_entre_capitulos` | Queda en el núcleo pero la interfaz no lo usa (dos capítulos a la vez) |
+
+**E17 — Timeline y Taller completos**
+
+| Qué | Dónde |
+|---|---|
+| Mover en grupo con la selección múltiple (un paso de deshacer, imán en el arrastrado) | `MoverElementos`; `controladores/timeline.arrastrar(..., originales_grupo)` |
+| Miniaturas en pistas V y forma de onda en pistas A (se generan si faltan) | `ui/pistas_medios.py`; `preparar_vista_previa` ahora sirve también a audios e imágenes |
+| Línea de volumen en las pistas A; **Alt + arrastrar** la mueve (keyframe en el cabezal si el volumen está animado) | `timeline.fijar_volumen` |
+| Transiciones visibles (triángulo al comienzo del Elemento) y editables en el inspector | `DescriptorTransicion`, `timeline.cambiar_transicion` |
+| Capa destino de audio (A1…) | `EstadoApp.capa_destino_audio` |
+| Buscar Elementos por nombre (Ctrl+F; Enter = siguiente) | `timeline.buscar` |
+| Taller: buscar escenas y silencios (marcas en las que se hace clic) | `servicios/analisis.py` |
+| Taller: alinear un audio externo con el sonido del Elemento elegido | `analisis.desfase` (envolventes a 1 kHz, FFT); `taller.sincronizar_audio` |
+
+**E18 — Proyecto, idiomas y mantenimiento** (menú ☰ Proyecto)
+
+| Qué | Dónde |
+|---|---|
+| Idiomas del proyecto (el primero es el principal); no se quita uno en uso | `comandos/proyecto.CambiarIdiomas` |
+| Atajos editables (solo se guardan los distintos de fábrica; se rechazan repetidos) | `teclado.guardar_atajos`, `ui/dialogos_proyecto.py` |
+| Mantenimiento: tamaños, vaciar caché (con la cola quieta), vaciar papelera (tras guardar; olvida el historial), quitar Brutos sin uso | `servicios/mantenimiento.py` |
+| Espacio en disco antes de hornear y renderizar (importar ya lo hacía) | `mantenimiento.comprobar_espacio` |
+
+**Corregido**: crear un capítulo escribía `_proyecto.json` sin registrarlo y el
+siguiente guardado lo veía como "modificado fuera del programa"
+(`registrar_manifiesto_proyecto`).
+
+**Verificado** (recorrido temporal fuera del repositorio): cortes de escena exactos
+(45 y 100 en un video de prueba), silencio de 3,0–5,0 s, desfase de +1,50 s con 94 %
+de confianza, mover en grupo fusionado y deshecho, idiomas, búsqueda, volumen,
+transición, regla de un capítulo, dependencias leídas del disco, espacio en disco.
+
+**Pendiente de E17/E18 que pasa a épicas posteriores**: recortar en grupo (E24,
+junto con el rendimiento de la timeline); ajuste por tramo con relaciones de
+aspecto distintas en una Pieza (E19).
+
 
 ### Revisión 10: orden de las épicas pendientes y guía de instalación en el README
 
@@ -1959,8 +2008,10 @@ Las revisiones 1–9 usan la numeración vieja de las épicas pendientes:
 | E14 | ✅ | Timeline (4 zooms, 6 herramientas, imán, fantasmas, Global, cabeceras de capa con idioma, marcadores, I/O, texto) y mapa del capítulo (3 estados, listo, intercambiar) |
 | E15 | ✅ (parcial) | Brutos, visor nativo, fps interpretado, método, tramos, hornear, colocar. Pendiente: detección de escenas y silencios, sincronía de audio externo |
 | E16 | ✅ | Inspector por grupos, keyframes (rombo, saltar), editor de curvas con bezier, historial |
-| E17 | **Siguiente** | Timeline y Taller completos |
-| E18–E24 | Pendiente | Ver el orden de la revisión 10 |
+| E17 | ✅ | Timeline y Taller completos (revisión 11) |
+| E18 | ✅ | Proyecto, idiomas y mantenimiento; un capítulo en memoria |
+| E19 | **Siguiente** | Efectos, transiciones y texto |
+| E20–E24 | Pendiente | |
 
 ### Decisiones tomadas al implementar la Fase B
 

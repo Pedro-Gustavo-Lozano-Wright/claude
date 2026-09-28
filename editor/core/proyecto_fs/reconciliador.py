@@ -456,6 +456,15 @@ def guardar(proyecto: Proyecto, estado: EstadoDisco, solo_lectura: bool = False,
     return ResultadoGuardado(True, len(plan.operaciones), plan.conflictos, plan.pendientes, errores)
 
 
+def registrar_manifiesto_proyecto(proyecto: Proyecto, estado: EstadoDisco) -> None:
+    """Tras escribir `_proyecto.json` fuera de un guardado (p. ej. al crear un capítulo):
+    lo escrito por el programa no debe verse después como "modificado fuera del programa"."""
+    assert proyecto.raiz is not None
+    ruta = estructura.ruta_manifiesto_proyecto(proyecto.raiz)
+    estado.proyecto = RegistroArchivo(estructura.relativa(proyecto.raiz, ruta), Firma.de(ruta),
+                                      huella(proyecto_a_datos(proyecto)))
+
+
 def refrescar_estado(proyecto: Proyecto, estado: EstadoDisco) -> None:
     """Deja el estado conocido igual a lo que hay en disco para lo cargado en memoria."""
     assert proyecto.raiz is not None

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from editor.core.ajustes import ARCHIVO_ATAJOS, CONFIG_REPOSITORIO, CONFIG_USUARIO, leer_json
+from editor.core.ajustes import ARCHIVO_ATAJOS, CONFIG_REPOSITORIO, CONFIG_USUARIO, escribir_json, leer_json
 
 _NOMBRES = {
     " ": "Space", "Space": "Space",
@@ -31,14 +31,42 @@ def normalizar(tecla: str, ctrl: bool = False, shift: bool = False, alt: bool = 
     return "+".join(partes + [nombre])
 
 
+def _leer(ruta) -> dict[str, str]:
+    try:
+        return {k: v for k, v in leer_json(ruta).items() if isinstance(v, str)}
+    except (OSError, ValueError):
+        return {}
+
+
+def atajos_por_accion() -> dict[str, str]:
+    """acción → combinación tal como se escribe ("Ctrl+Shift+Z"); los del usuario reemplazan a los de fábrica."""
+    return {**_leer(CONFIG_REPOSITORIO / ARCHIVO_ATAJOS), **_leer(CONFIG_USUARIO / ARCHIVO_ATAJOS)}
+
+
+def guardar_atajos(nuevos: dict[str, str]) -> list[str]:
+    """Guarda en `~/.config/editor/atajos.json` solo lo que difiere de fábrica.
+
+    Devuelve los problemas (combinación repetida); si hay alguno, no guarda nada.
+    """
+    usadas: dict[str, str] = {}
+    problemas = []
+    for accion, combinacion in nuevos.items():
+        clave = combinacion if "Flechas" in combinacion else normalizar_combinacion(combinacion)
+        if clave in usadas:
+            problemas.append(f"{combinacion}: la usan «{usadas[clave]}» y «{accion}»")
+        usadas[clave] = accion
+    if problemas:
+        return problemas
+    fabrica = _leer(CONFIG_REPOSITORIO / ARCHIVO_ATAJOS)
+    propios = {accion: c for accion, c in nuevos.items() if fabrica.get(accion) != c}
+    CONFIG_USUARIO.mkdir(parents=True, exist_ok=True)
+    escribir_json(CONFIG_USUARIO / ARCHIVO_ATAJOS, propios)
+    return []
+
+
 def cargar_atajos() -> dict[str, str]:
-    """combinación → acción. Los del usuario (`~/.config/editor/atajos.json`) reemplazan a los del repositorio."""
-    datos: dict[str, str] = {}
-    for ruta in (CONFIG_REPOSITORIO / ARCHIVO_ATAJOS, CONFIG_USUARIO / ARCHIVO_ATAJOS):
-        try:
-            datos.update({k: v for k, v in leer_json(ruta).items() if isinstance(v, str)})
-        except (OSError, ValueError):
-            pass
+    """combinación → acción."""
+    datos = atajos_por_accion()
     combinaciones: dict[str, str] = {}
     for accion, combinacion in datos.items():
         if "Flechas" in combinacion:          # "Alt+Flechas" → Alt+Left, Alt+Right…
@@ -66,6 +94,9 @@ class Teclado:
         self.atajos = cargar_atajos()
         self._foco = obtener_foco
         self.acciones: dict[str, Callable[..., None]] = {}
+
+    def recargar(self) -> None:
+        self.atajos = cargar_atajos()
 
     def registrar(self, accion: str, funcion: Callable[..., None]) -> None:
         self.acciones[accion] = funcion

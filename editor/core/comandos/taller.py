@@ -99,6 +99,7 @@ class QuitarBruto(_EdicionTaller):
 
     def ejecutar(self, proyecto: Proyecto) -> None:
         self._reiniciar()
+        # Solo hay un capítulo cargado: los demás los revisa quien llama (proyecto_fs.consultas).
         piezas, dependientes = proyecto.referencias.dependientes_de_bruto(self.id_bruto)
         if dependientes:
             raise EdicionRechazada(f"El Bruto se usa en {len(dependientes)} Elementos; quítelos primero.")

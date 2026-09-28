@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from editor.app.estado import Sesion
-from editor.core.servicios import huellas, render
+from editor.core.estandar import FOTOGRAMAS_POR_MINUTO
+from editor.core.servicios import huellas, mantenimiento, render
+from editor.core.servicios.importacion import EspacioInsuficiente
 from editor.core.tareas.cola import RENDER_FINAL, Tarea
 from editor.core.modelo.minuto import EstadoRender
 
@@ -11,6 +13,17 @@ from editor.core.modelo.minuto import EstadoRender
 def renderizar(sesion: Sesion, desde: int | None, hasta: int | None, por_idioma: bool = False) -> None:
     if sesion.solo_lectura:
         sesion.avisar("El proyecto está abierto en solo lectura: no se puede renderizar.")
+        return
+    estandar = sesion.proyecto.estandar
+    minutos = 24 if desde is None else (hasta if hasta is not None else desde) - desde + 1
+    # El capítulo completo necesita los minutos más el ensamblado (otra copia).
+    fotogramas = minutos * FOTOGRAMAS_POR_MINUTO * (2 if desde is None else 1)
+    try:
+        assert sesion.proyecto.raiz is not None
+        mantenimiento.comprobar_espacio(sesion.proyecto.raiz, mantenimiento.estimar_video(
+            fotogramas, estandar.lienzo_ancho, estandar.lienzo_alto), "renderizar")
+    except EspacioInsuficiente as error:
+        sesion.avisar(str(error))
         return
     pedido = render.PedidoRender.crear(
         sesion.proyecto, sesion.estado.capitulo, desde, hasta,

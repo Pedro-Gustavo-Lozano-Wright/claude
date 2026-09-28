@@ -103,8 +103,15 @@ class Proyecto:
         return capitulo
 
     def descargar_capitulo(self, numero: int) -> None:
-        """Libera un capítulo de la memoria (solo si no tiene cambios sin guardar; lo decide quien llama)."""
-        self.capitulos.pop(numero, None)
+        """Libera un capítulo de la memoria (solo si no tiene cambios sin guardar; lo decide quien llama).
+
+        Sus Elementos salen también del índice de referencias: lo que usa un capítulo no
+        cargado se consulta en disco (`proyecto_fs.consultas`).
+        """
+        capitulo = self.capitulos.pop(numero, None)
+        if capitulo is not None:
+            for elemento in capitulo.todos_los_elementos():
+                self.referencias.olvidar(elemento.id)
 
     def capitulos_cargados(self) -> list[Capitulo]:
         return [self.capitulos[n] for n in sorted(self.capitulos)]

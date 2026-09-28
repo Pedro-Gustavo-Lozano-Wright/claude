@@ -15,10 +15,13 @@ import flet.canvas as cv
 
 from editor.app.controladores import timeline as ctl
 from editor.app.estado import ZOOMS
+from editor.app.ui.pistas_medios import ProveedorMedios
 from editor.app.ui.tema import TEMA, texto_suave
 from editor.app.ui.widgets import actualizar, timecode
 from editor.core.comandos import CambiarEstadoCapa
+from editor.core.servicios import importacion
 from editor.core.estandar import FOTOGRAMAS_POR_CAPITULO, FOTOGRAMAS_POR_MINUTO, FPS
+from editor.core.modelo.bruto import TipoMedio
 from editor.core.modelo.capa import TipoCapa
 from editor.core.modelo.marcador import clave_capa
 
@@ -83,6 +86,17 @@ class Timeline:
             options=[ft.DropdownOption(key=c, text=c) for c in ctl.capas_de_tipo(TipoCapa.VIDEO)],
             on_select=self._cambiar_destino,
         )
+        self.capa_destino_audio = ft.Dropdown(
+            width=90, dense=True, label="Audio", value=app.sesion.estado.capa_destino_audio,
+            options=[ft.DropdownOption(key=c, text=c) for c in ctl.capas_de_tipo(TipoCapa.AUDIO)],
+            on_select=self._cambiar_destino_audio,
+        )
+        self.busqueda = ft.TextField(
+            dense=True, width=150, hint_text="Buscar (Ctrl+F)", text_size=TEMA.tamano_pequeno,
+            prefix_icon=ft.Icons.SEARCH, on_submit=self._buscar,
+            on_focus=lambda _: app.enfocar("texto"), on_blur=lambda _: app.enfocar("timeline"),
+        )
+        self.medios = ProveedorMedios(app.sesion, lambda: self.app.refrescar("timeline"))
         barra = ft.Row(
             [
                 *self.botones_herramienta.values(),
@@ -95,10 +109,12 @@ class Timeline:
                 ft.IconButton(ft.Icons.CROP, tooltip="Quitar el rango I–O (Shift: extraer)", icon_size=18,
                               on_click=lambda _: self._quitar_rango()),
                 self.capa_destino,
+                self.capa_destino_audio,
                 ft.Checkbox(label="Global", value=app.sesion.estado.destino_global,
                             tooltip="Colocar en la pista Global del capítulo (música, logo fijo)",
                             on_change=self._cambiar_destino_global),
                 ft.Container(expand=True),
+                self.busqueda,
                 self.titulo,
                 ft.IconButton(ft.Icons.ZOOM_OUT, tooltip="Pistas más bajas", icon_size=18,
                               on_click=lambda _: self._alto(-6)),
@@ -144,6 +160,7 @@ class Timeline:
         alto = ALTO_REGLA + len(self.pistas) * self.alto_pista
         self.lienzo.height = alto
         self.lienzo.width = self.ancho
+        self._miniaturas_usadas = 0
         self.lienzo.shapes = self._regla(vista) + self._capas(vista)
         self._cabeceras()
         self.mover_cabezal()
@@ -238,6 +255,12 @@ class Timeline:
                                           paint=_pintura(TEMA.fantasma, 0.9, relleno=False)))
                 else:
                     formas.append(cv.Rect(x0, y, ancho, alto, border_radius=3, paint=_pintura(color, opacidad)))
+                    formas += self._contenido(elemento, vista, x0, x1, y, alto)
+                if elemento.transicion_entrada is not None:
+                    xt = min(x1, vista.x(elemento.inicio + elemento.transicion_entrada.duracion))
+                    formas.append(cv.Path([cv.Path.MoveTo(x0, y + alto), cv.Path.LineTo(xt, y),
+                                           cv.Path.LineTo(xt, y + alto), cv.Path.Close()],
+                                          paint=_pintura(TEMA.seleccion, 0.35)))
                 if elemento.en_global:
                     formas.append(cv.Rect(x0, y, ancho, alto, border_radius=3,
                                           paint=_pintura(TEMA.global_borde, relleno=False, grosor=1.5)))
@@ -249,6 +272,61 @@ class Timeline:
                 if ancho > 24:
                     formas.append(cv.Text(x0 + 4, y + 2, elemento.nombre, style=estilo, max_width=ancho - 8, max_lines=1,
                                           ellipsis="…"))
+        return formas
+
+    # Límites para no enviar demasiado al canvas en cada redibujo.
+    MAX_MINIATURAS_POR_ELEMENTO = 8
+    MAX_MINIATURAS = 48
+
+    def _contenido(self, elemento, vista: ctl.Vista, x0: float, x1: float, y: float, alto: float) -> list[cv.Shape]:
+        """Miniaturas (V), forma de onda y línea de volumen (A) dentro del rectángulo del Elemento."""
+        formas: list[cv.Shape] = []
+        ancho = x1 - x0
+        if ancho < 12 or alto < 20:
+            return formas
+        ruta = self.sesion.vista_previa.resolutor(elemento)
+        if elemento.capa.tipo is TipoCapa.VIDEO and ruta is not None and self._miniaturas_usadas < self.MAX_MINIATURAS:
+            alto_mini = int(alto - 14)
+            if alto_mini >= 14:
+                ancho_mini = alto_mini * 16 / 9
+                cantidad = max(1, min(self.MAX_MINIATURAS_POR_ELEMENTO, int(ancho // ancho_mini)))
+                fija = importacion.tipo_de(ruta) is TipoMedio.IMAGEN
+                total = max(1, elemento.tiempo.fuente_duracion or elemento.duracion)
+                for k in range(cantidad):
+                    x = x0 + k * (ancho / cantidad)
+                    f = vista.f(x + 1)
+                    f = min(max(f, elemento.inicio), elemento.fin - 1)
+                    datos = (self.medios.imagen_fija(ruta, alto_mini) if fija
+                             else self.medios.miniatura(ruta, elemento.fotograma_fuente(f) / total, alto_mini))
+                    if datos is None:
+                        break
+                    formas.append(cv.Image(datos, x + 1, y + 13, min(ancho_mini, ancho / cantidad - 2), alto_mini))
+                    self._miniaturas_usadas += 1
+        if elemento.suena and ruta is not None and elemento.capa.tipo is TipoCapa.AUDIO:
+            picos = self.medios.onda(ruta)
+            centro, amplitud = y + alto / 2 + 5, (alto - 14) / 2
+            if picos:
+                trazo: list = []
+                paso = max(1.0, ancho / 400)            # como mucho ~400 columnas por Elemento
+                x = max(0.0, x0)
+                while x < min(x1, self.ancho):
+                    f = min(max(vista.f(x), elemento.inicio), elemento.fin - 1)
+                    n = elemento.fotograma_fuente(f)
+                    pico = max(picos[n]) if 0 <= n < len(picos) else 0.0
+                    # Raíz: los audios bajos (música de fondo) también se ven.
+                    h = (pico ** 0.5) * amplitud * min(1.0, elemento.volumen_en(f))
+                    trazo += [cv.Path.MoveTo(x, centro - h), cv.Path.LineTo(x, centro + h)]
+                    x += paso
+                formas.append(cv.Path(trazo, paint=_pintura(TEMA.texto, 0.55, relleno=False, grosor=1)))
+            # Línea de volumen (Alt + arrastrar la cambia): 100 % a media altura.
+            puntos: list = []
+            for k in range(0, 41):
+                x = x0 + ancho * k / 40
+                f = min(max(vista.f(x), elemento.inicio), elemento.fin - 1)
+                volumen = elemento.animacion.valor("volumen", elemento.local(f), elemento.audio.volumen)
+                yv = y + 12 + ctl.altura_de_volumen(volumen) * (alto - 14)
+                puntos.append(cv.Path.MoveTo(x, yv) if k == 0 else cv.Path.LineTo(x, yv))
+            formas.append(cv.Path(puntos, paint=_pintura(TEMA.marcador, 0.9, relleno=False, grosor=1.5)))
         return formas
 
     def _cabeceras(self) -> None:
@@ -363,9 +441,17 @@ class Timeline:
         # ya la decidió el toque (sumar o quitar) y aquí no se toca.
         if elemento.id not in self.sesion.estado.seleccion and not self.app.shift_presionado:
             self.app.seleccionar({elemento.id}, refrescar=False)
+        if self.app.alt_presionado and elemento.suena and elemento.capa.tipo is TipoCapa.AUDIO:
+            # Alt + arrastrar en un audio: la línea de volumen sigue al puntero.
+            fila = self.pistas.index(self._pista_en(y))
+            self._arrastre = {"tipo": "volumen", "id": elemento.id, "y_fila": ALTO_REGLA + fila * self.alto_pista}
+            return
+        seleccion = self.sesion.seleccionados()
+        grupo = ({e.id: copy.deepcopy(e) for e in seleccion}
+                 if len(seleccion) > 1 and elemento.id in self.sesion.estado.seleccion else None)
         self._arrastre = {
             "tipo": "elemento", "id": elemento.id, "original": copy.deepcopy(elemento),
-            "zona": ctl.zona_de(elemento, vista, x), "x0": x, "vista": vista,
+            "zona": ctl.zona_de(elemento, vista, x), "x0": x, "vista": vista, "grupo": grupo,
             # Sin desplazamiento no se ejecuta nada (un clic no deja pasos vacíos en el historial).
             "ultimo_delta": (0, self._pista_en(y)),
         }
@@ -377,6 +463,14 @@ class Timeline:
         x, y = evento.local_position.x, evento.local_position.y
         if arrastre["tipo"] == "cabezal":
             self.app.mover_cabezal_a(self.vista().f(x))
+            return
+        if arrastre["tipo"] == "volumen":
+            relativa = (y - arrastre["y_fila"] - 14) / max(1.0, self.alto_pista - 18)
+            volumen = ctl.volumen_desde_altura(max(0.0, min(1.0, relativa)))
+            if ctl.fijar_volumen(self.sesion, arrastre["id"], volumen):
+                self.app.aviso_breve(f"Volumen {volumen * 100:.0f} %")
+                self.refrescar()
+                actualizar(self.control)
             return
         vista: ctl.Vista = arrastre["vista"]
         delta = round((x - arrastre["x0"]) / vista.px_por_fotograma())
@@ -390,7 +484,8 @@ class Timeline:
         antes = self.sesion.avisar
         self.sesion.avisar = self.app.aviso_breve   # los choques al arrastrar no abren diálogos
         try:
-            ctl.arrastrar(self.sesion, elemento, arrastre["zona"], arrastre["original"], delta, vista, pista)
+            ctl.arrastrar(self.sesion, elemento, arrastre["zona"], arrastre["original"], delta, vista, pista,
+                          arrastre["grupo"])
         finally:
             self.sesion.avisar = antes
         self.refrescar()
@@ -398,7 +493,7 @@ class Timeline:
 
     def _soltar(self, _evento) -> None:
         arrastre, self._arrastre = self._arrastre, None
-        if arrastre is not None and arrastre["tipo"] == "elemento":
+        if arrastre is not None and arrastre["tipo"] in ("elemento", "volumen"):
             self.app.refrescar("timeline", "monitor", "inspector", "mapa")
 
     def _rueda(self, evento: ft.ScrollEvent) -> None:
@@ -427,6 +522,22 @@ class Timeline:
 
     def _cambiar_destino(self, evento) -> None:
         self.sesion.estado.capa_destino = evento.control.value
+
+    def _cambiar_destino_audio(self, evento) -> None:
+        self.sesion.estado.capa_destino_audio = evento.control.value
+
+    def enfocar_busqueda(self) -> None:
+        self.app.page.run_task(self.busqueda.focus)
+
+    def _buscar(self, evento) -> None:
+        """Enter: siguiente Elemento cuyo nombre contiene el texto (vuelve a empezar al final)."""
+        actual = self.sesion.seleccionado()
+        elemento = ctl.buscar(self.sesion, evento.control.value or "", actual.id if actual else None)
+        if elemento is None:
+            self.app.aviso_breve("Ningún Elemento de este capítulo tiene ese nombre.")
+            return
+        self.app.seleccionar({elemento.id})
+        self.app.mover_cabezal_a(elemento.inicio)
 
     def _cambiar_destino_global(self, evento) -> None:
         self.sesion.estado.destino_global = bool(evento.control.value)

@@ -28,7 +28,9 @@ from editor.core.comandos import (
     QuitarKeyframe,
     ReordenarEfecto,
 )
+from editor.app.controladores import timeline as ctl_timeline
 from editor.core.modelo.efecto import descriptor_efecto, efecto_nuevo, tipos_efecto
+from editor.core.modelo.transicion import DIRECCIONES, descriptor_transicion, tipos_transicion
 from editor.core.espacio.transform import MODOS_MEZCLA
 from editor.core.modelo.keyframe import Keyframe
 from editor.core.modelo.texto import ALINEACIONES, ANIMACIONES_TEXTO
@@ -138,6 +140,7 @@ class Inspector:
                                             lambda v: self._propiedad(elemento, "audio.fundido_entrada", max(0, int(v)))))
             filas.append(self._campo_numero("fundido salida", elemento.audio.fundido_salida, "f",
                                             lambda v: self._propiedad(elemento, "audio.fundido_salida", max(0, int(v)))))
+        filas += self._transicion(elemento)
         if elemento.es_visual:
             filas += self._efectos(elemento)
         self.cuerpo.controls = filas
@@ -246,6 +249,37 @@ class Inspector:
         if indice_efecto is not None:
             return fila   # el editor de curvas trabaja con las propiedades del Elemento (efectos: E19)
         return ft.GestureDetector(content=fila, on_tap=lambda _: self._activar(propiedad))
+
+    def _transicion(self, elemento) -> list[ft.Control]:
+        """Transición de entrada: solapa con el Elemento anterior de la capa durante su duración."""
+        actual = elemento.transicion_entrada
+        ninguna = "ninguna"
+
+        def cambiar(tipo=None, duracion=None, direccion=None) -> None:
+            elegido = tipo if tipo is not None else (actual.tipo if actual else None)
+            if elegido in (None, ninguna):
+                hecho = ctl_timeline.cambiar_transicion(self.sesion, elemento.id, None)
+            else:
+                hecho = ctl_timeline.cambiar_transicion(self.sesion, elemento.id, elegido, duracion, direccion)
+            if hecho:
+                self.app.refrescar("inspector", "timeline", "monitor", "mapa")
+
+        filas: list[ft.Control] = [ft.Text("TRANSICIÓN DE ENTRADA", size=TEMA.tamano_pequeno, color=TEMA.texto_suave),
+                                   ft.Dropdown(
+                                       dense=True, width=200, label="Tipo", value=actual.tipo if actual else ninguna,
+                                       options=[ft.DropdownOption(key=ninguna, text="Ninguna")] + [
+                                           ft.DropdownOption(key=t, text=descriptor_transicion(t).etiqueta)
+                                           for t in tipos_transicion()],
+                                       on_select=lambda e: cambiar(tipo=e.control.value))]
+        if actual is not None:
+            filas.append(self._campo_numero("duración", actual.duracion, "f",
+                                            lambda v: cambiar(duracion=max(1, int(v)))))
+            if descriptor_transicion(actual.tipo).usa_direccion:
+                filas.append(ft.Dropdown(
+                    dense=True, width=200, label="Dirección", value=actual.direccion,
+                    options=[ft.DropdownOption(key=d, text=d) for d in DIRECCIONES],
+                    on_select=lambda e: cambiar(direccion=e.control.value)))
+        return filas
 
     def _efectos(self, elemento) -> list[ft.Control]:
         """Pila de efectos: agregar, activar, parámetros con keyframes, opciones, subir y quitar."""

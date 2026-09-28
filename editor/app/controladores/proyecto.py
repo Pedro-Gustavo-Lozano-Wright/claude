@@ -14,12 +14,16 @@ from typing import Callable
 
 from editor.app.estado import Sesion
 from editor.core.ajustes import Ajustes
+from editor.core.comandos.compuesto import ComandoCompuesto
+from editor.core.comandos.proyecto import CambiarIdiomas
+from editor.core.comandos.taller import QuitarBruto
 from editor.core.estandar import Estandar
+from editor.core.servicios import mantenimiento
 from editor.core.eventos import BusEventos, CapituloCreado, ProyectoAbierto
-from editor.core.proyecto_fs import autosave, estructura
+from editor.core.proyecto_fs import autosave, consultas, estructura
 from editor.core.proyecto_fs.bloqueo import InfoBloqueo, ProyectoBloqueado
 from editor.core.proyecto_fs.escaner import Informe, NoEsProyecto, abrir_proyecto
-from editor.core.proyecto_fs.reconciliador import ResultadoGuardado
+from editor.core.proyecto_fs.reconciliador import ResultadoGuardado, registrar_manifiesto_proyecto
 
 
 @dataclass
@@ -73,7 +77,7 @@ def crear(
 def restaurar_autosave(sesion: Sesion) -> None:
     autosave.restaurar_instantanea(sesion.proyecto)
     sesion.vista_previa.actualizar_taller(sesion.proyecto)
-    # Lo restaurado no está en disco: hasta guardar, cerrar debe preguntar.
+    # Lo restaurado no está en disco: hasta guardar, cerrar o cambiar de capítulo pregunta.
     sesion.historial.marcar_sin_guardar()
 
 
@@ -86,9 +90,62 @@ def guardar(sesion: Sesion, forzar: bool = False) -> ResultadoGuardado:
     return sesion.guardado.guardar(forzar=forzar)
 
 
+# --- Idiomas del proyecto (E18) ---------------------------------------------------------
+
+def cambiar_idiomas(sesion: Sesion, idiomas: list[str]) -> bool:
+    """El primero es el principal. Se deshace; las capas A que usen un idioma quitado lo impiden."""
+    assert sesion.proyecto.raiz is not None
+    cargados = {c.numero for c in sesion.proyecto.capitulos_cargados()}
+    fuera = consultas.idiomas_en_disco(sesion.proyecto.raiz, cargados)
+    if sesion.ejecutar(lambda: CambiarIdiomas(idiomas, fuera)):
+        if sesion.estado.idioma_escucha not in sesion.proyecto.idiomas:
+            sesion.estado.idioma_escucha = sesion.proyecto.idioma_principal or None
+        return True
+    return False
+
+
+# --- Mantenimiento (E18) ----------------------------------------------------------------
+
+def tamanos(sesion: Sesion) -> dict[str, int]:
+    assert sesion.proyecto.raiz is not None
+    return mantenimiento.tamanos(sesion.proyecto.raiz)
+
+
+def vaciar_cache(sesion: Sesion) -> int:
+    """Con la cola en marcha podría borrarse algo que una tarea está escribiendo: se exige que esté quieta."""
+    if sesion.cola.pendientes():
+        raise RuntimeError("Hay tareas en cola; espere a que terminen.")
+    sesion.vista_previa.olvidar()
+    assert sesion.proyecto.raiz is not None
+    return mantenimiento.vaciar_cache(sesion.proyecto.raiz)
+
+
+def vaciar_papelera(sesion: Sesion) -> int:
+    """Deshacer después de guardar recupera archivos de la papelera: se guarda antes y se olvida el historial."""
+    if sesion.solo_lectura:
+        raise RuntimeError("El proyecto está abierto en solo lectura.")
+    if sesion.historial.hay_cambios:
+        raise RuntimeError("Guarde antes de vaciar la papelera.")
+    assert sesion.proyecto.raiz is not None
+    liberados = mantenimiento.vaciar_papelera(sesion.proyecto.raiz)
+    sesion.historial.vaciar()
+    return liberados
+
+
+def brutos_sin_uso(sesion: Sesion) -> list[str]:
+    return mantenimiento.brutos_sin_uso(sesion.proyecto)
+
+
+def quitar_brutos(sesion: Sesion, ids: list[str]) -> bool:
+    if not ids:
+        return False
+    return sesion.ejecutar(lambda: ComandoCompuesto("Quitar Brutos sin uso", [QuitarBruto(i) for i in ids]))
+
+
 def nuevo_capitulo(sesion: Sesion, titulo: str = "") -> int:
     """Crea el siguiente capítulo (en disco en el momento; no se deshace)."""
     capitulo = estructura.crear_capitulo(sesion.proyecto, titulo=titulo)
+    registrar_manifiesto_proyecto(sesion.proyecto, sesion.apertura.estado)
     sesion.bus.publicar(CapituloCreado(capitulo.numero))
     return capitulo.numero
 

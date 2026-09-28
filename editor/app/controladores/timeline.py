@@ -18,8 +18,12 @@ from editor.core.comandos import (
     DividirElementos,
     DuplicarElemento,
     IntercambiarMinutos,
+    CambiarPropiedad,
+    CambiarTransicion,
     MoverElemento,
+    MoverElementos,
     PegarElementos,
+    PonerKeyframe,
     PonerMarcador,
     QuitarElementos,
     QuitarRango,
@@ -35,7 +39,9 @@ from editor.core.comandos.operaciones import ModoColocacion
 from editor.core.estandar import FOTOGRAMAS_POR_CAPITULO, FOTOGRAMAS_POR_MINUTO, FPS
 from editor.core.modelo.capa import Capa, TipoCapa, todas_las_capas
 from editor.core.modelo.elemento import Elemento
+from editor.core.modelo.keyframe import Keyframe
 from editor.core.modelo.marcador import Marcador
+from editor.core.modelo.transicion import Transicion
 
 FOTOGRAMAS_VISIBLES = {
     "capitulo": FOTOGRAMAS_POR_CAPITULO,
@@ -158,8 +164,10 @@ def vecino_contiguo(sesion: Sesion, elemento: Elemento, lado: str) -> Elemento |
 
 
 def arrastrar(sesion: Sesion, elemento: Elemento, zona: str, original: Elemento, delta_f: int,
-              vista: Vista, pista_destino: Pista | None = None) -> bool:
-    """Aplica un arrastre según la herramienta. `original` es el Elemento al empezar el gesto."""
+              vista: Vista, pista_destino: Pista | None = None,
+              originales_grupo: dict[str, Elemento] | None = None) -> bool:
+    """Aplica un arrastre según la herramienta. `original` es el Elemento al empezar el gesto;
+    `originales_grupo`, la selección múltiple al empezar (se mueve entera con el cuerpo)."""
     estado = sesion.estado
     capitulo = estado.capitulo
     herramienta = estado.herramienta
@@ -180,6 +188,13 @@ def arrastrar(sesion: Sesion, elemento: Elemento, zona: str, original: Elemento,
             delta = (nuevo - borde) if zona == INICIO else (borde - nuevo)
             return sesion.ejecutar(RippleRecorte(capitulo, elemento.id, zona, delta))
         return sesion.ejecutar(RecortarElemento(capitulo, elemento.id, zona, nuevo))
+    grupo = originales_grupo if herramienta == "seleccion" and originales_grupo and len(originales_grupo) > 1 else None
+    if grupo is not None and original.id in grupo:
+        # Selección múltiple: todos se mueven lo mismo que el arrastrado (con imán en el arrastrado).
+        ignorar = set(grupo)
+        desplazamiento = iman(sesion, vista, original.inicio + delta_f, ignorar) - original.inicio
+        desplazamiento = max(desplazamiento, -min(g.inicio for g in grupo.values()))
+        return sesion.ejecutar(lambda: MoverElementos(capitulo, {i: g.inicio + desplazamiento for i, g in grupo.items()}))
     nuevo_inicio = iman(sesion, vista, original.inicio + delta_f, ignorar)
     nueva_capa = None
     if pista_destino is not None and pista_destino.en_global == elemento.en_global \
@@ -256,3 +271,64 @@ def agregar_texto(sesion: Sesion, texto: str = "Título", codigo_capa: str = "T1
         sesion.estado.seleccion = {elemento.id}
         return True
     return False
+
+
+# --- E17: búsqueda, transiciones y volumen en la timeline -------------------------------
+
+def buscar(sesion: Sesion, texto: str, desde_id: str | None = None) -> Elemento | None:
+    """Siguiente Elemento del capítulo cuyo nombre contiene `texto` (en orden de tiempo, circular)."""
+    texto = texto.strip().lower()
+    if not texto:
+        return None
+    candidatos = sorted((e for e in sesion.capitulo.todos_los_elementos() if texto in e.nombre.lower()),
+                        key=lambda e: (e.inicio, e.capa.codigo, e.id))
+    if not candidatos:
+        return None
+    ids = [e.id for e in candidatos]
+    siguiente = (ids.index(desde_id) + 1) % len(ids) if desde_id in ids else 0
+    return candidatos[siguiente]
+
+
+def cambiar_transicion(sesion: Sesion, id_elemento: str, tipo: str | None, duracion: int | None = None,
+                       direccion: str | None = None) -> bool:
+    """`tipo=None` quita la transición de entrada. Los demás valores conservan los actuales si faltan."""
+    elemento = sesion.capitulo.buscar(id_elemento)
+    if elemento is None:
+        return False
+    if tipo is None:
+        transicion = None
+    else:
+        actual = elemento.transicion_entrada
+        transicion = Transicion(
+            tipo=tipo,
+            duracion=duracion if duracion is not None else (actual.duracion if actual else 12),
+            direccion=direccion if direccion is not None else (actual.direccion if actual else "izquierda"),
+        )
+    return sesion.ejecutar(lambda: CambiarTransicion(sesion.estado.capitulo, id_elemento, transicion))
+
+
+VOLUMEN_MAXIMO = 2.0
+
+
+def volumen_desde_altura(y_relativa: float) -> float:
+    """0 arriba = volumen máximo (200 %), 1 abajo = silencio. La línea del 100 % queda a media altura."""
+    return round(max(0.0, min(VOLUMEN_MAXIMO, (1.0 - y_relativa) * VOLUMEN_MAXIMO)), 3)
+
+
+def altura_de_volumen(volumen: float) -> float:
+    return 1.0 - max(0.0, min(VOLUMEN_MAXIMO, volumen)) / VOLUMEN_MAXIMO
+
+
+def fijar_volumen(sesion: Sesion, id_elemento: str, volumen: float) -> bool:
+    """Arrastre vertical con Alt en un Elemento de audio: con keyframes de volumen pone uno en el
+    cabezal; sin ellos cambia el volumen base. Valores absolutos: el arrastre se fusiona."""
+    elemento = sesion.capitulo.buscar(id_elemento)
+    if elemento is None or not elemento.suena:
+        return False
+    capitulo = sesion.estado.capitulo
+    if elemento.animacion.tiene("volumen"):
+        f_local = min(max(0, sesion.estado.cabezal - elemento.inicio), elemento.duracion - 1)
+        previo = elemento.animacion.pista("volumen").obtener(f_local)
+        keyframe = Keyframe(f_local, volumen, previo.curva if previo else "lineal", previo.controles if previo else None)
+        return sesion.ejecutar(lambda: PonerKeyframe(capitulo, id_elemento, "volumen", keyframe))
+    return sesion.ejecutar(lambda: CambiarPropiedad(capitulo, id_elemento, "audio.volumen", volumen))

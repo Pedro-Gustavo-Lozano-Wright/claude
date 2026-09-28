@@ -57,6 +57,7 @@ class EstadoApp:
     seguir_cabezal: bool = True
     capa_destino: str = "V1"              # capa donde se colocan Piezas nuevas
     destino_global: bool = False          # colocar en Global (abarca minutos: música, logo fijo)
+    capa_destino_audio: str = "A1"        # capa donde se colocan los audios
     entrada: int | None = None            # marcas I / O de la timeline (fotogramas del capítulo)
     salida: int | None = None
 
@@ -135,22 +136,14 @@ class Sesion:
     def deshacer(self) -> None:
         comando = self.historial.deshacer()
         if comando is not None:
-            self._ir_al_capitulo_de(comando)
             self.avisar(f"Deshecho: {comando.descripcion}")
         self._limpiar_seleccion()
 
     def rehacer(self) -> None:
         comando = self.historial.rehacer()
         if comando is not None:
-            self._ir_al_capitulo_de(comando)
             self.avisar(f"Rehecho: {comando.descripcion}")
         self._limpiar_seleccion()
-
-    def _ir_al_capitulo_de(self, comando: Comando) -> None:
-        """El historial es del proyecto: si el paso tocó otro capítulo, se muestra ese."""
-        capitulos = {a.capitulo for a in comando.afectados() if a.capitulo is not None}
-        if capitulos and self.estado.capitulo not in capitulos:
-            self.cambiar_capitulo(min(capitulos))
 
     def _limpiar_seleccion(self) -> None:
         capitulo = self.capitulo
@@ -164,12 +157,35 @@ class Sesion:
     def ir_a_minuto(self, minuto: int) -> None:
         self.ir_a(minuto * FOTOGRAMAS_POR_MINUTO + (self.estado.cabezal % FOTOGRAMAS_POR_MINUTO))
 
-    def cambiar_capitulo(self, numero: int) -> None:
-        if numero != self.estado.capitulo:
-            self.estado.capitulo = numero
-            self.estado.seleccion.clear()
-            self.estado.cabezal = 0
-            self.estado.entrada = self.estado.salida = None
+    def cambiar_capitulo(self, numero: int) -> bool:
+        """Un solo capítulo en memoria (E18): cambiar es cerrar uno y abrir otro.
+
+        Con cambios sin guardar no se cambia (la interfaz ofrece guardar antes). El
+        historial empieza de nuevo: sus pasos eran del capítulo que se cierra.
+        """
+        if numero == self.estado.capitulo and numero in self.proyecto.capitulos:
+            return True
+        if self.historial.hay_cambios:
+            self.avisar("Guarde antes de cambiar de capítulo.")
+            return False
+        anterior = self.estado.capitulo
+        self.proyecto.capitulo(numero)          # carga; si falla, no se cambió nada
+        self.estado.capitulo = numero
+        self.estado.seleccion.clear()
+        self.estado.cabezal = 0
+        self.estado.entrada = self.estado.salida = None
+        self.estado.portapapeles.clear()
+        self.descargar_otros_capitulos()
+        if anterior != numero:
+            self.historial.vaciar()
+        return True
+
+    def descargar_otros_capitulos(self) -> list[int]:
+        """Deja en memoria solo el capítulo actual."""
+        otros = [c.numero for c in self.proyecto.capitulos_cargados() if c.numero != self.estado.capitulo]
+        for numero in otros:
+            self.proyecto.descargar_capitulo(numero)
+        return otros
 
     # --- Tareas -------------------------------------------------------------------------
 

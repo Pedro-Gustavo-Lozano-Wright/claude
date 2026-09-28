@@ -157,12 +157,16 @@ class Navegador:
         if self.sesion.solo_lectura:
             self.app.avisar("El proyecto está abierto en solo lectura.")
             return
-        numero = ctl_proyecto.nuevo_capitulo(self.sesion)
-        self.app.cambiar_capitulo(numero)
+        def crear() -> None:
+            numero = ctl_proyecto.nuevo_capitulo(self.sesion)
+            self.app.cambiar_capitulo(numero)
+
+        self.app.con_cambios_guardados(crear, "crear un capítulo")
 
     def _elegir_capitulo(self, evento) -> None:
         if evento.control.value:
             self.app.cambiar_capitulo(int(evento.control.value))
+            self.app.refrescar("navegador")   # si se canceló, vuelve a mostrar el capítulo actual
 
     def _titulo(self, evento) -> None:
         valor = (evento.control.value or "").strip()

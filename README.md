@@ -16,8 +16,8 @@ decisiones y el plan de épicas están en **[PROJECT.md](PROJECT.md)**.
 | B — Persistencia y edición | E5–E6 | ✅ |
 | C — Motor y servicios | E7–E11 | ✅ Verificado con medios reales |
 | D — Interfaz | E12–E16 | ✅ Recorrida en Chromium |
-| E — Completar la edición | E17 Timeline y Taller completos · E18 Proyecto, idiomas y mantenimiento | **Siguiente: E17** |
-| F — Capacidades creativas | E19 Efectos, transiciones y texto · E20 Audio avanzado | Pendiente |
+| E — Completar la edición | E17 Timeline y Taller completos · E18 Proyecto, idiomas y mantenimiento | ✅ |
+| F — Capacidades creativas | E19 Efectos, transiciones y texto · E20 Audio avanzado | **Siguiente: E19** |
 | G — Entrega | E21 Render y exportación · E22 Shorts 9:16 | Pendiente |
 | H — Extensión y cierre | E23 Plugins y plantillas · E24 Rendimiento, empaquetado y documentación | Pendiente |
 
@@ -173,6 +173,16 @@ python main.py --nuevo ~/Videos/mi-serie      # crea cap0001 con min00…min23 y
 4. Espacio **Minuto**: editar en la timeline, el monitor (asas) y el inspector.
 5. **Ctrl+S** guarda (renombra archivos, gemelos y guiones).
 6. Espacio **Render**: minuto actual, rango I–O o capítulo completo.
+
+Más herramientas:
+
+- **Un capítulo a la vez**: para cambiar de capítulo (o crear uno) se guarda antes.
+- Taller: **Buscar escenas** y **Buscar silencios** marcan puntos de corte; un audio
+  externo se **alinea** con el sonido del Elemento elegido en la timeline.
+- Timeline: selección múltiple con Shift (se mueve junta), **Alt + arrastrar** en un
+  audio cambia su volumen, **Ctrl+F** busca por nombre.
+- Menú **☰ Proyecto**: idiomas del proyecto, atajos de teclado y mantenimiento
+  (caché, papelera, Brutos sin uso).
 
 Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revisión-8).
 

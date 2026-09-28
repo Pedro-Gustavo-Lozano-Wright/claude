@@ -53,6 +53,14 @@ class Historial:
         self._marca_guardado = len(self._deshacer)
         self._publicar_estado()
 
+    def vaciar(self) -> None:
+        """Olvida los pasos: al cambiar de capítulo (eran del anterior) o tras vaciar la papelera."""
+        hay_cambios = self.hay_cambios
+        self._deshacer.clear()
+        self._rehacer.clear()
+        self._marca_guardado = None if hay_cambios else 0
+        self._publicar_estado()
+
     def marcar_sin_guardar(self) -> None:
         """El modelo cambió fuera del historial (p. ej. al restaurar un autosave): hay que guardar."""
         self._marca_guardado = None

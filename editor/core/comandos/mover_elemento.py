@@ -64,6 +64,37 @@ class MoverElemento(EdicionCapitulo):
         return colocar_con_modo(self, proyecto, capitulo, [elemento], self.modo, self.alcance)
 
 
+class MoverElementos(EdicionCapitulo):
+    """Mueve varios Elementos a la vez (selección múltiple), cada uno a su inicio absoluto.
+
+    Valores absolutos por Elemento: los arrastres se fusionan en un solo paso de
+    deshacer. Cada uno conserva su capa; se validan todos juntos.
+    """
+
+    descripcion = "Mover elementos"
+
+    def __init__(self, capitulo: int, destinos: dict[str, int]) -> None:
+        super().__init__(capitulo)
+        if not destinos:
+            raise ValueError("No hay Elementos que mover.")
+        if any(inicio < 0 for inicio in destinos.values()):
+            raise ValueError("Un Elemento no puede empezar antes de 00:00.")
+        self.destinos = dict(destinos)
+
+    def clave_fusion(self) -> tuple | None:
+        return ("mover-grupo", tuple(sorted(self.destinos)))
+
+    def involucrados(self, capitulo: Capitulo) -> set[str]:
+        return set(self.destinos)
+
+    def aplicar(self, proyecto: Proyecto, capitulo: Capitulo) -> set[str]:
+        elementos = [self.obtener(capitulo, identificador) for identificador in self.destinos]
+        self.retirar(capitulo, elementos)
+        for elemento in elementos:
+            elemento.tiempo.inicio = self.destinos[elemento.id]
+        return colocar_con_modo(self, proyecto, capitulo, elementos, ModoColocacion.RECHAZAR, Alcance.MINUTO)
+
+
 class CambiarAGlobal(EdicionCapitulo):
     """Pasa un Elemento de los minutos a Global o al revés, en el mismo instante y capa.
 

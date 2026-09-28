@@ -39,7 +39,8 @@ from editor.core.comandos.editar_short import (
     QuitarShort,
 )
 from editor.core.comandos.historial import Historial
-from editor.core.comandos.mover_elemento import CambiarAGlobal, MoverElemento, mover_entre_capitulos
+from editor.core.comandos.mover_elemento import CambiarAGlobal, MoverElemento, MoverElementos, mover_entre_capitulos
+from editor.core.comandos.proyecto import CambiarIdiomas
 from editor.core.comandos.mover_minuto import IntercambiarMinutos
 from editor.core.comandos.operaciones import Alcance, ModoColocacion
 from editor.core.comandos.quitar_efecto import QuitarEfecto

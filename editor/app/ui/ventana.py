@@ -22,6 +22,7 @@ from editor.app.controladores import reproduccion
 from editor.app.controladores import taller as ctl_taller
 from editor.app.controladores import timeline as ctl_timeline
 from editor.app.estado import ESPACIOS, ZOOMS, Sesion
+from editor.app.ui import dialogos_proyecto
 from editor.app.ui.cola_render import BarraTareas, ColaRender
 from editor.app.ui.distribucion import Distribucion
 from editor.app.ui.divisor import Divisor
@@ -109,6 +110,17 @@ class Ventana:
                 self.espacios,
                 ft.Container(expand=True),
                 self.boton_deshacer, self.boton_rehacer, self.boton_guardar,
+                ft.PopupMenuButton(
+                    icon=ft.Icons.MENU, tooltip="Proyecto",
+                    items=[
+                        ft.PopupMenuItem(content="Idiomas del proyecto…", icon=ft.Icons.TRANSLATE,
+                                         on_click=lambda _: dialogos_proyecto.idiomas(self)),
+                        ft.PopupMenuItem(content="Atajos de teclado…", icon=ft.Icons.KEYBOARD,
+                                         on_click=lambda _: dialogos_proyecto.atajos(self)),
+                        ft.PopupMenuItem(content="Mantenimiento…", icon=ft.Icons.CLEANING_SERVICES,
+                                         on_click=lambda _: dialogos_proyecto.mantenimiento(self)),
+                    ],
+                ),
                 ft.IconButton(ft.Icons.RESTART_ALT, tooltip="Restablecer la distribución de este espacio",
                               on_click=lambda _: self._restablecer_distribucion()),
                 ft.IconButton(ft.Icons.CLOSE, tooltip="Cerrar el proyecto", on_click=lambda _: self.pedir_cierre()),
@@ -312,6 +324,10 @@ class Ventana:
         return bool(self._teclas & {"Shift Left", "Shift Right", "Shift"})
 
     @property
+    def alt_presionado(self) -> bool:
+        return bool(self._teclas & {"Alt Left", "Alt Right", "Alt"})
+
+    @property
     def ctrl_presionado(self) -> bool:
         return bool(self._teclas & {"Control Left", "Control Right", "Control", "Meta Left", "Meta Right"})
 
@@ -350,16 +366,34 @@ class Ventana:
     def ir_a_minuto(self, minuto: int) -> None:
         self.mover_cabezal_a(max(0, min(MINUTOS_POR_CAPITULO - 1, minuto)) * FOTOGRAMAS_POR_MINUTO)
 
-    def cambiar_capitulo(self, numero: int) -> None:
-        self.monitor.detener()
-        try:
-            self.sesion.cambiar_capitulo(numero)
-            self.sesion.capitulo  # carga perezosa: si falla, se avisa aquí
-        except Exception as error:  # noqa: BLE001
-            self.avisar(f"No se pudo abrir el capítulo {numero}: {error}")
+    def con_cambios_guardados(self, accion: Callable[[], None], que: str) -> None:
+        """Ejecuta `accion` si no hay cambios; si los hay, ofrece guardar antes (un capítulo a la vez)."""
+        if not self.sesion.historial.hay_cambios:
+            accion()
             return
-        self._minuto_visto = self.sesion.estado.minuto
-        self.refrescar(*TODAS)
+        self.raiz.dialogo(
+            "Cambios sin guardar",
+            f"Para {que} hay que guardar primero: en memoria hay un solo capítulo a la vez.",
+            [("Guardar y continuar", lambda: self.guardar(despues=accion)), ("Cancelar", None)],
+        )
+
+    def cambiar_capitulo(self, numero: int) -> None:
+        if numero == self.sesion.estado.capitulo:
+            return
+
+        def cambiar() -> None:
+            self.monitor.detener()
+            try:
+                cambiado = self.sesion.cambiar_capitulo(numero)
+            except Exception as error:  # noqa: BLE001
+                self.avisar(f"No se pudo abrir el capítulo {numero}: {error}")
+                return
+            if cambiado:
+                self.timeline.medios.olvidar()
+                self._minuto_visto = self.sesion.estado.minuto
+            self.refrescar(*TODAS)
+
+        self.con_cambios_guardados(cambiar, f"ir al capítulo {numero}")
 
     def elegir_herramienta(self, nombre: str) -> None:
         self.sesion.estado.herramienta = nombre
@@ -548,6 +582,7 @@ class Ventana:
           and self.refrescar("timeline", "monitor", "inspector", "mapa"))
         t("mover_1px", lambda direccion: self.monitor.mover_seleccion(direccion, 1))
         t("mover_10px", lambda direccion: self.monitor.mover_seleccion(direccion, 10))
+        t("buscar", self.timeline.enfocar_busqueda)
         t("zoom_timeline_mas", lambda: self.cambiar_zoom_timeline(1))
         t("zoom_timeline_menos", lambda: self.cambiar_zoom_timeline(-1))
         t("minuto_anterior", lambda: self.ir_a_minuto(s.estado.minuto - 1))

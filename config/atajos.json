@@ -25,6 +25,7 @@
   "copiar": "Ctrl+C",
   "pegar": "Ctrl+V",
   "duplicar": "Ctrl+D",
+  "buscar": "Ctrl+F",
   "rehacer_alternativo": "Ctrl+Y",
   "borrar": "Delete",
   "ripple_borrar": "Shift+Delete",
