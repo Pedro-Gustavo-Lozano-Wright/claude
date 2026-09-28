@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 13. Fases A–G (E0–E22) implementadas. Siguiente: **Fase H — Extensión y cierre (E23 Plugins y plantillas)**. Instalación y uso: [README.md](README.md).
+- **Estado:** revisión 14. Fases A–G (E0–E22) implementadas y consolidadas. Siguiente: **Fase H — Extensión y cierre** (alcance recomendado en la revisión 14). Instalación y uso: [README.md](README.md).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 13](#0-cambios-de-las-revisiones-2-a-13)
+0. [Cambios de las revisiones 2 a 14](#0-cambios-de-las-revisiones-2-a-14)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,40 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 13
+## 0. Cambios de las revisiones 2 a 14
+
+### Revisión 14: consolidación de A–G antes de la Fase H
+
+Revisión de punta a punta (tareas de fondo, huellas, disco, un capítulo en memoria,
+espacios de trabajo). Corregido:
+
+| # | Borde | Qué pasaba | Corrección |
+|---|---|---|---|
+| C1 | Tarea que termina después de cambiar de capítulo | Sincronizar colocaba el audio en el capítulo nuevo; estabilizar y bajar la música podían recargar el anterior | `Sesion.tarea(..., del_capitulo=True)`: si el capítulo cambió, no se aplica y se avisa |
+| C2 | Render o Short de un capítulo que ya no está cargado | `registrar` volvía a cargarlo (dos capítulos en memoria) | `automatico.anotar_renders`: con el capítulo descargado actualiza `_renders.json` en disco sin cargarlo |
+| C3 | Subtítulos y vista previa | Al sacar los subtítulos de la huella del video (rev. 13), editar un subtítulo no invalidaba el pre-render, que sí los dibuja | `huellas.huella_subtitulos` entra en la huella del pre-render y en la del Short |
+| C4 | Cierre a mitad de un trabajo | Quedaban temporales `.…parcial…` (render, Shorts, horneado, caché, importación) | `mantenimiento.limpiar_parciales` al abrir (no toca el diario de guardado) |
+| C5 | Recorte en grupo (pendiente desde E17) | Solo se recortaba el Elemento arrastrado | `RecortarElementos`: con varios seleccionados, el mismo borde de todos; un paso de deshacer |
+| C6 | Encuadre del Short en el monitor | La guía 9:16 siempre estaba centrada | En el espacio Shorts dibuja la ventana del Short elegido, también mientras se arrastra |
+| C7 | Espacio Shorts apretado | Navegador + inspector + panel + monitor | Por defecto: panel de Shorts, monitor y timeline |
+
+Comprobado sin cambios: guardado de Shorts (renombrar mueve la receta, quitar va a la
+papelera), autosave con Shorts, solo lectura (ningún comando ni render), fusión de
+gestos en los comandos de estado del capítulo, idiomas en vista previa, render y Shorts.
+
+**Casos contemplados para el futuro** (no bloquean el uso actual):
+
+- Los Shorts y los marcadores no siguen al contenido si se hace ripple o se
+  intercambian minutos: quedan en su tiempo. Cuando importe, un comando que los
+  corra junto con el ripple.
+- El render del capítulo completo mezcla el audio de los 24 minutos en memoria
+  (≈ 550 MB por idioma): con varios idiomas conviene mezclar y codificar por minuto (E24).
+- El Short se compone desde material de 720p: la ventana 9:16 se amplía ×1,78.
+  Material de mayor resolución solo ayudaría si las Piezas se hornearan más grandes.
+- Los archivos de render viejos (versiones anteriores, Shorts renombrados) no se
+  borran solos; el gestor de mantenimiento puede listarlos (E24).
+- Las tareas del monitor que llegan tras cambiar de capítulo se ignoran por su clave;
+  no escriben en el modelo.
 
 ### Revisión 13: Fase G (entrega) implementada, simplificada
 
@@ -2013,7 +2046,20 @@ sus descriptores; plantillas de capítulo; subtítulos automáticos opcionales.
 
 **E24. Rendimiento, empaquetado y documentación** — capítulos grandes (cientos
 de Elementos por minuto) en mapa y timeline; mediciones de memoria y tiempos;
-empaquetado para Linux; README y este documento al día.
+audio del render por minuto; empaquetado para Linux; README y este documento al
+día. (El recorte en grupo se adelantó a la revisión 14.)
+
+**Alcance recomendado (revisión 14, a decidir):** la Fase H no es solo documentar.
+
+| Parte | Recomendación | Por qué |
+|---|---|---|
+| Plantillas de capítulo | **Hacer** | Serie de capítulos: cada uno nuevo nace con la intro, el logo, la música de Global y los idiomas de capa de una plantilla. Poco código, mucho uso |
+| Presets propios (guardar ajustes de efectos, textos y encuadres) | **Hacer** | Reutiliza los descriptores que ya existen |
+| Plugins de código externo | Posponer | Solo sirve si alguien más escribe efectos; los descriptores ya lo dejan preparado |
+| Subtítulos automáticos (voz a texto) | Posponer u opcional | Dependencia pesada (modelo de reconocimiento); el `.srt` ya se importa |
+| Rendimiento con capítulos grandes y audio por minuto | **Hacer** | Riesgo real de memoria con varios idiomas |
+| Empaquetado (script de instalación, lanzador `.desktop`) | **Hacer** | Abrir el editor sin PyCharm ni terminal |
+| Documentación final | **Hacer** | Guía de uso completa por espacio de trabajo |
 
 ### Numeración anterior
 
@@ -2045,12 +2091,12 @@ Las revisiones 1–9 usan la numeración vieja de las épicas pendientes:
 | E7 | ✅ | `motor_base`, `decodificador` (búsqueda exacta, reapertura si el archivo cambia), `cache_fotogramas`, `compositor` (descarte, región de interés, transiciones, modos de mezcla, ventana para Shorts), `texto` (con animaciones), `efectos/` (registro ampliable: brillo, contraste, saturación, temperatura, desenfoque, nitidez, croma, LUT), `conversion_fps` (5 métodos), `codificador` (H.264, NVENC, ProRes 4444, AAC, WAV) |
 | E8 | ✅ | `mezclador_audio`: 2000 muestras por fotograma, velocidad y reversa, rampas de volumen y paneo, cruces por transición, idiomas, limitador |
 | E9 | ✅ | `tareas/cola` y servicios `fuentes`, `importacion` (fps medido y fps variable), `horneado` (+ `aplicar_horneado`), `banco` (+ `GestorFuentesBanco`), `miniaturas`, `forma_onda` |
-| E10 | ✅ | `huellas` (video por minuto, audio por idioma), `render` (caché de minutos, modos `pistas` y `archivos`, `registrar`), `ensamblado` (sin recodificar, faststart); `main.py --render` y `--fotograma` |
+| E10 | ✅ | `huellas` (video por minuto, audio por idioma), `render` (caché de minutos, pistas por idioma, `registrar`; perfiles en E21), `ensamblado` (sin recodificar, faststart); `main.py --render` y `--fotograma` |
 | E11 | ✅ | `vista_previa` (niveles 1–4, audio por rango, pre-render por minuto, `RelojAudio`) y `guardado` (materialización pendiente, autosave) |
 | E12 | ✅ | `aplicacion`, `estado` (Sesion), ventana con divisores y 5 espacios de trabajo, inicio, navegador, diálogos, teclado por foco, tema, autosave periódico, cierre seguro |
 | E13 | ✅ | Monitor (niveles 2, 3 y 4 con reloj de audio y respaldo en vivo), asas, ancla, imán, márgenes seguros, guía 9:16, zoom, Alt + flechas |
 | E14 | ✅ | Timeline (4 zooms, 6 herramientas, imán, fantasmas, Global, cabeceras de capa con idioma, marcadores, I/O, texto) y mapa del capítulo (3 estados, listo, intercambiar) |
-| E15 | ✅ (parcial) | Brutos, visor nativo, fps interpretado, método, tramos, hornear, colocar. Pendiente: detección de escenas y silencios, sincronía de audio externo |
+| E15 | ✅ | Brutos, visor nativo, fps interpretado, método, tramos, hornear, colocar (escenas, silencios y sincronía se completaron en E17) |
 | E16 | ✅ | Inspector por grupos, keyframes (rombo, saltar), editor de curvas con bezier, historial |
 | E17 | ✅ | Timeline y Taller completos (revisión 11) |
 | E18 | ✅ | Proyecto, idiomas y mantenimiento; un capítulo en memoria |
@@ -2058,7 +2104,8 @@ Las revisiones 1–9 usan la numeración vieja de las épicas pendientes:
 | E20 | ✅ | Audio avanzado: ducking, medidores, −14 LUFS, reducción de ruido, conservar tono |
 | E21 | ✅ | Render: perfiles 720p y solo audio, `.srt` por idioma, capítulos de YouTube (revisión 13) |
 | E22 | ✅ | Shorts 720×1280: servicio, espacio de trabajo, `--shorts` |
-| E23 | **Siguiente** | Plugins y plantillas |
+| Revisión 14 | ✅ | Consolidación C1–C7, recorte en grupo |
+| E23 | **Siguiente** | Plugins y plantillas (alcance recomendado en la sección 19) |
 | E24 | Pendiente | |
 
 ### Decisiones tomadas al implementar la Fase B

@@ -23,8 +23,7 @@ from pathlib import Path
 
 from editor.core.estandar import FOTOGRAMAS_POR_MINUTO, Estandar
 from editor.core.eventos import BusEventos, RenderTerminado
-from editor.core.modelo.capitulo import Capitulo, RegistroRender
-from editor.core.modelo.minuto import RegistroRenderMinuto
+from editor.core.modelo.capitulo import Capitulo
 from editor.core.modelo.proyecto import Proyecto
 from editor.core.motor.codificador import Codificador, PerfilAudio, PerfilVideo
 from editor.core.motor.compositor import FINAL, Compositor
@@ -225,13 +224,9 @@ def normalizar(muestras, objetivo: float):
 
 def registrar(proyecto: Proyecto, estado: EstadoDisco, resultado: ResultadoRender, bus: BusEventos | None = None) -> None:
     """Hilo principal: estado automático del render (no depende de que el usuario guarde)."""
-    capitulo = proyecto.capitulo(resultado.capitulo)
-    for nombre in resultado.nombres:
-        capitulo.renders.append(RegistroRender(nombre, resultado.huella))
-    for numero, marca in resultado.minutos.items():
-        minuto = capitulo.minuto(numero)
-        minuto.ultimo_render = RegistroRenderMinuto(minuto.siguiente_version_render, marca)
-    automatico.guardar_renders(proyecto, estado, capitulo)
+    automatico.anotar_renders(proyecto, estado, resultado.capitulo,
+                              entregables=[(n.archivo, resultado.huella) for n in resultado.nombres],
+                              minutos=resultado.minutos)
     if bus is not None:
         for archivo in resultado.archivos:
             bus.publicar(RenderTerminado(f"render-{resultado.capitulo}", str(archivo), True))

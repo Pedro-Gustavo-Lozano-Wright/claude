@@ -231,8 +231,8 @@ def _pintura(color: str, grosor: float = 1.0, relleno: bool = False, opacidad: f
     )
 
 
-def formas_lienzo(vista: VistaLienzo, margenes: bool, guia_vertical: bool) -> list[cv.Shape]:
-    """Borde del lienzo, márgenes seguros y guía 9:16."""
+def formas_lienzo(vista: VistaLienzo, margenes: bool, guia_vertical: bool, ventana_short=None) -> list[cv.Shape]:
+    """Borde del lienzo, márgenes seguros y guía 9:16 (centrada, o la ventana del Short elegido)."""
     r = vista.rect_lienzo
     formas: list[cv.Shape] = [cv.Rect(r.x, r.y, r.ancho, r.alto, paint=_pintura(TEMA.borde, 1))]
     if margenes:
@@ -241,8 +241,8 @@ def formas_lienzo(vista: VistaLienzo, margenes: bool, guia_vertical: bool) -> li
             o = vista.a_pantalla(Punto(s.x, s.y))
             formas.append(cv.Rect(o.x, o.y, s.ancho * vista.factor, s.alto * vista.factor,
                                   paint=_pintura(TEMA.margen_seguro, 1, opacidad=0.25)))
-    if guia_vertical:
-        v = LIENZO.ventana_vertical(LIENZO.x_ventana_centrada())
+    if guia_vertical or ventana_short is not None:
+        v = ventana_short or LIENZO.ventana_vertical(LIENZO.x_ventana_centrada())
         o = vista.a_pantalla(Punto(v.x, v.y))
         formas.append(cv.Rect(o.x, o.y, v.ancho * vista.factor, v.alto * vista.factor,
                               paint=_pintura(TEMA.guia, 1.5, opacidad=0.8)))

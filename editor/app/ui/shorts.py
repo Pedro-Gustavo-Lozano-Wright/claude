@@ -156,6 +156,12 @@ class PanelShorts:
         ctl.vista_vertical(self.app.sesion, self.id_short, f, float(self.x.value or 0), float(self.zoom.value or 1),
                            llegar)
 
+    def encuadre(self):
+        """Ventana vertical que muestra la vista (para dibujarla en el monitor 16:9)."""
+        if self.id_short is None or self.id_short not in self.app.sesion.capitulo.shorts:
+            return None
+        return LIENZO.ventana_vertical(float(self.x.value or 0), float(self.zoom.value or 1))
+
     # --- Acciones ----------------------------------------------------------------------
 
     def _elegir(self, id_short: str) -> None:
@@ -184,6 +190,7 @@ class PanelShorts:
         self.x.max = LIENZO.ancho - LIENZO.ventana_vertical(0, zoom).ancho
         self.x.value = min(float(self.x.value or 0), self.x.max)
         self._pedir_vista()
+        self.app.monitor.redibujar_superposicion()
 
     def _soltar_encuadre(self, _evento) -> None:
         self._arrastrando = False

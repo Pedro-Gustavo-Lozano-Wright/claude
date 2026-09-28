@@ -180,7 +180,7 @@ Más herramientas:
 - **Un capítulo a la vez**: para cambiar de capítulo (o crear uno) se guarda antes.
 - Taller: **Buscar escenas** y **Buscar silencios** marcan puntos de corte; un audio
   externo se **alinea** con el sonido del Elemento elegido en la timeline.
-- Timeline: selección múltiple con Shift (se mueve junta), **Alt + arrastrar** en un
+- Timeline: selección múltiple con Shift (se mueve y se recorta junta), **Alt + arrastrar** en un
   audio cambia su volumen, **Ctrl+F** busca por nombre.
 - Menú **☰ Proyecto**: idiomas del proyecto, atajos de teclado y mantenimiento
   (caché, papelera, Brutos sin uso).

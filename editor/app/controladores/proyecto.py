@@ -51,6 +51,8 @@ def abrir(
     except Exception as error:  # noqa: BLE001 — la interfaz debe mostrarlo, no caerse
         return ResultadoApertura(error=f"No se pudo abrir el proyecto: {error}")
     sesion = Sesion(apertura, ajustes, bus, en_principal)
+    if not solo_lectura:
+        mantenimiento.limpiar_parciales(apertura.proyecto.raiz)
     ajustes.registrar_reciente(ruta)
     ajustes.guardar_usuario()
     assert apertura.proyecto.raiz is not None

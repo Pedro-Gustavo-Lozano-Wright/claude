@@ -20,14 +20,14 @@ from pathlib import Path
 from editor.core.estandar import FPS, Estandar
 from editor.core.modelo.capitulo import Capitulo
 from editor.core.modelo.proyecto import Proyecto
-from editor.core.modelo.short import RegistroRenderShort, Short
+from editor.core.modelo.short import Short
 from editor.core.motor.codificador import Codificador, PerfilAudio
 from editor.core.motor.compositor import FINAL, Compositor
 from editor.core.motor.decodificador import GestorFuentes
 from editor.core.motor.mezclador_audio import Mezclador
 from editor.core.proyecto_fs import automatico
 from editor.core.proyecto_fs.estado_disco import EstadoDisco
-from editor.core.proyecto_fs.gemelo import elemento_a_datos, short_a_datos
+from editor.core.proyecto_fs.gemelo import short_a_datos
 from editor.core.proyecto_fs.serializacion import huella
 from editor.core.servicios import huellas
 from editor.core.servicios.fuentes import ResolutorFuentes
@@ -47,17 +47,12 @@ def idioma_short(proyecto: Proyecto) -> str | None:
 
 
 def huella_short(capitulo: Capitulo, short: Short, estandar: Estandar, resolutor, idioma: str | None) -> str:
-    subtitulos = [
-        elemento_a_datos(e) for e in list(capitulo.elementos_de_minutos()) + list(capitulo.global_)
-        if e.es_texto and idioma and capitulo.estado_capa(e).idioma == idioma
-        and e.inicio < short.fin and short.inicio < e.fin
-    ]
     return huella({
         "short": short_a_datos(short),
         "tamano": [ANCHO_SHORT, ALTO_SHORT],
         "video": [huellas.huella_video_minuto(capitulo, m, estandar, resolutor) for m in short.minutos_cruzados],
         "audio": huellas.huella_audio(capitulo, short.inicio, short.fin, idioma, resolutor),
-        "subtitulos": subtitulos,
+        "subtitulos": huellas.huella_subtitulos(capitulo, short.inicio, short.fin, idioma),
     })
 
 
@@ -143,9 +138,5 @@ def renderizar(pedido: PedidoShort, contexto: Contexto) -> ResultadoShort:
 
 def registrar(proyecto: Proyecto, estado_disco: EstadoDisco, resultado: ResultadoShort) -> None:
     """Hilo principal: versión y huella del Short en `_renders.json`."""
-    capitulo = proyecto.capitulo(resultado.capitulo)
-    short = capitulo.shorts.get(resultado.id_short)
-    if short is None:
-        return
-    short.ultimo_render = RegistroRenderShort(resultado.version, resultado.huella)
-    automatico.guardar_renders(proyecto, estado_disco, capitulo)
+    automatico.anotar_renders(proyecto, estado_disco, resultado.capitulo,
+                              shorts={resultado.id_short: (resultado.version, resultado.huella)})

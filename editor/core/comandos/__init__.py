@@ -46,7 +46,7 @@ from editor.core.comandos.operaciones import Alcance, ModoColocacion
 from editor.core.comandos.quitar_efecto import QuitarEfecto
 from editor.core.comandos.quitar_elemento import QuitarElementos
 from editor.core.comandos.quitar_keyframe import QuitarKeyframe
-from editor.core.comandos.recortar_elemento import FIN, INICIO, RecortarElemento
+from editor.core.comandos.recortar_elemento import FIN, INICIO, RecortarElemento, RecortarElementos
 from editor.core.comandos.ripple import RippleRecorte
 from editor.core.comandos.roll import Roll
 from editor.core.comandos.separar_audio import SepararAudio

@@ -64,7 +64,7 @@ def estabilizar(sesion: Sesion, id_elemento: str) -> None:
 
     sesion.tarea(Tarea("analisis", f"Estabilizar {elemento.nombre}",
                        lambda contexto: analisis.movimiento(ruta, desde, hasta, contexto),
-                       prioridad=BANCO_VISIBLE, clave=f"estabilizar-{id_elemento}"), terminar)
+                       prioridad=BANCO_VISIBLE, clave=f"estabilizar-{id_elemento}"), terminar, del_capitulo=True)
 
 
 def importar_srt(sesion: Sesion, ruta: Path, codigo_capa: str, idioma: str) -> int:

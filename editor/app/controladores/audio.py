@@ -81,7 +81,7 @@ def ducking(sesion: Sesion, id_musica: str, reduccion_db: float = 12.0) -> None:
             sesion.avisar(f"Música bajada {reduccion_db:.0f} dB en {len(tramos)} tramos de voz.")
 
     sesion.tarea(Tarea("analisis", "Buscar voz para bajar la música", trabajo, prioridad=BANCO_VISIBLE,
-                       clave=f"ducking-{id_musica}"), terminar)
+                       clave=f"ducking-{id_musica}"), terminar, del_capitulo=True)
 
 
 def medir_sonoridad(sesion: Sesion, desde: int | None, hasta: int | None,

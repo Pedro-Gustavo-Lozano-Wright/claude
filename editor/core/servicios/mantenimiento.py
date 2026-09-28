@@ -1,6 +1,8 @@
 """Mantenimiento del proyecto (E18): espacio en disco, tamaños, caché, papelera y Brutos sin uso.
 
 - `comprobar_espacio` se llama antes de hornear y renderizar (importar ya lo hace).
+- `limpiar_parciales` borra al abrir los restos de trabajos interrumpidos (renders,
+  Shorts, caché, importaciones) que quedan si la aplicación se cerró a mitad.
 - La caché se regenera sola; la papelera guarda lo que un guardado reemplazó y
   permite deshacer después de guardar: vaciarla obliga a olvidar el historial.
 """
@@ -84,3 +86,23 @@ def brutos_sin_uso(proyecto: Proyecto) -> list[str]:
         if not piezas and not elementos and identificador not in en_disco:
             resultado.append(identificador)
     return sorted(resultado, key=lambda i: proyecto.taller.brutos[i].numero)
+
+
+def limpiar_parciales(raiz: Path) -> int:
+    """Borra los temporales `.<nombre>.parcial…` de trabajos interrumpidos (render, Shorts,
+    horneado, caché, materialización) y las importaciones `….parcial` en `brutos/`; devuelve
+    los bytes liberados. No toca el diario de guardado (sus copias se resuelven al abrir).
+    """
+    from editor.core.tiempo.nomenclatura import CARPETA_BRUTOS, CARPETA_DIARIO
+
+    liberados = 0
+    candidatos = [r for r in raiz.rglob(".*.parcial*") if CARPETA_DIARIO not in r.relative_to(raiz).parts]
+    candidatos += list((raiz / CARPETA_BRUTOS).rglob("*.parcial"))
+    for ruta in candidatos:
+        if ruta.is_file():
+            try:
+                liberados += ruta.stat().st_size
+                ruta.unlink()
+            except OSError:
+                pass
+    return liberados

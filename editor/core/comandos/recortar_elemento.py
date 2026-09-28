@@ -41,3 +41,38 @@ class RecortarElemento(EdicionCapitulo):
             recortar_fin(elemento, self.nuevo_borde)
         self.colocar(capitulo, [elemento])
         return set()
+
+
+class RecortarElementos(EdicionCapitulo):
+    """Recorte en grupo (selección múltiple): el mismo lado de cada Elemento a su borde absoluto.
+
+    Se aplica todo o nada; los arrastres se fusionan en un solo paso de deshacer.
+    """
+
+    descripcion = "Recortar elementos"
+
+    def __init__(self, capitulo: int, lado: str, bordes: dict[str, int]) -> None:
+        super().__init__(capitulo)
+        if lado not in (INICIO, FIN):
+            raise ValueError(f"Lado desconocido: {lado!r}")
+        if not bordes:
+            raise ValueError("No hay Elementos que recortar.")
+        self.lado = lado
+        self.bordes = dict(bordes)
+
+    def clave_fusion(self) -> tuple | None:
+        return ("recortar-grupo", self.lado, tuple(sorted(self.bordes)))
+
+    def involucrados(self, capitulo: Capitulo) -> set[str]:
+        return set(self.bordes)
+
+    def aplicar(self, proyecto: Proyecto, capitulo: Capitulo) -> set[str]:
+        elementos = [self.obtener(capitulo, identificador) for identificador in self.bordes]
+        self.retirar(capitulo, elementos)
+        for elemento in elementos:
+            if self.lado == INICIO:
+                recortar_inicio(elemento, self.bordes[elemento.id])
+            else:
+                recortar_fin(elemento, self.bordes[elemento.id])
+        self.colocar(capitulo, elementos)
+        return set()

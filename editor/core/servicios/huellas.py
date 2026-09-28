@@ -73,12 +73,23 @@ def huella_audio(capitulo: Capitulo, inicio: int, fin: int, idioma: str | None, 
     })
 
 
+def huella_subtitulos(capitulo: Capitulo, inicio: int, fin: int, idioma: str | None) -> str:
+    """Textos de las capas T de `idioma` en el rango: la vista previa y los Shorts los dibujan,
+    el video común no (van en `.srt`)."""
+    textos = [
+        e for e in list(capitulo.elementos_de_minutos()) + list(capitulo.global_)
+        if idioma and e.es_texto and capitulo.estado_capa(e).idioma == idioma and e.inicio < fin and inicio < e.fin
+    ]
+    return huella({"tipo": "subtitulos", "idioma": idioma, "elementos": _elementos(capitulo, textos, lambda _e: None)})
+
+
 def huella_minuto(capitulo: Capitulo, numero: int, estandar: Estandar, resolver: Resolutor, idioma: str | None) -> str:
-    """Video + audio del minuto: la usa el pre-render de vista previa (nivel 3)."""
+    """Video + audio + subtítulos del idioma: la usa el pre-render de vista previa (nivel 3)."""
     inicio, fin = granularidad.rango_minuto(numero)
     return huella([
         huella_video_minuto(capitulo, numero, estandar, resolver),
         huella_audio(capitulo, inicio, fin, idioma, resolver),
+        huella_subtitulos(capitulo, inicio, fin, idioma),
     ])
 
 

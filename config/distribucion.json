@@ -42,11 +42,9 @@
       "navegador": 240,
       "inspector": 280,
       "mapa": 48,
-      "timeline": 240,
+      "timeline": 200,
       "visibles": [
-        "navegador",
         "monitor",
-        "inspector",
         "timeline"
       ]
     },

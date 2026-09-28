@@ -201,7 +201,7 @@ def sincronizar_audio(sesion: Sesion, id_elemento: str, id_bruto_audio: str) -> 
         colocar_audio_desfasado(sesion, id_bruto_audio, inicio, round(segundos * FPS), confianza)
 
     sesion.tarea(Tarea("analisis", f"Sincronizar {bruto.nombre} con {nombre}", trabajo,
-                       prioridad=BANCO_VISIBLE, clave=f"sincronia-{id_bruto_audio}"), terminar)
+                       prioridad=BANCO_VISIBLE, clave=f"sincronia-{id_bruto_audio}"), terminar, del_capitulo=True)
 
 
 def colocar_audio_desfasado(sesion: Sesion, id_bruto: str, inicio_referencia: int, desfase: int,

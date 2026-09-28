@@ -28,6 +28,7 @@ from editor.core.comandos import (
     QuitarElementos,
     QuitarRango,
     RecortarElemento,
+    RecortarElementos,
     RippleRecorte,
     Roll,
     Slide,
@@ -187,6 +188,12 @@ def arrastrar(sesion: Sesion, elemento: Elemento, zona: str, original: Elemento,
         if herramienta == "ripple":
             delta = (nuevo - borde) if zona == INICIO else (borde - nuevo)
             return sesion.ejecutar(RippleRecorte(capitulo, elemento.id, zona, delta))
+        grupo = originales_grupo if herramienta == "seleccion" and originales_grupo and len(originales_grupo) > 1 else None
+        if grupo is not None and original.id in grupo:
+            # Recorte en grupo: el mismo lado de todos los seleccionados, lo mismo que el arrastrado.
+            cambio = nuevo - borde
+            return sesion.ejecutar(lambda: RecortarElementos(capitulo, zona, {
+                i: (g.inicio if zona == INICIO else g.fin) + cambio for i, g in grupo.items()}))
         return sesion.ejecutar(RecortarElemento(capitulo, elemento.id, zona, nuevo))
     grupo = originales_grupo if herramienta == "seleccion" and originales_grupo and len(originales_grupo) > 1 else None
     if grupo is not None and original.id in grupo:

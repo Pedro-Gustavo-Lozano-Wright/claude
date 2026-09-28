@@ -204,6 +204,12 @@ class Monitor:
         carpeta = self.sesion.proyecto.raiz / "recursos" / "fuentes"
         return asas.Contorno.de(elemento, self.sesion.estado.cabezal, asas.tamano_natural(elemento, carpeta))
 
+    def _ventana_short(self):
+        """En el espacio Shorts, el encuadre del Short elegido (el que se arrastra, si se arrastra)."""
+        if self.sesion.estado.espacio_trabajo != "shorts":
+            return None
+        return self.app.shorts.encuadre()
+
     def _seleccion_visual(self):
         elemento = self.sesion.seleccionado()
         if elemento is None or not elemento.es_visual or not elemento.contiene(self.sesion.estado.cabezal):
@@ -211,7 +217,7 @@ class Monitor:
         return elemento
 
     def redibujar_superposicion(self, contorno_vivo: asas.Contorno | None = None) -> None:
-        formas = asas.formas_lienzo(self.vista, self.margenes, self.guia_vertical)
+        formas = asas.formas_lienzo(self.vista, self.margenes, self.guia_vertical, self._ventana_short())
         elemento = self._seleccion_visual()
         if contorno_vivo is not None:
             formas += asas.formas_contorno(contorno_vivo, self.vista)

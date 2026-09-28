@@ -189,10 +189,23 @@ class Sesion:
 
     # --- Tareas -------------------------------------------------------------------------
 
-    def tarea(self, tarea: Tarea, al_terminar_principal: Callable[[Any, BaseException | None], None] | None = None) -> str:
-        """Envía una tarea; su `al_terminar` se ejecuta en el hilo principal."""
+    def tarea(self, tarea: Tarea, al_terminar_principal: Callable[[Any, BaseException | None], None] | None = None,
+              del_capitulo: bool = False) -> str:
+        """Envía una tarea; su `al_terminar` se ejecuta en el hilo principal.
+
+        `del_capitulo`: el resultado edita el capítulo actual (sincronizar, estabilizar, bajar la
+        música…). Si al terminar el usuario ya cambió de capítulo, no se aplica: se avisa.
+        """
         if al_terminar_principal is not None:
-            tarea.al_terminar = lambda resultado, error: self.en_principal(lambda: al_terminar_principal(resultado, error))
+            numero = self.estado.capitulo
+
+            def terminar(resultado, error) -> None:
+                if del_capitulo and self.estado.capitulo != numero:
+                    self.avisar(f"«{tarea.descripcion}» terminó después de cambiar de capítulo: no se aplicó.")
+                    return
+                al_terminar_principal(resultado, error)
+
+            tarea.al_terminar = lambda resultado, error: self.en_principal(lambda: terminar(resultado, error))
         return self.cola.enviar(tarea)
 
     def escuchar(self, tipo: type[Evento], manejador: Callable[[Any], None]) -> Callable[[], None]:
