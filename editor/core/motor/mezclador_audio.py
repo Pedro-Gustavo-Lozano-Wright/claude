@@ -23,6 +23,7 @@ import numpy as np
 from editor.core.estandar import FPS
 from editor.core.modelo.capitulo import Capitulo
 from editor.core.modelo.elemento import Elemento
+from editor.core.motor.estiramiento import estirar
 
 FRECUENCIA = 48_000
 MUESTRAS_POR_FOTOGRAMA = FRECUENCIA // FPS  # 2000
@@ -147,6 +148,8 @@ class Mezclador:
             return np.zeros((2, cantidad), dtype=np.float32)
         velocidad = abs(tiempo.velocidad)
         fuente = self._fuente(ruta)
+        if elemento.con_rampa:
+            return self._senal_rampa(elemento, fuente, a, b)
         inicio_fuente = tiempo.fuente_entrada * MUESTRAS_POR_FOTOGRAMA + round((a - elemento.inicio) * velocidad * MUESTRAS_POR_FOTOGRAMA)
         if velocidad == 1.0 and tiempo.velocidad > 0:
             return fuente.leer(inicio_fuente, cantidad)
@@ -157,10 +160,25 @@ class Mezclador:
             original = fuente.leer(inicio_fuente, largo_fuente)[:, ::-1]
         else:
             original = fuente.leer(inicio_fuente, largo_fuente)
-        # Cambio de velocidad simple (también cambia el tono); E20 puede sustituirlo por uno que lo conserve.
-        posiciones = np.linspace(0, original.shape[1] - 1, cantidad)
+        # Velocidad constante: se conserva el tono (WSOLA); fuera de 0,5–2× se remuestrea.
+        return estirar(original, cantidad)
+
+    @staticmethod
+    def _senal_rampa(elemento: Elemento, fuente: "FuenteAudio", a: int, b: int) -> np.ndarray:
+        """Rampa de velocidad: cada muestra lee la posición que da la integral de la velocidad.
+
+        El tono sigue a la velocidad (como en los editores al hacer una rampa)."""
+        cantidad = (b - a) * MUESTRAS_POR_FOTOGRAMA
+        bordes = np.arange(a, b + 1, dtype=np.float64)
+        avance = np.array([elemento.avance_fuente(f - elemento.inicio) for f in bordes]) * MUESTRAS_POR_FOTOGRAMA
+        posiciones = np.interp(np.linspace(0, len(bordes) - 1, cantidad), np.arange(len(bordes)), avance)
+        base = elemento.tiempo.fuente_entrada * MUESTRAS_POR_FOTOGRAMA
+        desde = int(np.floor(posiciones[0])) if cantidad else 0
+        largo = int(np.ceil(posiciones[-1])) - desde + 2 if cantidad else 0
+        original = fuente.leer(base + desde, max(1, largo))
         indices = np.arange(original.shape[1])
-        return np.vstack([np.interp(posiciones, indices, original[c]) for c in range(2)]).astype(np.float32)
+        relativas = posiciones - desde
+        return np.vstack([np.interp(relativas, indices, original[c]) for c in range(2)]).astype(np.float32)
 
     def _envolvente(self, capitulo: Capitulo, elemento: Elemento, senal: np.ndarray, a: int, b: int) -> np.ndarray:
         # Volumen y paneo evaluados en cada borde de fotograma e interpolados por muestra.

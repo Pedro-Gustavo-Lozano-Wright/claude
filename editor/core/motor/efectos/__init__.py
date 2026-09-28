@@ -11,6 +11,8 @@ Parámetros (convención):
 - desenfoque `radio` en px del lienzo · nitidez `cantidad` 0…2
 - croma: opciones `color` (hex), parámetros `tolerancia` 0…1 y `suavidad` 0…1
 - lut: opción `archivo` (en `recursos/luts/`), parámetro `intensidad` 0…1
+- mascara: `centro_x`, `centro_y`, `ancho`, `alto` (fracciones), `suavidad`, `invertir`; opción `forma`
+- vineta: `intensidad` 0…1, `radio`
 """
 
 from __future__ import annotations
@@ -175,6 +177,35 @@ def _lut(img, p, o, c):
     return img
 
 
+def _mascara(img, p, o, c):
+    alto, ancho = img.shape[:2]
+    cx, cy = p.get("centro_x", 0.5), p.get("centro_y", 0.5)
+    rx, ry = max(1e-3, p.get("ancho", 0.6) / 2), max(1e-3, p.get("alto", 0.6) / 2)
+    suavidad = max(1e-3, p.get("suavidad", 0.05))
+    y, x = np.mgrid[0:alto, 0:ancho].astype(np.float32)
+    dx, dy = (x / max(1, ancho - 1) - cx) / rx, (y / max(1, alto - 1) - cy) / ry
+    if o.get("forma", "elipse") == "rectangulo":
+        distancia = np.maximum(np.abs(dx), np.abs(dy))
+    else:
+        distancia = np.sqrt(dx * dx + dy * dy)
+    mascara = np.clip((1 + suavidad - distancia) / suavidad, 0, 1)
+    if p.get("invertir", 0) >= 0.5:
+        mascara = 1 - mascara
+    img[..., 3] *= mascara
+    return img
+
+
+def _vineta(img, p, o, c):
+    alto, ancho = img.shape[:2]
+    y, x = np.mgrid[0:alto, 0:ancho].astype(np.float32)
+    dx, dy = x / max(1, ancho - 1) * 2 - 1, y / max(1, alto - 1) * 2 - 1
+    distancia = np.sqrt(dx * dx + dy * dy) / np.sqrt(2)
+    radio = max(0.05, p.get("radio", 0.8))
+    oscuro = np.clip((distancia - radio * 0.5) / max(1e-3, radio), 0, 1) * p.get("intensidad", 0.5)
+    img[..., :3] *= (1 - oscuro)[..., None]
+    return img
+
+
 for _tipo, _funcion in {
     "brillo": _brillo,
     "contraste": _contraste,
@@ -184,5 +215,7 @@ for _tipo, _funcion in {
     "nitidez": _nitidez,
     "croma": _croma,
     "lut": _lut,
+    "mascara": _mascara,
+    "vineta": _vineta,
 }.items():
     registrar_efecto(_tipo, _funcion)

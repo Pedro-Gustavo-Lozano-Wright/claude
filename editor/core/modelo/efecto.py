@@ -19,7 +19,9 @@ LUT = "lut"
 DESENFOQUE = "desenfoque"
 NITIDEZ = "nitidez"
 CROMA = "croma"
-TIPOS_EFECTO = (BRILLO, CONTRASTE, SATURACION, TEMPERATURA, LUT, DESENFOQUE, NITIDEZ, CROMA)
+MASCARA = "mascara"
+VINETA = "vineta"
+TIPOS_EFECTO = (BRILLO, CONTRASTE, SATURACION, TEMPERATURA, LUT, DESENFOQUE, NITIDEZ, CROMA, MASCARA, VINETA)
 
 
 
@@ -56,6 +58,13 @@ _DESCRIPTORES: dict[str, DescriptorEfecto] = {
         DescriptorEfecto(NITIDEZ, "Nitidez", (Parametro("cantidad", 0, 2, 0.5),)),
         DescriptorEfecto(CROMA, "Croma", (Parametro("tolerancia", 0, 1, 0.3), Parametro("suavidad", 0, 1, 0.1)),
                          (("color", "#00ff00"),)),
+        # Máscara: rectángulo o elipse en fracciones del Elemento (0–1); animable para seguir algo.
+        DescriptorEfecto(MASCARA, "Máscara", (
+            Parametro("centro_x", 0, 1, 0.5), Parametro("centro_y", 0, 1, 0.5),
+            Parametro("ancho", 0, 1, 0.6), Parametro("alto", 0, 1, 0.6),
+            Parametro("suavidad", 0, 0.5, 0.05), Parametro("invertir", 0, 1, 0),
+        ), (("forma", "elipse"),)),
+        DescriptorEfecto(VINETA, "Viñeta", (Parametro("intensidad", 0, 1, 0.5), Parametro("radio", 0.2, 1.5, 0.8))),
     )
 }
 

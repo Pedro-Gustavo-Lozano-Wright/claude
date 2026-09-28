@@ -30,12 +30,13 @@ def pedir_imagen(sesion: Sesion, al_llegar: Callable[[bytes, int], None], exacta
     capitulo = sesion.capitulo.instantanea(f, f + 1)
     servicio = sesion.vista_previa
     tamano = tamano_exacto(ancho_monitor) if exacta else TAMANO_RAPIDO
+    idioma = sesion.estado.idioma_escucha
 
     def trabajo(contexto):
         contexto.comprobar()
         if exacta:
-            return servicio.fotograma_exacto(capitulo, f, tamano)
-        return servicio.fotograma_rapido(capitulo, f, tamano)
+            return servicio.fotograma_exacto(capitulo, f, tamano, idioma)
+        return servicio.fotograma_rapido(capitulo, f, tamano, idioma)
 
     def terminar(resultado, error) -> None:
         if error is None and resultado is not None:
@@ -52,7 +53,7 @@ def instantanea_en(sesion: Sesion, f: int):
 def fotograma_en_vivo(sesion: Sesion, capitulo, f: int) -> bytes:
     """Nivel 2 durante la reproducción. Corre en un hilo aparte (`asyncio.to_thread`);
     `capitulo` es la instantánea tomada antes en el hilo principal."""
-    return sesion.vista_previa.fotograma_rapido(capitulo, f, TAMANO_RAPIDO)
+    return sesion.vista_previa.fotograma_rapido(capitulo, f, TAMANO_RAPIDO, sesion.estado.idioma_escucha)
 
 
 def preparar_minuto(sesion: Sesion, minuto: int, al_terminar: Callable[[object], None] | None = None,
@@ -97,3 +98,39 @@ def prerender_listo(sesion: Sesion, minuto: int):
 
 def minuto_de(f: int) -> int:
     return min(23, f // FOTOGRAMAS_POR_MINUTO)
+
+
+# --- E19: monitores de señal ----------------------------------------------------------------
+
+BINS_HISTOGRAMA = 64
+COLUMNAS_ONDA, NIVELES_ONDA = 96, 48
+
+
+def calcular_senal(imagen) -> dict:
+    """Histograma RGB (0–1 normalizado) y forma de onda de luminancia (columnas × niveles, 0–1)."""
+    import numpy as np
+
+    rgb = imagen[..., :3].astype(np.float32)
+    histogramas = []
+    for canal in range(3):
+        cuenta, _ = np.histogram(rgb[..., canal], bins=BINS_HISTOGRAMA, range=(0, 256))
+        histogramas.append(cuenta / max(1, cuenta.max()))
+    luma = rgb[..., 0] * 0.2126 + rgb[..., 1] * 0.7152 + rgb[..., 2] * 0.0722
+    alto, ancho = luma.shape
+    columnas = np.minimum((np.arange(ancho) * COLUMNAS_ONDA) // ancho, COLUMNAS_ONDA - 1)
+    niveles = np.minimum((luma * NIVELES_ONDA / 256).astype(int), NIVELES_ONDA - 1)
+    onda = np.zeros((COLUMNAS_ONDA, NIVELES_ONDA))
+    np.add.at(onda, (np.broadcast_to(columnas, (alto, ancho)).ravel(), niveles.ravel()), 1)
+    onda = np.sqrt(onda / max(1.0, onda.max()))
+    return {"histogramas": [h.tolist() for h in histogramas], "onda": onda.tolist()}
+
+
+def pedir_senal(sesion: Sesion, al_llegar: Callable[[dict], None]) -> None:
+    """Señal del fotograma del cabezal (imagen exacta a 320×180; tarea de prioridad 1)."""
+    f = sesion.estado.cabezal
+    capitulo = sesion.capitulo.instantanea(f, f + 1)
+    servicio = sesion.vista_previa
+    idioma = sesion.estado.idioma_escucha
+    sesion.tarea(Tarea("monitor", "Señal", lambda c: calcular_senal(servicio.imagen_exacta(capitulo, f, (320, 180), idioma)),
+                       prioridad=MONITOR, clave="senal"),
+                 lambda resultado, error: al_llegar(resultado) if error is None and resultado else None)

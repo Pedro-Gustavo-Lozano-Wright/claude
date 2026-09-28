@@ -24,6 +24,7 @@ from editor.core.estandar import FOTOGRAMAS_POR_CAPITULO, FOTOGRAMAS_POR_MINUTO,
 from editor.core.modelo.bruto import TipoMedio
 from editor.core.modelo.capa import TipoCapa
 from editor.core.modelo.marcador import clave_capa
+from editor.core.modelo.plantillas_texto import PLANTILLAS
 
 if TYPE_CHECKING:
     from editor.app.ui.ventana import Ventana
@@ -104,8 +105,12 @@ class Timeline:
                 self.boton_iman,
                 ft.IconButton(ft.Icons.BOOKMARK_ADD, tooltip="Marcador en el cabezal", icon_size=18,
                               on_click=lambda _: self._marcador()),
-                ft.IconButton(ft.Icons.TEXT_FIELDS, tooltip="Añadir texto en T1", icon_size=18,
-                              on_click=lambda _: self._texto()),
+                ft.PopupMenuButton(
+                    icon=ft.Icons.TEXT_FIELDS, tooltip="Añadir texto en T1 (plantillas)",
+                    items=[ft.PopupMenuItem(content="Texto simple", on_click=lambda _: self._texto())] + [
+                        ft.PopupMenuItem(content=p.etiqueta, on_click=lambda _, n=nombre: self._texto(n))
+                        for nombre, p in PLANTILLAS.items()],
+                ),
                 ft.IconButton(ft.Icons.CROP, tooltip="Quitar el rango I–O (Shift: extraer)", icon_size=18,
                               on_click=lambda _: self._quitar_rango()),
                 self.capa_destino,
@@ -353,6 +358,11 @@ class Timeline:
             else:
                 controles.append(self._icono(ft.Icons.VISIBILITY if visible else ft.Icons.VISIBILITY_OFF, "Ver",
                                              clave, visible=not visible))
+                if pista.capa.tipo is TipoCapa.TEXTO:
+                    # Una capa T con idioma es de subtítulos: se ve al escuchar ese idioma.
+                    idioma = estado.idioma if estado else ""
+                    controles.append(ft.TextButton(idioma or "*", tooltip="Idioma de los subtítulos (* = siempre visible)",
+                                                   on_click=lambda _, c=clave, i=idioma: self._rotar_idioma(c, i)))
             controles.append(self._icono(ft.Icons.LOCK if bloqueada else ft.Icons.LOCK_OPEN, "Bloquear",
                                          clave, bloqueada=not bloqueada))
             filas.append(ft.Container(ft.Row(controles, spacing=0), height=self.alto_pista,
@@ -550,8 +560,9 @@ class Timeline:
         if ctl.poner_marcador(self.sesion):
             self.refrescar()
 
-    def _texto(self) -> None:
-        if ctl.agregar_texto(self.sesion):
+    def _texto(self, plantilla: str | None = None) -> None:
+        texto = PLANTILLAS[plantilla].etiqueta if plantilla else "Título"
+        if ctl.agregar_texto(self.sesion, texto, plantilla=plantilla):
             self.app.refrescar("timeline", "monitor", "inspector")
 
     def _quitar_rango(self) -> None:

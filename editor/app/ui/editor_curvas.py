@@ -31,6 +31,7 @@ class EditorCurvas:
     def __init__(self, app: "Ventana") -> None:
         self.app = app
         self.propiedad: str | None = None
+        self.indice_efecto: int | None = None   # None = propiedad del Elemento; si no, parámetro de ese efecto
         self.elegido: int | None = None     # f local del keyframe elegido
         self.ancho = 280.0
         self._arrastre: dict | None = None
@@ -56,9 +57,10 @@ class EditorCurvas:
             spacing=4,
         )
 
-    def mostrar(self, propiedad: str | None) -> None:
-        if propiedad != self.propiedad:
+    def mostrar(self, propiedad: str | None, indice_efecto: int | None = None) -> None:
+        if (propiedad, indice_efecto) != (self.propiedad, self.indice_efecto):
             self.propiedad = propiedad
+            self.indice_efecto = indice_efecto
             self.elegido = None
         self.refrescar()
 
@@ -66,9 +68,17 @@ class EditorCurvas:
 
     def _pista(self):
         elemento = self.app.sesion.seleccionado()
-        if elemento is None or self.propiedad is None or not elemento.animacion.tiene(self.propiedad):
+        if elemento is None or self.propiedad is None:
             return elemento, None
-        return elemento, elemento.animacion.pista(self.propiedad)
+        if self.indice_efecto is not None:
+            if self.indice_efecto >= len(elemento.efectos):
+                return elemento, None
+            animacion = elemento.efectos[self.indice_efecto].animacion
+        else:
+            animacion = elemento.animacion
+        if not animacion.tiene(self.propiedad):
+            return elemento, None
+        return elemento, animacion.pista(self.propiedad)
 
     def _escalas(self, elemento, pista):
         valores = [k.valor for k in pista] or [0.0]
@@ -95,7 +105,8 @@ class EditorCurvas:
             self.titulo.value = "Curvas: elija una propiedad con keyframes en el inspector."
             self.lienzo.shapes = formas
             return
-        self.titulo.value = f"Curvas · {self.propiedad} · {len(pista)} keyframes"
+        donde = f"efecto {self.indice_efecto + 1} · " if self.indice_efecto is not None else ""
+        self.titulo.value = f"Curvas · {donde}{self.propiedad} · {len(pista)} keyframes"
         a_x, a_y, _ = self._escalas(elemento, pista)
         linea = ft.Paint(color=TEMA.acento, stroke_width=2, style=ft.PaintingStyle.STROKE)
         puntos = max(2, int(self.ancho // 3))
@@ -172,7 +183,7 @@ class EditorCurvas:
             return
         sesion = self.app.sesion
         if sesion.ejecutar(lambda: MoverKeyframe(sesion.estado.capitulo, elemento.id, self.propiedad,
-                                                 arrastre["origen"], arrastre["destino"])):
+                                                 arrastre["origen"], arrastre["destino"], self.indice_efecto)):
             self.elegido = arrastre["destino"]
             self.app.refrescar("inspector", "monitor")
 
@@ -185,7 +196,8 @@ class EditorCurvas:
             return
         sesion = self.app.sesion
         nuevo = Keyframe(actual.f, actual.valor, curva, tuple(controles) if curva == BEZIER else None)
-        if sesion.ejecutar(lambda: PonerKeyframe(sesion.estado.capitulo, elemento.id, self.propiedad, nuevo)):
+        if sesion.ejecutar(lambda: PonerKeyframe(sesion.estado.capitulo, elemento.id, self.propiedad, nuevo,
+                                                 self.indice_efecto)):
             self.app.refrescar("inspector", "monitor")
 
     def _cambiar_curva(self, evento) -> None:

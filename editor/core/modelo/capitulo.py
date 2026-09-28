@@ -169,7 +169,17 @@ class Capitulo:
         """Elementos de minutos (no Global) que tocan [inicio, fin), incluidos desbordes."""
         return [e for e in self.elementos_de_minutos() if e.inicio < fin and inicio < e.fin]
 
-    def visuales_activos_en(self, f: int) -> list[Elemento]:
+    def se_ve_en_idioma(self, elemento: Elemento, idioma: str | None) -> bool:
+        """Textos de una capa T con idioma (subtítulos): solo se ven al ver ese idioma.
+
+        Sin `idioma` (imagen común del render) no se dibujan: son pistas de subtítulos (E21).
+        """
+        if not elemento.es_texto:
+            return True
+        propio = self.estado_capa(elemento).idioma
+        return not propio or propio == idioma
+
+    def visuales_activos_en(self, f: int, idioma: str | None = None) -> list[Elemento]:
         """Todo lo visible en f: minuto actual, desbordes de minutos anteriores y Global."""
         if not granularidad.dentro_del_capitulo(f):
             return []
@@ -178,7 +188,7 @@ class Capitulo:
             if e.es_visual and e.activo_en(f)
         ]
         candidatos.extend(self.global_.visuales_activos_en(f))
-        return sorted((e for e in candidatos if self.se_ve(e)), key=clave_apilado)
+        return sorted((e for e in candidatos if self.se_ve(e) and self.se_ve_en_idioma(e, idioma)), key=clave_apilado)
 
     def sonoros_activos_en(self, f: int, idioma: str | None = None) -> list[Elemento]:
         if not granularidad.dentro_del_capitulo(f):

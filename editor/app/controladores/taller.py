@@ -17,7 +17,7 @@ from editor.core.modelo.bruto import TipoMedio
 from editor.core.modelo.capa import Capa, TipoCapa
 from editor.core.modelo.errores import ErrorModelo
 from editor.core.proyecto_fs import consultas
-from editor.core.modelo.pieza import MetodoConversionFps, Pieza, TramoFuente
+from editor.core.modelo.pieza import AudioConformado, MetodoConversionFps, Pieza, TramoFuente
 from editor.core.estandar import ASAS_FOTOGRAMAS, FPS
 from editor.core.modelo.capitulo import Capitulo
 from editor.core.motor.mezclador_audio import Mezclador
@@ -39,6 +39,8 @@ def crear_pieza(sesion: Sesion, id_bruto: str, entrada: int, salida: int,
             nombre=normalizar_nombre(nombre or bruto.nombre),
             tramos=[TramoFuente(id_bruto, entrada, salida)],
             metodo_fps=metodo,
+            # Si el método cambia la duración, el audio se estira sin cambiar el tono (E20).
+            audio_conformado=AudioConformado.CONSERVAR_TONO,
         )
     except ErrorModelo as error:
         sesion.avisar(str(error))
@@ -53,6 +55,10 @@ def agregar_tramo(sesion: Sesion, id_pieza: str, id_bruto: str, entrada: int, sa
 
 def cambiar_metodo(sesion: Sesion, id_pieza: str, metodo: MetodoConversionFps) -> bool:
     return sesion.ejecutar(CambiarRecetaPieza(id_pieza, metodo_fps=metodo))
+
+
+def cambiar_audio_conformado(sesion: Sesion, id_pieza: str, modo: AudioConformado) -> bool:
+    return sesion.ejecutar(CambiarRecetaPieza(id_pieza, audio_conformado=modo))
 
 
 def interpretar_fps(sesion: Sesion, id_bruto: str, fps: Fraction | None) -> bool:

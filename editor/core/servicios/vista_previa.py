@@ -74,11 +74,15 @@ class ServicioVistaPrevia:
 
     # --- Niveles 1, 2 y 4 --------------------------------------------------------------
 
-    def fotograma_rapido(self, capitulo: Capitulo, f: int, tamano: tuple[int, int]) -> bytes:
-        return a_jpeg(self._rapido.componer(capitulo, f, tamano), self.calidad_jpeg)
+    def fotograma_rapido(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], idioma: str | None = None) -> bytes:
+        return a_jpeg(self._rapido.componer(capitulo, f, tamano, idioma=idioma), self.calidad_jpeg)
 
-    def fotograma_exacto(self, capitulo: Capitulo, f: int, tamano: tuple[int, int]) -> bytes:
-        return a_jpeg(self._exacto.componer(capitulo, f, tamano), self.calidad_pausa)
+    def fotograma_exacto(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], idioma: str | None = None) -> bytes:
+        return a_jpeg(self._exacto.componer(capitulo, f, tamano, idioma=idioma), self.calidad_pausa)
+
+    def imagen_exacta(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], idioma: str | None = None):
+        """RGB uint8 sin comprimir (para los monitores de señal)."""
+        return self._exacto.componer(capitulo, f, tamano, idioma=idioma)
 
     # --- Audio -----------------------------------------------------------------------------
 
@@ -114,7 +118,7 @@ class ServicioVistaPrevia:
         muestras = self._mezclador.mezclar(capitulo, inicio, fin, idioma)
         with Codificador(temporal, *tamano, perfil, [(PerfilAudio(), idioma)]) as salida:
             for f in range(inicio, fin):
-                salida.escribir_video(self._rapido.componer(capitulo, f, tamano))
+                salida.escribir_video(self._rapido.componer(capitulo, f, tamano, idioma=idioma))
                 if (f - inicio) % 48 == 0:
                     contexto.progreso((f - inicio) / FOTOGRAMAS_POR_MINUTO, f"Vista previa del minuto {minuto:02d}")
             salida.escribir_audio(muestras)

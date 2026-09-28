@@ -16,6 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+import wave
+
+import numpy as np
 from typing import TYPE_CHECKING
 
 import flet as ft
@@ -39,6 +42,7 @@ from editor.core.servicios.vista_previa import RelojAudio
 if TYPE_CHECKING:
     from editor.app.ui.ventana import Ventana
 
+ANCHO_SENAL, ALTO_SENAL = 220, 110
 ZOOMS_LIENZO = {"Encajar": 0.0, "25 %": 0.25, "50 %": 0.5, "100 %": 1.0, "200 %": 2.0}
 INTERVALO_ARRASTRE = 0.1   # la imagen se refresca ~10 veces por segundo al arrastrar
 
@@ -111,6 +115,11 @@ class Monitor:
             options=[ft.DropdownOption(key=k, text=k) for k in ZOOMS_LIENZO], on_select=self._cambiar_zoom,
         )
         self.estado_texto = texto_suave("")
+        # Medidores de nivel (E20) y monitores de señal (E19).
+        self.medidor = cv.Canvas(shapes=[], height=8, expand=True)
+        self._pcm: dict[str, np.ndarray] = {}
+        self.senal = cv.Canvas(shapes=[], height=ALTO_SENAL, width=2 * ANCHO_SENAL + 12)
+        self.panel_senal = ft.Container(self.senal, visible=False, bgcolor=TEMA.panel_alto, padding=4)
         transporte = ft.Row(
             [
                 ft.IconButton(ft.Icons.SKIP_PREVIOUS, tooltip="Inicio del minuto (PageUp: minuto anterior)",
@@ -127,13 +136,16 @@ class Monitor:
                 ft.Container(expand=True),
                 ft.IconButton(ft.Icons.CROP_FREE, tooltip="Márgenes seguros", on_click=self._alternar_margenes),
                 ft.IconButton(ft.Icons.STAY_CURRENT_PORTRAIT, tooltip="Guía 9:16", on_click=self._alternar_guia),
+                ft.IconButton(ft.Icons.MONITOR_HEART, tooltip="Señal: histograma y forma de onda de luminancia",
+                              on_click=self._alternar_senal),
                 self.zoom,
             ],
             spacing=2,
             height=44,
         )
         self.control = ft.Container(
-            content=ft.Column([self.area, transporte, self.estado_texto], spacing=2, expand=True),
+            content=ft.Column([self.area, self.medidor, transporte, self.panel_senal, self.estado_texto],
+                              spacing=2, expand=True),
             bgcolor=TEMA.panel,
             padding=4,
             expand=True,
@@ -151,6 +163,8 @@ class Monitor:
         self.redibujar_superposicion()
         if not self.sesion.estado.reproduciendo:
             self._pedir_imagen()
+            if self.panel_senal.visible:
+                reproduccion.pedir_senal(self.sesion, self._dibujar_senal)
 
     def _pedir_imagen(self) -> None:
         def exacta(datos: bytes, f: int) -> None:
@@ -488,6 +502,7 @@ class Monitor:
                 sesion.ir_a(fin)
                 return True
             sesion.ir_a(f)
+            self._medir(self._audios_listos.get(clave), f - inicio)
             copia = reproduccion.instantanea_en(sesion, f)
             datos = await asyncio.to_thread(reproduccion.fotograma_en_vivo, sesion, copia, f)
             if not self._sigue(generacion):
@@ -498,6 +513,68 @@ class Monitor:
             actualizar(self.app.page)
             await asyncio.sleep(max(0.0, periodo - (time.monotonic() - momento)))
         return False
+
+    # --- Medidores y señal ---------------------------------------------------------------
+
+    def _medir(self, ruta: str | None, f_local: float) -> None:
+        """Pico por canal en 50 ms alrededor del instante (del WAV del minuto)."""
+        if ruta is None:
+            return
+        if ruta not in self._pcm:
+            if len(self._pcm) > 4:
+                self._pcm.clear()
+            try:
+                with wave.open(ruta, "rb") as archivo:
+                    datos = np.frombuffer(archivo.readframes(archivo.getnframes()), dtype="<i2")
+                self._pcm[ruta] = datos.reshape(-1, 2).astype(np.float32) / 32768
+            except (OSError, wave.Error, ValueError):
+                self._pcm[ruta] = np.zeros((0, 2), dtype=np.float32)
+        pcm = self._pcm[ruta]
+        centro = int(f_local / FPS * 48000)
+        trozo = pcm[max(0, centro - 1200): centro + 1200]
+        picos = np.abs(trozo).max(axis=0) if len(trozo) else np.zeros(2)
+        ancho = max(10.0, self.vista.area_ancho)
+        formas: list[cv.Shape] = [cv.Rect(0, 0, ancho, 8, paint=ft.Paint(color=TEMA.panel_alto))]
+        for canal, pico in enumerate(picos):
+            db = 20 * np.log10(max(float(pico), 1e-5))
+            fraccion = max(0.0, min(1.0, (db + 60) / 60))
+            color = TEMA.error if db > -1 else (TEMA.marcador if db > -9 else TEMA.render_al_dia)
+            formas.append(cv.Rect(0, canal * 4, ancho * fraccion, 3, paint=ft.Paint(color=color)))
+        self.medidor.shapes = formas
+
+    def _alternar_senal(self, _evento) -> None:
+        self.panel_senal.visible = not self.panel_senal.visible
+        if self.panel_senal.visible:
+            reproduccion.pedir_senal(self.sesion, self._dibujar_senal)
+        actualizar(self.control)
+
+    def _dibujar_senal(self, datos: dict) -> None:
+        """Izquierda: histograma RGB; derecha: forma de onda de luminancia (0 abajo, 255 arriba)."""
+        formas: list[cv.Shape] = [cv.Rect(0, 0, ANCHO_SENAL, ALTO_SENAL, paint=ft.Paint(color=TEMA.lienzo)),
+                                  cv.Rect(ANCHO_SENAL + 12, 0, ANCHO_SENAL, ALTO_SENAL, paint=ft.Paint(color=TEMA.lienzo))]
+        for histograma, color in zip(datos["histogramas"], ("#ff5555", "#55ff55", "#5599ff")):
+            paso = ANCHO_SENAL / len(histograma)
+            puntos = [cv.Path.MoveTo(0, ALTO_SENAL)]
+            puntos += [cv.Path.LineTo(i * paso, ALTO_SENAL - v * (ALTO_SENAL - 4)) for i, v in enumerate(histograma)]
+            formas.append(cv.Path(puntos, paint=ft.Paint(color=ft.Colors.with_opacity(0.8, color), stroke_width=1.2,
+                                                         style=ft.PaintingStyle.STROKE)))
+        onda = datos["onda"]
+        columnas, niveles = len(onda), len(onda[0]) if onda else 1
+        bandas = {0.15: [], 0.4: [], 0.75: []}
+        for c, columna in enumerate(onda):
+            x = ANCHO_SENAL + 12 + (c + 0.5) * ANCHO_SENAL / columnas
+            for n, valor in enumerate(columna):
+                for umbral in sorted(bandas, reverse=True):
+                    if valor >= umbral:
+                        y = ALTO_SENAL - (n + 0.5) * ALTO_SENAL / niveles
+                        bandas[umbral] += [cv.Path.MoveTo(x, y - 1), cv.Path.LineTo(x, y + 1)]
+                        break
+        for umbral, trazos in bandas.items():
+            if trazos:
+                formas.append(cv.Path(trazos, paint=ft.Paint(color=ft.Colors.with_opacity(min(1.0, umbral + 0.2), "#9fe8a0"),
+                                                             stroke_width=2, style=ft.PaintingStyle.STROKE)))
+        self.senal.shapes = formas
+        actualizar(self.senal)
 
     async def _sonar(self, ruta: str, segundos: float) -> bool:
         if self._audio.src != ruta:
@@ -515,6 +592,10 @@ class Monitor:
         inicio, fin = minuto * FOTOGRAMAS_POR_MINUTO, (minuto + 1) * FOTOGRAMAS_POR_MINUTO
         self._video_listo.clear()
         terminado = asyncio.Event()
+        clave_audio = (sesion.estado.capitulo, minuto, sesion.estado.idioma_escucha)
+        if clave_audio not in self._audios_listos:   # solo para los medidores de nivel
+            reproduccion.audio_del_minuto(sesion, minuto,
+                                          lambda ruta: self._audios_listos.__setitem__(clave_audio, str(ruta)))
         fallo = asyncio.Event()
         self._video = flet_video.Video(
             playlist=[flet_video.VideoMedia(ruta)], autoplay=False, controls=False,
@@ -552,6 +633,7 @@ class Monitor:
             if f >= fin - 1:
                 break
             sesion.ir_a(f)
+            self._medir(self._audios_listos.get(clave_audio), f - inicio)
             self.tiempo.value = timecode.formatear(f)
             self.app.cabezal_movido(ligero=True)
             self.app.page.update()

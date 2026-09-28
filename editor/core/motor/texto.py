@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from editor.core.modelo.texto import CENTRO, DERECHA, ContenidoTexto, EstiloTexto
+from editor.core.modelo.texto import CENTRO, DERECHA, IZQUIERDA, ContenidoTexto, EstiloTexto
 
 registro = logging.getLogger(__name__)
 
@@ -76,6 +76,10 @@ def _dibujar(texto: str, estilo: EstiloTexto, escala: float, carpeta: str) -> np
     alto_linea = round(tamano * estilo.interlineado)
     anchos = [fuente.getlength(linea) for linea in lineas]
     ancho = max(1, round(max(anchos) + 2 * contorno))
+    if estilo.ancho_maximo > 0 and estilo.alineacion != IZQUIERDA:
+        # Caja de ancho fijo: centrar o alinear a la derecha no depende del largo del texto
+        # (la posición en el lienzo no se corre al editarlo).
+        ancho = max(ancho, round(estilo.ancho_maximo * escala + 2 * contorno))
     alto = max(1, alto_linea * (len(lineas) - 1) + tamano + 2 * contorno + round(tamano * 0.3))
 
     margen = 0

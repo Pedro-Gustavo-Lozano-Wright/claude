@@ -47,6 +47,8 @@ class Navegador:
                 titulo_panel("Proyecto",
                              ft.IconButton(ft.Icons.UPLOAD_FILE, tooltip="Importar Brutos", icon_size=18,
                                            on_click=self._importar),
+                             ft.IconButton(ft.Icons.SUBTITLES, tooltip="Importar subtítulos .srt", icon_size=18,
+                                           on_click=self._importar_srt),
                              ft.IconButton(ft.Icons.CREATE_NEW_FOLDER, tooltip="Nuevo capítulo", icon_size=18,
                                            on_click=lambda _: self._nuevo_capitulo())),
                 texto(app.sesion.proyecto.nombre, weight=ft.FontWeight.BOLD),
@@ -152,6 +154,37 @@ class Navegador:
 
             medios.importar(self.sesion, [Path(r) for r in rutas])
             self.app.aviso_breve(f"Importando {len(rutas)} archivo(s)…")
+
+    async def _importar_srt(self, _evento) -> None:
+        archivos = await self.app.selector.pick_files(dialog_title="Subtítulos .srt", allowed_extensions=["srt"])
+        rutas = [a.path for a in archivos or [] if a.path]
+        if not rutas:
+            return
+        from pathlib import Path
+
+        from editor.app.controladores import creativo
+        from editor.app.controladores import timeline as ctl_timeline
+        from editor.core.modelo.capa import TipoCapa
+
+        capa = ft.Dropdown(label="Capa", value="T2", width=120, dense=True,
+                           options=[ft.DropdownOption(key=c, text=c) for c in ctl_timeline.capas_de_tipo(TipoCapa.TEXTO)])
+        idioma = ft.Dropdown(label="Idioma", width=160, dense=True, value=self.sesion.proyecto.idioma_principal,
+                             options=[ft.DropdownOption(key="", text="Siempre visible")] + [
+                                 ft.DropdownOption(key=i, text=i) for i in self.sesion.proyecto.idiomas])
+
+        def importar() -> None:
+            cantidad = creativo.importar_srt(self.sesion, Path(rutas[0]), capa.value or "T2", idioma.value or "")
+            if cantidad:
+                self.app.aviso_breve(f"{cantidad} subtítulos en {capa.value}.")
+                self.app.refrescar("timeline", "monitor", "mapa")
+
+        self.app.raiz.dialogo(
+            "Importar subtítulos",
+            ft.Column([texto_suave(Path(rutas[0]).name), ft.Row([capa, idioma]),
+                       texto_suave("Con idioma, se ven al escuchar ese idioma y no se queman en el video común.")],
+                      tight=True, width=420),
+            [("Importar", importar), ("Cancelar", None)],
+        )
 
     def _nuevo_capitulo(self) -> None:
         if self.sesion.solo_lectura:

@@ -31,6 +31,7 @@ from editor.core.motor.codificador import Codificador, PerfilAudio, PerfilVideo
 from editor.core.motor.conversion_fps import convertir, factor_audio, fotogramas_salida
 from editor.core.motor.decodificador import FuenteVideo
 from editor.core.motor.efectos import ContextoEfecto, aplicar_efectos
+from editor.core.motor.estiramiento import estirar
 from editor.core.motor.mezclador_audio import FRECUENCIA, FuenteAudio
 from editor.core.proyecto_fs import automatico, estructura
 from editor.core.proyecto_fs.estado_disco import EstadoDisco
@@ -90,10 +91,16 @@ def hornear(raiz: Path, pieza: Pieza, brutos: dict[str, Bruto], estandar: Estand
             ruta = estructura.ruta_bruto(raiz, bruto)
             fuente = FuenteVideo(ruta)
 
+            encaje = _encaje(bruto, ancho, alto)
+
             def cuadros():
                 nonlocal procesados
                 for n in range(desde, hasta):
-                    imagen = fuente.fotograma(n, (ancho, alto))
+                    if encaje is None:
+                        imagen = fuente.fotograma(n, (ancho, alto))
+                    else:
+                        # Otra relación de aspecto que el primer tramo: se encaja con bandas, sin estirar.
+                        imagen = _con_bandas(fuente.fotograma(n, encaje), ancho, alto)
                     procesados += 1
                     if procesados % 24 == 0:
                         contexto.progreso(0.95 * procesados / max(1, total_nativos), f"Horneando {pieza.nombre}")
@@ -150,6 +157,25 @@ def _procesar(imagen: np.ndarray, pieza: Pieza, matriz, ancho: int, alto: int) -
     return (np.clip(flotante, 0, 1) * 255 + 0.5).astype(np.uint8)
 
 
+def _encaje(bruto: Bruto, ancho: int, alto: int) -> tuple[int, int] | None:
+    """Tamaño que conserva la relación de aspecto del Bruto dentro de ancho×alto; None si ya coincide."""
+    if not bruto.ancho or not bruto.alto:
+        return None
+    escala = min(ancho / bruto.ancho, alto / bruto.alto)
+    tamano = (max(2, round(bruto.ancho * escala)), max(2, round(bruto.alto * escala)))
+    return None if abs(tamano[0] - ancho) <= 2 and abs(tamano[1] - alto) <= 2 else tamano
+
+
+def _con_bandas(imagen: np.ndarray, ancho: int, alto: int) -> np.ndarray:
+    """Centra la imagen en un lienzo negro opaco de ancho×alto (RGBA)."""
+    lienzo = np.zeros((alto, ancho, 4), dtype=np.uint8)
+    lienzo[..., 3] = 255
+    y = (alto - imagen.shape[0]) // 2
+    x = (ancho - imagen.shape[1]) // 2
+    lienzo[y: y + imagen.shape[0], x: x + imagen.shape[1]] = imagen
+    return lienzo
+
+
 def _audio_tramo(ruta: Path, bruto: Bruto, desde: int, hasta: int, fps: Fraction, pieza: Pieza) -> np.ndarray:
     segundos_inicio = float(desde / fps)
     segundos = float((hasta - desde) / fps)
@@ -160,7 +186,8 @@ def _audio_tramo(ruta: Path, bruto: Bruto, desde: int, hasta: int, fps: Fraction
     largo = round(muestras.shape[1] * factor)
     if pieza.audio_conformado is AudioConformado.SILENCIAR:
         return np.zeros((2, largo), dtype=np.float32)
-    # Estiramiento simple (cambia el tono); E20 puede sustituirlo por uno que lo conserve.
+    if pieza.audio_conformado is AudioConformado.CONSERVAR_TONO:
+        return estirar(muestras, largo)
     return _ajustar_largo(muestras, largo)
 
 

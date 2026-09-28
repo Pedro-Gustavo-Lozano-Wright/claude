@@ -28,12 +28,15 @@ from editor.core.comandos import (
     QuitarKeyframe,
     ReordenarEfecto,
 )
+from editor.app.controladores import audio as ctl_audio
+from editor.app.controladores import creativo as ctl_creativo
 from editor.app.controladores import timeline as ctl_timeline
+from editor.core.comandos.presets import ANIMACIONES_CLIP
 from editor.core.modelo.efecto import descriptor_efecto, efecto_nuevo, tipos_efecto
 from editor.core.modelo.transicion import DIRECCIONES, descriptor_transicion, tipos_transicion
 from editor.core.espacio.transform import MODOS_MEZCLA
 from editor.core.modelo.keyframe import Keyframe
-from editor.core.modelo.texto import ALINEACIONES, ANIMACIONES_TEXTO
+from editor.core.modelo.texto import ALINEACIONES, ANIMACIONES_TEXTO, ETIQUETAS_ANIMACION
 from editor.core.tiempo.nomenclatura import normalizar_nombre
 
 if TYPE_CHECKING:
@@ -113,8 +116,10 @@ class Inspector:
             ], wrap=True),
         ]
         if not elemento.es_texto:
-            filas.append(self._campo_numero("velocidad", elemento.tiempo.velocidad, "×",
-                                            lambda v: self._velocidad(elemento, v)))
+            # Velocidad: con keyframes es una rampa (la integral de la velocidad da el tiempo de fuente).
+            velocidad = elemento.animacion.valor("velocidad", elemento.local(f), elemento.tiempo.velocidad)
+            filas.append(self._fila_animable(elemento, "velocidad", "velocidad", velocidad, "×", lambda v: v, None,
+                                             aplicar_base=lambda v: self._velocidad(elemento, v)))
         if elemento.es_visual:
             filas.append(ft.Text("ESPACIO", size=TEMA.tamano_pequeno, color=TEMA.texto_suave))
             transform = elemento.transform_en(f)
@@ -140,11 +145,17 @@ class Inspector:
                                             lambda v: self._propiedad(elemento, "audio.fundido_entrada", max(0, int(v)))))
             filas.append(self._campo_numero("fundido salida", elemento.audio.fundido_salida, "f",
                                             lambda v: self._propiedad(elemento, "audio.fundido_salida", max(0, int(v)))))
+        filas += self._presets(elemento)
         filas += self._transicion(elemento)
         if elemento.es_visual:
             filas += self._efectos(elemento)
         self.cuerpo.controls = filas
-        self.curvas.mostrar(self.propiedad_activa if elemento.animacion.tiene(self.propiedad_activa) else None)
+        curvas = self.curvas
+        if (curvas.indice_efecto is not None and curvas.propiedad and curvas.indice_efecto < len(elemento.efectos)
+                and elemento.efectos[curvas.indice_efecto].animacion.tiene(curvas.propiedad)):
+            curvas.mostrar(curvas.propiedad, curvas.indice_efecto)   # se sigue viendo el parámetro del efecto
+        else:
+            curvas.mostrar(self.propiedad_activa if elemento.animacion.tiene(self.propiedad_activa) else None)
 
     def _texto(self, elemento) -> list[ft.Control]:
         contenido = elemento.texto
@@ -162,10 +173,10 @@ class Inspector:
                         on_select=lambda e: self._propiedad(elemento, "texto.estilo.alineacion", e.control.value)),
             ft.Row([
                 ft.Dropdown(dense=True, label="Entrada", value=contenido.animacion_entrada, width=150,
-                            options=[ft.DropdownOption(key=a, text=a) for a in ANIMACIONES_TEXTO],
+                            options=[ft.DropdownOption(key=a, text=ETIQUETAS_ANIMACION.get(a, a)) for a in ANIMACIONES_TEXTO],
                             on_select=lambda e: self._propiedad(elemento, "texto.animacion_entrada", e.control.value)),
                 ft.Dropdown(dense=True, label="Salida", value=contenido.animacion_salida, width=150,
-                            options=[ft.DropdownOption(key=a, text=a) for a in ANIMACIONES_TEXTO],
+                            options=[ft.DropdownOption(key=a, text=ETIQUETAS_ANIMACION.get(a, a)) for a in ANIMACIONES_TEXTO],
                             on_select=lambda e: self._propiedad(elemento, "texto.animacion_salida", e.control.value)),
             ], wrap=True),
         ]
@@ -211,7 +222,8 @@ class Inspector:
 
     def _fila_animable(self, elemento, propiedad: str, etiqueta: str, valor_pantalla: float, unidad: str,
                        desde_pantalla: Callable[[float], float], base_ruta: str | None,
-                       indice_efecto: int | None = None) -> ft.Control:
+                       indice_efecto: int | None = None,
+                       aplicar_base: Callable[[float], None] | None = None) -> ft.Control:
         """Campo con rombo de keyframe. `indice_efecto`: parámetro del efecto en esa posición."""
         f_local = self.sesion.estado.cabezal - elemento.inicio
         animacion = _animacion(elemento, indice_efecto)
@@ -223,6 +235,8 @@ class Inspector:
             valor = desde_pantalla(nuevo)
             if animada:
                 self._poner_keyframe(elemento, propiedad, valor, indice_efecto)
+            elif aplicar_base is not None:
+                aplicar_base(valor)
             elif indice_efecto is not None:
                 self._ejecutar(lambda: CambiarParametroEfecto(self.sesion.estado.capitulo, elemento.id,
                                                               indice_efecto, propiedad, valor))
@@ -246,9 +260,36 @@ class Inspector:
         ]
         campo = self._campo_numero(etiqueta, valor_pantalla, unidad, aplicar)
         fila = ft.Row([rombo, campo, *navegar], spacing=0)
-        if indice_efecto is not None:
-            return fila   # el editor de curvas trabaja con las propiedades del Elemento (efectos: E19)
-        return ft.GestureDetector(content=fila, on_tap=lambda _: self._activar(propiedad))
+        return ft.GestureDetector(content=fila, on_tap=lambda _: self._activar(propiedad, indice_efecto))
+
+    def _presets(self, elemento) -> list[ft.Control]:
+        """Atajos de animación (E19) y de audio (E20); cada uno es un paso de deshacer."""
+        botones: list[ft.Control] = []
+        sesion = self.sesion
+        refrescar = lambda hecho: hecho and self.app.refrescar("inspector", "monitor", "timeline")  # noqa: E731
+        if elemento.es_visual and not elemento.es_texto:
+            botones.append(ft.OutlinedButton("Ken Burns", icon=ft.Icons.ZOOM_IN_MAP,
+                                             on_click=lambda _: refrescar(ctl_creativo.ken_burns(sesion, elemento.id))))
+            botones.append(ft.OutlinedButton("Estabilizar", icon=ft.Icons.CENTER_FOCUS_STRONG,
+                                             on_click=lambda _: ctl_creativo.estabilizar(sesion, elemento.id)))
+        if elemento.es_visual:
+            tipo = ft.Dropdown(dense=True, width=130, value="fundido",
+                               options=[ft.DropdownOption(key=t, text=t) for t in ANIMACIONES_CLIP])
+            botones.append(ft.Row([
+                tipo,
+                ft.TextButton("Entrada", on_click=lambda _: refrescar(
+                    ctl_creativo.animar_clip(sesion, elemento.id, tipo.value or "fundido", True))),
+                ft.TextButton("Salida", on_click=lambda _: refrescar(
+                    ctl_creativo.animar_clip(sesion, elemento.id, tipo.value or "fundido", False))),
+            ], spacing=0))
+        if elemento.suena and elemento.capa.tipo.value == "A":
+            botones.append(ft.OutlinedButton(
+                "Bajar con la voz", icon=ft.Icons.GRAPHIC_EQ,
+                tooltip="Ducking: baja esta música 12 dB mientras suenan las voces (capas con idioma)",
+                on_click=lambda _: ctl_audio.ducking(sesion, elemento.id)))
+        if not botones:
+            return []
+        return [ft.Text("PRESETS", size=TEMA.tamano_pequeno, color=TEMA.texto_suave), ft.Row(botones, wrap=True)]
 
     def _transicion(self, elemento) -> list[ft.Control]:
         """Transición de entrada: solapa con el Elemento anterior de la capa durante su duración."""
@@ -380,10 +421,13 @@ class Inspector:
                 self.propiedad_activa = propiedad
             self.app.mover_cabezal_a(elemento.inicio + destino[0])
 
-    def _activar(self, propiedad: str) -> None:
-        self.propiedad_activa = propiedad
+    def _activar(self, propiedad: str, indice_efecto: int | None = None) -> None:
+        """La propiedad (o el parámetro de efecto) que muestra el editor de curvas."""
+        if indice_efecto is None:
+            self.propiedad_activa = propiedad
         elemento = self.sesion.seleccionado()
-        self.curvas.mostrar(propiedad if elemento is not None and elemento.animacion.tiene(propiedad) else None)
+        animada = elemento is not None and _animacion(elemento, indice_efecto).tiene(propiedad)
+        self.curvas.mostrar(propiedad if animada else None, indice_efecto)
         actualizar(self.curvas.control)
 
 

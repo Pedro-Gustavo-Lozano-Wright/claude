@@ -10,15 +10,23 @@ from __future__ import annotations
 from editor.core.comandos.comando import EdicionCapitulo, EdicionRechazada
 from editor.core.espacio.transform import PROPIEDADES_ANIMABLES
 from editor.core.modelo.capitulo import Capitulo
-from editor.core.modelo.elemento import PROPIEDADES_AUDIO_ANIMABLES, Elemento
+from editor.core.modelo.elemento import (
+    PROPIEDADES_AUDIO_ANIMABLES,
+    PROPIEDADES_TIEMPO_ANIMABLES,
+    VELOCIDAD_MAXIMA,
+    VELOCIDAD_MINIMA,
+    Elemento,
+)
 from editor.core.modelo.keyframe import Animacion, Keyframe
 from editor.core.modelo.proyecto import Proyecto
 
 
 def animacion_de(elemento: Elemento, propiedad: str, indice_efecto: int | None) -> Animacion:
     if indice_efecto is None:
-        if propiedad not in PROPIEDADES_ANIMABLES + PROPIEDADES_AUDIO_ANIMABLES:
+        if propiedad not in PROPIEDADES_ANIMABLES + PROPIEDADES_AUDIO_ANIMABLES + PROPIEDADES_TIEMPO_ANIMABLES:
             raise EdicionRechazada(f"La propiedad {propiedad!r} no se puede animar.")
+        if propiedad == "velocidad" and (elemento.tiempo.velocidad < 0 or elemento.tiempo.congelado):
+            raise EdicionRechazada("Las rampas de velocidad no se aplican en reversa ni a un fotograma congelado.")
         return elemento.animacion
     try:
         efecto = elemento.efectos[indice_efecto]
@@ -50,6 +58,9 @@ class PonerKeyframe(EdicionCapitulo):
         elemento = self.obtener(capitulo, self.id_elemento)
         if self.keyframe.f >= elemento.duracion:
             raise EdicionRechazada("El keyframe cae fuera del Elemento.")
+        if self.propiedad == "velocidad" and self.indice_efecto is None and \
+                not VELOCIDAD_MINIMA <= self.keyframe.valor <= VELOCIDAD_MAXIMA:
+            raise EdicionRechazada(f"La velocidad va de {VELOCIDAD_MINIMA} a {VELOCIDAD_MAXIMA}.")
         animacion_de(elemento, self.propiedad, self.indice_efecto).pista(self.propiedad).poner(self.keyframe)
         return set()
 

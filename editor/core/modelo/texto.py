@@ -14,6 +14,11 @@ DERECHA = "derecha"
 ALINEACIONES = (IZQUIERDA, CENTRO, DERECHA)
 
 ANIMACIONES_TEXTO = ("ninguna", "fundido", "deslizar-arriba", "deslizar-abajo", "escribir", "escala")
+# Descriptor de las animaciones de texto (como efectos y transiciones): nombre visible.
+ETIQUETAS_ANIMACION = {
+    "ninguna": "Ninguna", "fundido": "Fundido", "deslizar-arriba": "Deslizar hacia arriba",
+    "deslizar-abajo": "Deslizar hacia abajo", "escribir": "Máquina de escribir", "escala": "Escala",
+}
 
 
 @dataclass(frozen=True)

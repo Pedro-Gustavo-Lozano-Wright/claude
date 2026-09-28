@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import flet as ft
 
+from editor.app.controladores import audio as ctl_audio
 from editor.app.controladores import taller as ctl
 from editor.app.ui.tema import TEMA, texto, texto_suave, titulo_panel
 from editor.app.ui.widgets import actualizar, timecode
@@ -20,7 +21,7 @@ from editor.app.ui.widgets.imagen import imagen_vacia
 from editor.core.comandos.taller import QuitarPieza
 from editor.core.estandar import FPS
 from editor.core.modelo.bruto import TipoMedio
-from editor.core.modelo.pieza import MetodoConversionFps
+from editor.core.modelo.pieza import AudioConformado, MetodoConversionFps
 from editor.core.tiempo.granularidad import FPS_COMUNES, texto_fps
 
 if TYPE_CHECKING:
@@ -32,6 +33,11 @@ NOMBRES_METODO = {
     MetodoConversionFps.CAMARA_LENTA: "Cámara lenta",
     MetodoConversionFps.MEZCLA: "Mezcla de fotogramas",
     MetodoConversionFps.INTERPOLACION: "Interpolación (flujo óptico)",
+}
+NOMBRES_AUDIO = {
+    AudioConformado.CONSERVAR_TONO: "Estirar conservando el tono",
+    AudioConformado.ESTIRAR_CON_TONO: "Estirar (cambia el tono)",
+    AudioConformado.SILENCIAR: "Silenciar",
 }
 AUTOMATICO = "auto"
 ALTO_VISOR = 300
@@ -184,6 +190,12 @@ class Taller:
                 origen = taller.brutos.get(tramo.id_bruto)
                 info.append(texto_suave(f"  tramo {i}: {origen.nombre if origen else tramo.id_bruto} "
                                         f"[{tramo.entrada}, {tramo.salida}) · {tramo.fotogramas_nativos} f nativos"))
+            if not pieza.metodo_fps.conserva_tiempo:
+                # El método cambia la duración: qué hacer con el audio.
+                info.append(ft.Dropdown(
+                    dense=True, width=260, label="Audio al cambiar la duración", value=pieza.audio_conformado.value,
+                    options=[ft.DropdownOption(key=m.value, text=t) for m, t in NOMBRES_AUDIO.items()],
+                    on_select=lambda e, i=pieza.id: self._audio_conformado(i, e.control.value)))
             acciones += [
                 ft.FilledButton("Hornear", icon=ft.Icons.LOCAL_FIRE_DEPARTMENT,
                                 on_click=lambda _: self._hornear(), disabled=pieza.horneada_al_dia),
@@ -205,6 +217,11 @@ class Taller:
         if bruto.tiene_audio or bruto.tipo is TipoMedio.AUDIO:
             botones.append(ft.OutlinedButton("Buscar silencios", icon=ft.Icons.VOLUME_OFF,
                                              on_click=lambda _: self._buscar_silencios(bruto.id)))
+        if bruto.tiene_audio or bruto.tipo is TipoMedio.AUDIO:
+            botones.append(ft.OutlinedButton(
+                "Reducir ruido", icon=ft.Icons.NOISE_CONTROL_OFF,
+                tooltip="Crea un Bruto nuevo con el ruido de fondo reducido (el original no cambia)",
+                on_click=lambda _: self._reducir_ruido(bruto.id)))
         if bruto.tipo is TipoMedio.AUDIO:
             botones.append(ft.OutlinedButton(
                 "Alinear con el Elemento seleccionado", icon=ft.Icons.SYNC,
@@ -226,6 +243,14 @@ class Taller:
                               on_click=lambda _, n=int(s.fin * fps): self._ir_y_marcar(n, entrada=True))
                 for s in silencios[:40]], wrap=True, spacing=0))
         return filas
+
+    def _reducir_ruido(self, id_bruto: str) -> None:
+        ctl_audio.reducir_ruido(self.sesion, id_bruto)
+        self.app.aviso_breve("Reduciendo ruido…")
+
+    def _audio_conformado(self, id_pieza: str, valor: str | None) -> None:
+        if valor and ctl.cambiar_audio_conformado(self.sesion, id_pieza, AudioConformado(valor)):
+            self.app.refrescar("taller", "navegador")
 
     def _buscar_escenas(self, id_bruto: str) -> None:
         def listo(cortes) -> None:

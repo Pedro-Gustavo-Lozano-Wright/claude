@@ -17,8 +17,8 @@ decisiones y el plan de épicas están en **[PROJECT.md](PROJECT.md)**.
 | C — Motor y servicios | E7–E11 | ✅ Verificado con medios reales |
 | D — Interfaz | E12–E16 | ✅ Recorrida en Chromium |
 | E — Completar la edición | E17 Timeline y Taller completos · E18 Proyecto, idiomas y mantenimiento | ✅ |
-| F — Capacidades creativas | E19 Efectos, transiciones y texto · E20 Audio avanzado | **Siguiente: E19** |
-| G — Entrega | E21 Render y exportación · E22 Shorts 9:16 | Pendiente |
+| F — Capacidades creativas | E19 Efectos, transiciones y texto · E20 Audio avanzado | ✅ |
+| G — Entrega | E21 Render y exportación · E22 Shorts 9:16 | **Siguiente: E21** |
 | H — Extensión y cierre | E23 Plugins y plantillas · E24 Rendimiento, empaquetado y documentación | Pendiente |
 
 ## Modos de `main.py`
@@ -183,6 +183,17 @@ Más herramientas:
   audio cambia su volumen, **Ctrl+F** busca por nombre.
 - Menú **☰ Proyecto**: idiomas del proyecto, atajos de teclado y mantenimiento
   (caché, papelera, Brutos sin uso).
+- Inspector: **Ken Burns**, **Estabilizar**, animaciones de entrada y salida
+  (fundido, deslizar, zoom), efectos **Máscara** y **Viñeta**, transición
+  **Fundido a negro**, **rampas de velocidad** (rombo en la fila Velocidad) y
+  **Bajar con la voz** en un audio de música.
+- Timeline: botón **T** con plantillas (título, rótulo, subtítulo, créditos); las
+  capas T pueden tener idioma (solo se ven al ver ese idioma).
+- Navegador: **importar `.srt`** a una capa T de un idioma.
+- Taller: **Reducir ruido** en un Bruto de audio (crea un Bruto nuevo); al
+  conformar se **conserva el tono** por defecto.
+- Monitor: botón ♥ muestra **medidores de nivel**, histograma RGB y forma de onda.
+- Render: **normalizar a −14 LUFS** (YouTube) y medir la sonoridad antes.
 
 Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revisión-8).
 

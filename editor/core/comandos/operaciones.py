@@ -69,7 +69,9 @@ def recortar_inicio(elemento: Elemento, nuevo_inicio: int) -> None:
         raise EdicionRechazada("El recorte dejaría el Elemento sin duración.")
     tiempo = elemento.tiempo
     if not tiempo.congelado and tiempo.velocidad > 0:
-        nueva_entrada = tiempo.fuente_entrada + math.floor(delta * tiempo.velocidad)
+        # Con rampa, lo recorrido hasta el corte es la integral de la velocidad.
+        avance = elemento.avance_fuente(delta) if (delta > 0 and elemento.con_rampa) else delta * tiempo.velocidad
+        nueva_entrada = tiempo.fuente_entrada + math.floor(avance + 1e-9)
         if nueva_entrada < 0:
             raise EdicionRechazada("No hay más material de la fuente antes de la entrada.")
         tiempo.fuente_entrada = nueva_entrada

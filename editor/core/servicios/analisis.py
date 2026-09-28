@@ -136,3 +136,153 @@ def desfase_con_archivo(referencia: np.ndarray, ruta_externa: Path, contexto: Co
     externo = _mono(ruta_externa, contexto)
     contexto.progreso(0.9, "Comparando audio")
     return desfase(mono, externo)
+
+
+# --- E19: movimiento de cámara para estabilizar -------------------------------------------
+
+def movimiento(ruta: Path, desde: int, hasta: int, contexto: Contexto, suavizado: int = 15) -> dict[int, tuple[float, float, float]]:
+    """Corrección por fotograma [desde, hasta) del archivo (24 fps): (dx, dy, grados) que la anulan.
+
+    Sigue puntos con Lucas-Kanade, estima una transformación rígida por par de
+    fotogramas, acumula la trayectoria y la suaviza con una media móvil; la
+    corrección es suavizada − real. Claves: fotograma relativo a `desde`.
+    """
+    import cv2
+
+    from editor.core.motor.decodificador import FuenteVideo
+
+    fuente = FuenteVideo(ruta)
+    try:
+        escala = min(1.0, 480 / max(1, fuente.info.ancho))
+        tamano = (max(16, round(fuente.info.ancho * escala)), max(16, round(fuente.info.alto * escala)))
+        anterior = None
+        trayectoria = [(0.0, 0.0, 0.0)]
+        for n in range(desde, hasta):
+            if (n - desde) % 24 == 0:
+                contexto.comprobar()
+                contexto.progreso(0.9 * (n - desde) / max(1, hasta - desde), "Midiendo el movimiento")
+            gris = cv2.cvtColor(fuente.fotograma(n, tamano)[..., :3], cv2.COLOR_RGB2GRAY)
+            if anterior is not None:
+                dx = dy = da = 0.0
+                puntos = cv2.goodFeaturesToTrack(anterior, maxCorners=200, qualityLevel=0.01, minDistance=20)
+                if puntos is not None and len(puntos) >= 6:
+                    siguientes, estado, _ = cv2.calcOpticalFlowPyrLK(anterior, gris, puntos, None)
+                    buenos = estado.reshape(-1) == 1
+                    if buenos.sum() >= 6:
+                        matriz, _ = cv2.estimateAffinePartial2D(puntos[buenos], siguientes[buenos])
+                        if matriz is not None:
+                            dx, dy = float(matriz[0, 2]), float(matriz[1, 2])
+                            da = float(np.degrees(np.arctan2(matriz[1, 0], matriz[0, 0])))
+                x, y, a = trayectoria[-1]
+                trayectoria.append((x + dx / escala, y + dy / escala, a + da))
+            anterior = gris
+    finally:
+        fuente.cerrar()
+    real = np.array(trayectoria)
+    ventana = max(1, suavizado)
+    relleno = np.pad(real, ((ventana, ventana), (0, 0)), mode="edge")
+    nucleo = np.ones(2 * ventana + 1) / (2 * ventana + 1)
+    suave = np.stack([np.convolve(relleno[:, c], nucleo, mode="valid") for c in range(3)], axis=1)
+    correccion = suave - real
+    return {k: (float(c[0]), float(c[1]), float(c[2])) for k, c in enumerate(correccion)}
+
+
+# --- E20: sonoridad (ITU-R BS.1770 / EBU R128) ---------------------------------------------
+
+# Coeficientes del filtro K de BS.1770-4 a 48 kHz: (b0, b1, b2, a1, a2).
+_ESTANTE = (1.53512485958697, -2.69169618940638, 1.19839281085285, -1.69065929318241, 0.73248077421585)
+_PASO_ALTO = (1.0, -2.0, 1.0, -1.99004745483398, 0.99007225036621)
+
+
+def _respuesta_k(bins: int, frecuencia: int) -> np.ndarray:
+    """|H(f)|² del filtro K en las frecuencias de una rfft de `bins` puntos."""
+    f = np.fft.rfftfreq(bins, 1 / frecuencia)
+    z = np.exp(-2j * np.pi * f / frecuencia)
+    respuesta = np.ones_like(z)
+    for b0, b1, b2, a1, a2 in (_ESTANTE, _PASO_ALTO):
+        respuesta *= (b0 + b1 * z + b2 * z * z) / (1 + a1 * z + a2 * z * z)
+    return np.abs(respuesta) ** 2
+
+
+def sonoridad(muestras: np.ndarray, frecuencia: int = FRECUENCIA) -> tuple[float, float]:
+    """(LUFS integrados, pico en dBFS) de una señal estéreo (2, n).
+
+    Bloques de 400 ms con 75 % de solape, puertas absoluta (−70) y relativa (−10 LU).
+    La ponderación K se aplica sobre el espectro de cada bloque (Parseval): la energía
+    por bloque es lo único que usa la medida, así que no hace falta filtrar en el tiempo.
+    """
+    if muestras.size == 0:
+        return float("-inf"), float("-inf")
+    bloque, salto = int(0.4 * frecuencia), int(0.1 * frecuencia)
+    n = muestras.shape[1]
+    if n < bloque:
+        bloque = salto = n
+    peso = _respuesta_k(bloque, frecuencia)
+    peso[1:-1] *= 2                                          # bins que representan ±f
+    inicios = np.arange(0, n - bloque + 1, salto)
+    energias = np.zeros(len(inicios))
+    for canal in muestras:
+        # Por tandas para no crear una matriz enorme con un capítulo entero.
+        for i in range(0, len(inicios), 512):
+            tanda = inicios[i: i + 512]
+            marcos = np.stack([canal[k: k + bloque] for k in tanda]).astype(np.float64)
+            espectro = np.abs(np.fft.rfft(marcos, axis=1)) ** 2
+            energias[i: i + 512] += (espectro * peso).sum(axis=1) / (bloque * bloque)
+    con_senal = energias[energias > 10 ** ((-70 + 0.691) / 10)]              # puerta absoluta −70 LUFS
+    if con_senal.size == 0:
+        return float("-inf"), _pico(muestras)
+    relativa = -0.691 + 10 * np.log10(np.mean(con_senal)) - 10              # puerta relativa −10 LU
+    finales = con_senal[-0.691 + 10 * np.log10(con_senal) > relativa]
+    lufs = -0.691 + 10 * np.log10(np.mean(finales if finales.size else con_senal))
+    return float(lufs), _pico(muestras)
+
+
+def _pico(muestras: np.ndarray) -> float:
+    maximo = float(np.max(np.abs(muestras))) if muestras.size else 0.0
+    return float(20 * np.log10(maximo)) if maximo > 0 else float("-inf")
+
+
+def ganancia_para(lufs_medidos: float, objetivo: float = -14.0, pico_db: float = 0.0, techo_db: float = -1.0) -> float:
+    """dB a aplicar para llegar al objetivo sin que el pico pase del techo."""
+    if lufs_medidos == float("-inf"):
+        return 0.0
+    ganancia = objetivo - lufs_medidos
+    if pico_db != float("-inf"):
+        ganancia = min(ganancia, techo_db - pico_db)
+    return round(ganancia, 2)
+
+
+# --- E20: voz para bajar la música (ducking) -------------------------------------------------
+
+def actividad(muestras: np.ndarray, umbral_db: float = -38.0, ventana_s: float = 0.05,
+              retencion_s: float = 0.4) -> np.ndarray:
+    """Por ventana de 50 ms: True donde hay voz (RMS sobre el umbral), con retención para no cortar."""
+    mono = muestras.mean(axis=0) if muestras.ndim == 2 else muestras
+    ventana = int(FRECUENCIA * ventana_s)
+    cantidad = len(mono) // ventana
+    if cantidad == 0:
+        return np.zeros(0, dtype=bool)
+    rms = np.sqrt(np.mean(mono[:cantidad * ventana].reshape(cantidad, ventana) ** 2, axis=1) + 1e-12)
+    activo = 20 * np.log10(rms) > umbral_db
+    retencion = int(retencion_s / ventana_s)
+    resultado = activo.copy()
+    ultimo = -10**9
+    for i, a in enumerate(activo):
+        if a:
+            ultimo = i
+        elif i - ultimo <= retencion:
+            resultado[i] = True
+    return resultado
+
+
+def tramos_activos(activo: np.ndarray, ventana_s: float = 0.05) -> list[tuple[float, float]]:
+    """Ventanas activas → tramos (inicio, fin) en segundos."""
+    tramos: list[tuple[float, float]] = []
+    inicio = None
+    for i, a in enumerate(np.append(activo, False)):
+        if a and inicio is None:
+            inicio = i
+        elif not a and inicio is not None:
+            tramos.append((inicio * ventana_s, i * ventana_s))
+            inicio = None
+    return tramos

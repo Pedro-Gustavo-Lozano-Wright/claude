@@ -125,17 +125,30 @@ def elemento_texto(
     duracion: int = DURACION_TEXTO_POR_DEFECTO,
     nombre: str | None = None,
     en_global: bool = False,
+    plantilla: str | None = None,
 ) -> Elemento:
+    """Texto nuevo; con `plantilla` (ver `modelo/plantillas_texto.py`) toma su estilo, lugar y animaciones."""
     if capa.tipo is not TipoCapa.TEXTO:
         raise ErrorModelo("Un texto va en una capa T.")
+    contenido = ContenidoTexto(texto=texto)
+    # Sin plantilla: tercio inferior izquierdo, dentro del margen seguro de títulos (10 %).
+    espacio = Transform(x=LIENZO.ancho * 0.1, y=LIENZO.alto * 0.78)
+    if plantilla is not None:
+        from editor.core.modelo.plantillas_texto import PLANTILLAS
+
+        modelo = PLANTILLAS.get(plantilla)
+        if modelo is None:
+            raise ErrorModelo(f"Plantilla de texto desconocida: {plantilla!r}")
+        contenido = ContenidoTexto(texto=texto, estilo=modelo.estilo, animacion_entrada=modelo.entrada,
+                                   animacion_salida=modelo.salida)
+        espacio = Transform(x=modelo.x, y=modelo.y)
     return Elemento(
         id=proyecto.nuevo_id(),
         nombre=normalizar_nombre(nombre or texto or "texto"),
         capa=capa,
         tiempo=TiempoElemento(inicio=inicio, duracion=duracion, fuente_entrada=0),
         fuente=ReferenciaFuente(TipoFuente.TEXTO),
-        texto=ContenidoTexto(texto=texto),
-        # Tercio inferior izquierdo, dentro del margen seguro de títulos (10 %).
-        espacio=Transform(x=LIENZO.ancho * 0.1, y=LIENZO.alto * 0.78),
+        texto=contenido,
+        espacio=espacio,
         en_global=en_global,
     )

@@ -10,7 +10,12 @@ from editor.core.tareas.cola import RENDER_FINAL, Tarea
 from editor.core.modelo.minuto import EstadoRender
 
 
-def renderizar(sesion: Sesion, desde: int | None, hasta: int | None, por_idioma: bool = False) -> None:
+LUFS_YOUTUBE = -14.0
+
+
+def renderizar(sesion: Sesion, desde: int | None, hasta: int | None, por_idioma: bool = False,
+               normalizar: bool = False) -> None:
+    """`normalizar`: cada pista de idioma a −14 LUFS (YouTube) sin pasar de −1 dBFS de pico."""
     if sesion.solo_lectura:
         sesion.avisar("El proyecto está abierto en solo lectura: no se puede renderizar.")
         return
@@ -28,6 +33,7 @@ def renderizar(sesion: Sesion, desde: int | None, hasta: int | None, por_idioma:
     pedido = render.PedidoRender.crear(
         sesion.proyecto, sesion.estado.capitulo, desde, hasta,
         modo=render.ARCHIVOS if por_idioma else render.PISTAS,
+        normalizar_lufs=LUFS_YOUTUBE if normalizar else None,
     )
     descripcion = "capítulo completo" if desde is None else (
         f"minuto {desde:02d}" if hasta in (None, desde) else f"minutos {desde:02d}-{hasta:02d}")

@@ -260,10 +260,16 @@ def quitar_rango(sesion: Sesion, extraer: bool) -> bool:
     return sesion.ejecutar(lambda: QuitarRango(estado.capitulo, estado.entrada, estado.salida, capas, extraer))
 
 
-def agregar_texto(sesion: Sesion, texto: str = "Título", codigo_capa: str = "T1") -> bool:
+def agregar_texto(sesion: Sesion, texto: str = "Título", codigo_capa: str = "T1", plantilla: str | None = None) -> bool:
     capa = Capa.desde_codigo(codigo_capa)
     try:
-        elemento = elemento_texto(sesion.proyecto, capa, sesion.estado.cabezal, texto)
+        duracion = FPS * 3
+        if plantilla is not None:
+            from editor.core.modelo.plantillas_texto import PLANTILLAS
+
+            duracion = FPS * PLANTILLAS[plantilla].duracion_segundos
+        elemento = elemento_texto(sesion.proyecto, capa, sesion.estado.cabezal, texto, duracion=duracion,
+                                  plantilla=plantilla)
     except ValueError as error:
         sesion.avisar(str(error))
         return False

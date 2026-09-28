@@ -41,7 +41,8 @@ class MetodoConversionFps(Enum):
 class AudioConformado(Enum):
     """Qué hacer con el audio cuando el método cambia la duración."""
 
-    ESTIRAR_CON_TONO = "estirar_con_tono"
+    ESTIRAR_CON_TONO = "estirar_con_tono"   # remuestrear: el tono cambia con la duración
+    CONSERVAR_TONO = "conservar_tono"       # WSOLA (E20): misma altura, otra duración
     SILENCIAR = "silenciar"
 
 

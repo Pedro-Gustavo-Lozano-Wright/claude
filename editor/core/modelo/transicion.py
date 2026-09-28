@@ -13,7 +13,8 @@ FUNDIDO = "fundido"
 DESLIZAMIENTO = "deslizamiento"
 ZOOM = "zoom"
 BARRIDO = "barrido"
-TIPOS_TRANSICION = (FUNDIDO, DESLIZAMIENTO, ZOOM, BARRIDO)
+NEGRO = "negro"   # fundido a negro: sale el anterior, pasa por negro, entra el nuevo
+TIPOS_TRANSICION = (FUNDIDO, DESLIZAMIENTO, ZOOM, BARRIDO, NEGRO)
 DIRECCIONES = ("izquierda", "derecha", "arriba", "abajo")
 
 
@@ -31,6 +32,7 @@ _DESCRIPTORES: dict[str, DescriptorTransicion] = {
         DescriptorTransicion(DESLIZAMIENTO, "Deslizamiento", usa_direccion=True),
         DescriptorTransicion(ZOOM, "Zoom"),
         DescriptorTransicion(BARRIDO, "Barrido", usa_direccion=True),
+        DescriptorTransicion(NEGRO, "Fundido a negro"),
     )
 }
 

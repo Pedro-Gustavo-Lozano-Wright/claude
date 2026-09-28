@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 11. Fases A–E (E0–E18) implementadas. Siguiente: **Fase F — Capacidades creativas (E19 Efectos, transiciones y texto)**. Instalación y uso: [README.md](README.md).
+- **Estado:** revisión 12. Fases A–F (E0–E20) implementadas. Siguiente: **Fase G — Entrega (E21 Render y exportación)**. Instalación y uso: [README.md](README.md).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 11](#0-cambios-de-las-revisiones-2-a-11)
+0. [Cambios de las revisiones 2 a 12](#0-cambios-de-las-revisiones-2-a-12)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,29 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 11
+## 0. Cambios de las revisiones 2 a 12
+
+### Revisión 12: Fase F (capacidades creativas) implementada
+
+| Área | Qué hay | Dónde |
+|---|---|---|
+| Rampas de velocidad | Keyframes de `velocidad` (0,05×–8×, no en reversa ni congelado); la fuente avanzada es la integral (trapecio, en caché); recortes y ripple la respetan | `modelo/elemento.py`, `comandos/agregar_keyframe.py` |
+| Conservar el tono | WSOLA entre 0,5× y 2× (fuera: remuestreo); velocidad constante en la mezcla y `AudioConformado.CONSERVAR_TONO` (por defecto al crear Piezas) | `motor/estiramiento.py`, `mezclador_audio.py`, `horneado.py` |
+| Tramos de otro aspecto | Se encajan con bandas al hornear | `servicios/horneado.py` |
+| Efectos | Máscara (elipse o rectángulo, suavidad, invertir) y Viñeta; curvas de parámetros de efecto en el editor de curvas | `modelo/efecto.py`, `motor/efectos`, `ui/editor_curvas.py` |
+| Transiciones | Fundido a negro (el saliente se oscurece y desaparece a la mitad) | `modelo/transicion.py`, `motor/compositor.py` |
+| Presets | Ken Burns, animaciones de entrada/salida (fundido, deslizar, zoom), estabilizar (flujo óptico LK + afín parcial, suavizado; ≤ 60 s) | `comandos/presets.py`, `controladores/creativo.py` |
+| Texto | Plantillas título, rótulo, subtítulo y créditos; capas T con idioma solo se ven al ver ese idioma | `modelo/plantillas_texto.py`, `modelo/capitulo.py` |
+| Subtítulos | Importar `.srt` (una línea = un texto, sin solapes) y exportar desde una capa T | `servicios/subtitulos.py` |
+| Monitores de señal | Medidores de nivel por canal, histograma RGB, forma de onda de luminancia | `ui/monitor.py` |
+| Audio | Bajar la música con la voz (keyframes de volumen, un paso de deshacer), sonoridad BS.1770 (ponderación K por bloque, puertas), normalizar a −14 LUFS con techo −1 dBFS, reducción de ruido espectral | `servicios/analisis.py`, `audio_procesado.py`, `render.py`, `controladores/audio.py` |
+
+**Limitaciones conocidas** (se resuelven en E21):
+
+- Los subtítulos de capas T con idioma no se queman en el video común; E21 los exporta como `.srt` o los quema por idioma.
+- La huella del video incluye los textos de idioma: cambiarlos provoca un re-render extra, que es inofensivo.
+- Las rampas de velocidad cambian el tono del audio (el WSOLA se aplica solo a velocidad constante).
+- La normalización se hace por rango renderizado y por pista de idioma.
 
 ### Revisión 11: Fase E (completar la edición) implementada
 
@@ -2010,8 +2032,10 @@ Las revisiones 1–9 usan la numeración vieja de las épicas pendientes:
 | E16 | ✅ | Inspector por grupos, keyframes (rombo, saltar), editor de curvas con bezier, historial |
 | E17 | ✅ | Timeline y Taller completos (revisión 11) |
 | E18 | ✅ | Proyecto, idiomas y mantenimiento; un capítulo en memoria |
-| E19 | **Siguiente** | Efectos, transiciones y texto |
-| E20–E24 | Pendiente | |
+| E19 | ✅ | Efectos, transiciones y texto; rampas; monitores de señal (revisión 12) |
+| E20 | ✅ | Audio avanzado: ducking, medidores, −14 LUFS, reducción de ruido, conservar tono |
+| E21 | **Siguiente** | Render y exportación |
+| E22–E24 | Pendiente | |
 
 ### Decisiones tomadas al implementar la Fase B
 

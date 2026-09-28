@@ -80,6 +80,9 @@ class ColaRender:
     def __init__(self, app: "Ventana") -> None:
         self.app = app
         self.por_idioma = ft.Checkbox(label="Un archivo por idioma", value=False)
+        self.normalizar = ft.Checkbox(label="Sonoridad −14 LUFS (YouTube)", value=True,
+                                      tooltip="Cada pista de idioma a −14 LUFS integrados, pico ≤ −1 dBFS")
+        self.sonoridad = texto_suave("")
         self.lista = ft.Column(spacing=0)
         self.control = ft.Container(
             content=ft.Column(
@@ -90,7 +93,12 @@ class ColaRender:
                         ft.OutlinedButton("Rango I–O", on_click=lambda _: self._rango()),
                         ft.OutlinedButton("Capítulo completo", on_click=lambda _: self._capitulo()),
                         self.por_idioma,
+                        self.normalizar,
                     ], wrap=True),
+                    ft.Row([ft.TextButton("Medir sonoridad del minuto", icon=ft.Icons.EQUALIZER,
+                                          on_click=lambda _: self._medir(False)),
+                            ft.TextButton("…del capítulo", on_click=lambda _: self._medir(True)),
+                            self.sonoridad], wrap=True),
                     texto_suave("Los minutos al día se reutilizan: solo se renderiza lo que cambió."),
                     ft.Divider(),
                     titulo_panel("Entregables del capítulo"),
@@ -122,9 +130,21 @@ class ColaRender:
             ))
         self.lista.controls = filas or [texto_suave("Todavía no hay renders de este capítulo.")]
 
+    def _medir(self, capitulo: bool) -> None:
+        from editor.app.controladores import audio as ctl_audio
+
+        minuto = self.app.sesion.estado.minuto
+
+        def listo(lufs: float, pico: float) -> None:
+            self.sonoridad.value = ("Capítulo: " if capitulo else f"min{minuto:02d}: ") + _texto_sonoridad(lufs, pico)
+            self.app.refrescar("render")
+
+        ctl_audio.medir_sonoridad(self.app.sesion, None if capitulo else minuto, None if capitulo else minuto, listo)
+        self.sonoridad.value = "Midiendo…"
+
     def _minuto(self) -> None:
         minuto = self.app.sesion.estado.minuto
-        ctl_render.renderizar(self.app.sesion, minuto, minuto, self.por_idioma.value)
+        ctl_render.renderizar(self.app.sesion, minuto, minuto, self.por_idioma.value, self.normalizar.value)
         self.app.aviso_breve(f"Render del minuto {minuto:02d} en cola.")
 
     def _rango(self) -> None:
@@ -133,12 +153,18 @@ class ColaRender:
             self.app.avisar("Marque entrada (I) y salida (O) en la timeline: se renderizan los minutos que cubren.")
             return
         desde, hasta = minuto_de(estado.entrada), min(23, minuto_de(max(estado.entrada, estado.salida - 1)))
-        ctl_render.renderizar(self.app.sesion, desde, hasta, self.por_idioma.value)
+        ctl_render.renderizar(self.app.sesion, desde, hasta, self.por_idioma.value, self.normalizar.value)
         self.app.aviso_breve(f"Render de los minutos {desde:02d}–{hasta:02d} en cola.")
 
     def _capitulo(self) -> None:
-        ctl_render.renderizar(self.app.sesion, None, None, self.por_idioma.value)
+        ctl_render.renderizar(self.app.sesion, None, None, self.por_idioma.value, self.normalizar.value)
         self.app.aviso_breve("Render del capítulo completo en cola.")
+
+
+def _texto_sonoridad(lufs: float, pico: float) -> str:
+    if lufs == float("-inf"):
+        return "Silencio."
+    return f"{lufs:.1f} LUFS · pico {pico:.1f} dBFS" + ("  (YouTube: −14)" if abs(lufs + 14) > 1 else "  ✓")
 
 
 def _abrir_carpeta(carpeta) -> None:

@@ -62,6 +62,7 @@ class _Ajuste:
     dy: float = 0.0
     escala: float = 1.0
     barrido: tuple[str, float] | None = None  # (dirección, fracción visible)
+    oscurecer: float = 0.0                    # fundido a negro: 0 = normal, 1 = negro
 
 
 def _ajustes_transicion(transiciones: list[TransicionActiva]) -> dict[str, _Ajuste]:
@@ -84,6 +85,14 @@ def _ajustes_transicion(transiciones: list[TransicionActiva]) -> dict[str, _Ajus
             ajuste.escala = 0.8 + 0.2 * p
         elif transicion.tipo == "barrido":
             ajuste.barrido = (transicion.direccion, p)
+        elif transicion.tipo == "negro":
+            # Primera mitad: el saliente se oscurece; segunda: el entrante aparece desde negro.
+            ajuste.oscurecer = max(0.0, 1 - (p * 2 - 1)) if p > 0.5 else 1.0
+            ajuste.opacidad = 1.0 if p > 0.5 else 0.0
+            saliente = ajustes.setdefault(activa.saliente.id, _Ajuste())
+            saliente.oscurecer = min(1.0, p * 2)
+            if p > 0.5:
+                saliente.opacidad = 0.0
         else:
             ajuste.opacidad = p  # tipos de plugins sin implementación visual: fundido
         ajustes[activa.entrante.id] = ajuste
@@ -111,13 +120,17 @@ class Compositor:
         f: int,
         tamano: tuple[int, int] = (LIENZO_ANCHO, LIENZO_ALTO),
         ventana: Rect = LIENZO_RECT,
+        idioma: str | None = None,
     ) -> np.ndarray:
-        """Imagen RGB uint8 de (alto, ancho) del fotograma f vista a través de `ventana`."""
+        """Imagen RGB uint8 de (alto, ancho) del fotograma f vista a través de `ventana`.
+
+        `idioma`: además de lo común, los subtítulos (capas T con idioma) de ese idioma.
+        """
         ancho, alto = tamano
         base = Afin.escala(ancho / ventana.ancho, alto / ventana.alto) @ Afin.traslacion(-ventana.x, -ventana.y)
         lienzo = np.zeros((alto, ancho, 3), dtype=np.float32)
         ajustes = _ajustes_transicion(capitulo.transiciones_activas(f))
-        for elemento in capitulo.visuales_activos_en(f):
+        for elemento in capitulo.visuales_activos_en(f, idioma):
             try:
                 self._dibujar(lienzo, elemento, f, base, ajustes.get(elemento.id))
             except ErrorFuente as error:
@@ -183,6 +196,8 @@ class Compositor:
                 fuente, elemento.efectos, f_local,
                 ContextoEfecto(escala=kx, carpeta_recursos=self.carpeta_recursos),
             )
+        if ajuste.oscurecer > 0:
+            fuente[..., :3] *= (1 - ajuste.oscurecer)
         fuente[..., :3] *= fuente[..., 3:4]  # premultiplicar
 
         x0, y0, x1, y1 = roi

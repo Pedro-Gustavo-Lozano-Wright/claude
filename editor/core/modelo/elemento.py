@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import lru_cache
 from enum import Enum
 from pathlib import Path
 
@@ -27,6 +28,22 @@ from editor.core.tiempo.granularidad import Duracion, Instante
 from editor.core.tiempo.nomenclatura import NombreElemento
 
 PROPIEDADES_AUDIO_ANIMABLES = ("volumen", "paneo")
+# Rampas de velocidad (E19): keyframes de "velocidad" (siempre positiva; la reversa no se anima).
+PROPIEDADES_TIEMPO_ANIMABLES = ("velocidad",)
+VELOCIDAD_MINIMA, VELOCIDAD_MAXIMA = 0.05, 8.0
+
+
+@lru_cache(maxsize=256)
+def _avance_acumulado(keyframes: tuple, base: float, fotogramas: int) -> tuple[float, ...]:
+    """Fotogramas de fuente avanzados al comienzo de cada fotograma local 0…fotogramas (regla del trapecio)."""
+    from editor.core.modelo.keyframe import PistaKeyframes
+
+    pista = PistaKeyframes(list(keyframes))
+    valores = [max(VELOCIDAD_MINIMA, pista.valor_en(k, base)) for k in range(fotogramas + 1)]
+    acumulado = [0.0]
+    for k in range(fotogramas):
+        acumulado.append(acumulado[-1] + (valores[k] + valores[k + 1]) / 2)
+    return tuple(acumulado)
 
 
 class TipoFuente(Enum):
@@ -153,12 +170,39 @@ class Elemento:
         return self.tiempo.duracion
 
     @property
+    def con_rampa(self) -> bool:
+        return self.animacion.tiene("velocidad") and not self.tiempo.congelado and self.tiempo.velocidad > 0
+
+    def avance_fuente(self, local: float) -> float:
+        """Fotogramas de fuente recorridos desde el inicio del Elemento hasta `local` (rampas incluidas)."""
+        if not self.con_rampa:
+            return max(0.0, local) * abs(self.tiempo.velocidad)
+        acumulado = _avance_acumulado(tuple(self.animacion.pista("velocidad").keyframes),
+                                      float(self.tiempo.velocidad), self.duracion)
+        if local <= 0:
+            return 0.0
+        k = min(int(local), self.duracion - 1)
+        return acumulado[k] + (acumulado[k + 1] - acumulado[k]) * (min(local, self.duracion) - k)
+
+    @property
+    def fuente_usada(self) -> int:
+        """Fotogramas de fuente que consume el Elemento (con rampa, la integral de la velocidad)."""
+        if not self.con_rampa:
+            return self.tiempo.fotogramas_fuente_usados
+        return max(1, math.ceil(self.avance_fuente(self.duracion) - 1e-9))
+
+    @property
     def excede_fuente(self) -> bool:
-        return self.tiempo.excede_fuente
+        if not self.con_rampa:
+            return self.tiempo.excede_fuente
+        return self.tiempo.fuente_duracion > 0 and self.tiempo.fuente_entrada + self.fuente_usada > self.tiempo.fuente_duracion
 
     @property
     def margen_fuente(self) -> tuple[int, int]:
-        return self.tiempo.margen_fuente
+        if not self.con_rampa or self.tiempo.fuente_duracion <= 0:
+            return self.tiempo.margen_fuente
+        despues = self.tiempo.fuente_duracion - self.tiempo.fuente_entrada - self.fuente_usada
+        return (self.tiempo.fuente_entrada, max(0, despues))
 
     @property
     def minuto_inicio(self) -> int:
@@ -192,7 +236,7 @@ class Elemento:
         """Fotograma de la fuente (Pieza a 24 fps) que se ve en el fotograma f del capítulo."""
         if self.tiempo.congelado:
             return self.tiempo.fuente_entrada
-        desplazamiento = math.floor((f - self.inicio) * abs(self.tiempo.velocidad))
+        desplazamiento = math.floor(self.avance_fuente(f - self.inicio) + 1e-9)
         if self.tiempo.velocidad > 0:
             return self.tiempo.fuente_entrada + desplazamiento
         ultimo = self.tiempo.fuente_entrada + self.tiempo.fotogramas_fuente_usados - 1

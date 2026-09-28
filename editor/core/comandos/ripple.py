@@ -53,7 +53,9 @@ class RippleRecorte(EdicionCapitulo):
         if self.lado == INICIO:
             # El inicio en pantalla queda fijo; se consume (o recupera) material de la fuente.
             if not tiempo.congelado:
-                nueva_entrada = tiempo.fuente_entrada + round(self.delta * abs(tiempo.velocidad))
+                avance = (elemento.avance_fuente(self.delta) if self.delta > 0 and elemento.con_rampa
+                          else self.delta * abs(tiempo.velocidad))
+                nueva_entrada = tiempo.fuente_entrada + round(avance)
                 if nueva_entrada < 0:
                     raise EdicionRechazada("No hay más material de la fuente antes de la entrada.")
                 tiempo.fuente_entrada = nueva_entrada

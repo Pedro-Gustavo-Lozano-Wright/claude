@@ -53,10 +53,13 @@ class PedidoRender:
     idiomas: list[str]
     modo: str = PISTAS
     version: int = 1
+    # E20: sonoridad objetivo (LUFS integrados, p. ej. −14 para YouTube); None = sin normalizar.
+    normalizar_lufs: float | None = None
 
     @classmethod
     def crear(cls, proyecto: Proyecto, numero: int, desde: int | None = None, hasta: int | None = None,
-              idiomas: list[str] | None = None, modo: str = PISTAS) -> "PedidoRender":
+              idiomas: list[str] | None = None, modo: str = PISTAS,
+              normalizar_lufs: float | None = None) -> "PedidoRender":
         assert proyecto.raiz is not None
         capitulo = proyecto.capitulo(numero)
         return cls(
@@ -68,6 +71,7 @@ class PedidoRender:
             hasta=hasta if hasta is not None else desde,
             idiomas=list(idiomas or proyecto.idiomas),
             modo=modo,
+            normalizar_lufs=normalizar_lufs,
             version=_version_libre(proyecto.raiz, capitulo, desde, hasta if hasta is not None else desde),
         )
 
@@ -156,8 +160,11 @@ def renderizar(pedido: PedidoRender, contexto: Contexto) -> ResultadoRender:
     un_idioma = len(pedido.idiomas) <= 1
     idiomas = pedido.idiomas or [None]  # type: ignore[list-item]
     pistas = [(mezclador.mezclar(pedido.capitulo, inicio, fin, idioma), idioma) for idioma in idiomas]
+    if pedido.normalizar_lufs is not None:
+        contexto.progreso(0.55, "Midiendo sonoridad")
+        pistas = [(normalizar(muestras, pedido.normalizar_lufs), idioma) for muestras, idioma in pistas]
     marca_audio = [huellas.huella_audio(pedido.capitulo, inicio, fin, i, pedido.resolutor) for i in idiomas]
-    marca_total = huella([list(huellas_minutos.items()), marca_audio])
+    marca_total = huella([list(huellas_minutos.items()), marca_audio, pedido.normalizar_lufs])
 
     carpeta = carpeta_render(pedido.raiz, pedido.capitulo.numero)
     archivos: list[Path] = []
@@ -173,6 +180,18 @@ def renderizar(pedido: PedidoRender, contexto: Contexto) -> ResultadoRender:
             nombres.append(nombre)
     contexto.progreso(1.0, "Render terminado")
     return ResultadoRender(pedido.capitulo.numero, archivos, nombres, marca_total, huellas_minutos)
+
+
+def normalizar(muestras, objetivo: float):
+    """Ganancia para llegar a `objetivo` LUFS sin pasar de −1 dBFS de pico; luego el limitador."""
+    from editor.core.motor.mezclador_audio import limitar
+    from editor.core.servicios import analisis
+
+    lufs, pico = analisis.sonoridad(muestras)
+    ganancia = analisis.ganancia_para(lufs, objetivo, pico)
+    if ganancia == 0:
+        return muestras
+    return limitar(muestras * (10 ** (ganancia / 20)))
 
 
 def registrar(proyecto: Proyecto, estado: EstadoDisco, resultado: ResultadoRender, bus: BusEventos | None = None) -> None:
