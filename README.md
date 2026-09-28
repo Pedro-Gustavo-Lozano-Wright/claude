@@ -1,79 +1,226 @@
-# Video Editor
+# Editor de video por capítulos y minutos
 
-Scaffolding para un editor de video no lineal (NLE) de escritorio en Python.
+Editor de video de escritorio para Linux, escrito en **Python** con la interfaz en
+**Flet**. Organiza todo por tiempo: capítulos de exactamente 24 minutos, una
+carpeta por minuto y nombres de archivo que dicen en qué instante aparece cada
+elemento.
 
-> **Estado: andamiaje sin implementar.** Todos los módulos `.py` están vacíos
-> (0 bytes). Este repositorio publica la *estructura* y el *diseño* de dos
-> arquitecturas alternativas, no código funcional. No hay nada que importar ni
-> que ejecutar todavía.
+Este README explica cómo **instalar** el programa y dar los primeros pasos.
+Todo lo demás (conceptos, cada pantalla, edición, render, Shorts, formato en
+disco y arquitectura) está en **[PROJECT.md](PROJECT.md)**, la documentación
+central del proyecto.
 
-## Arquitectura
-
-El proyecto contiene dos borradores paralelos del mismo editor. Son mutually
-exclusive: no forman un sistema único, son el resultado de explorar dos
-enfoques distintos.
-
-### `deep_video_editor/` — NLE de escritorio, UI plana
-
-- `app/ui/` — un único nivel de módulos de UI: `timeline`, `viewer`,
-  `effects_panel`, `inspector`, `graph_editor` (grafo de efectos en nodos),
-  `export_dialog`, `audio_controls`.
-- `core/commands/` — 13 comandos. Incluye las primitivas de edición
-  **avanzadas**: `ripple_delete`, `roll_edit`, `slide_edit`, `slip_edit`.
-- `core/engines/` — doble backend de render: `mlt_engine` (linaje MLT/Shotcut)
-  y `pyav_engine` (PyAV/FFmpeg), más `frame_cache`, `spatial_compositor`.
-- `core/plugins/` — sistema de descubrimiento y carga de plugins.
-- `core/utils/` — interpolación de keyframes, utilidades de tiempo y math.
-- Config por defecto: 30 fps, 1920x1080 (`config/settings.json`).
-- Sin `requirements.txt` ni tests.
-
-### `qwen_video_editor/` — NLE en Flet, paradigm source/program monitor
-
-El borrador más desarrollado. Built on [Flet](https://flet.dev).
-
-- `app/ui/monitors/` — paradigma de doble monitor: `source_monitor`,
-  `program_monitor`, `video_surface`.
-- `app/ui/timeline/` — timeline rica: `timeline_view`, `track_view`, `clip_view`,
-  `ruler`, `playhead`, `snap_engine`.
-- `app/ui/panels/` — `media_browser`, `properties_panel`, `effects_panel`,
-  `keyframe_editor`, `export_dialog`.
-- `app/state/app_state.py` — store de estado reactivo central.
-- `core/commands/` — 12 comandos con `base_command`, `compound_command` y un
-  conjunto de edición más simple (sin ripple/roll/slide/slip).
-- `core/time/` — paquete dedicado: `timecode` (NTSC drop-frame),
-  `fps_converter`, `time_utils`.
-- `core/engines/` — `base_engine`, `mlt_engine`, `pyav_engine`, `compositor`.
-- `tests/` — 9 módulos de test (vacíos).
-- Config por defecto: 24 fps, 1920x1080, proxies libx264, frame cache de 512 MB,
-  autosave cada 120 s, límite de undo de 100 pasos.
-- `project_workspace/` se genera en runtime (medios del usuario, `Exportaciones/`,
-  `AutoSave/`, cachés) y no se versiona.
-
-> El nombre `qwen` es una etiqueta de procedencia/branding. No hay código de
-> modelo, inferencia ni red en este repositorio.
-
-## Requisitos
-
-Python 3.13. Declarados en `qwen_video_editor/requirements.txt`:
-
-```
-flet>=0.25.0
-av>=12.0.0
-numpy>=1.26.0
-opencv-python-headless>=4.9.0
-pydantic>=2.5.0
-```
-
-## Install
+## Modos de `main.py`
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r qwen_video_editor/requirements.txt
+python main.py                                    # interfaz: último proyecto o pantalla de inicio
+python main.py RUTA_PROYECTO                      # interfaz con un proyecto
+python main.py --nuevo RUTA_PROYECTO              # crear proyecto y abrirlo
+python main.py --escanear RUTA_PROYECTO           # revisar el proyecto en disco
+python main.py --render RUTA --capitulo 1 --minutos 00-05   # render sin interfaz (--solo-audio: .m4a)
+python main.py --fotograma RUTA --capitulo 1 --tiempo 02:12.08 --salida f.png  # exportar un fotograma
+python main.py --shorts RUTA --capitulo 1         # renderiza los Shorts que no están al día
 ```
 
-`deep_video_editor` no declara dependencias todavía.
+Detalle de cada modo: [PROJECT.md, sección 20](PROJECT.md#20-modos-sin-interfaz).
 
-## Estado
+## Estructura
 
-Sin tests, sin CI, sin licencia. Todo el código está pendiente de escribir.
+```
+main.py            punto de entrada único
+config/            valores por defecto: estándar, ajustes, distribución, atajos
+editor/core/       núcleo en Python puro (sin interfaz)
+editor/app/        aplicación Flet (controladores y pantallas)
+```
+
+## 1. Requisitos
+
+| Qué | Versión | Comprobar |
+|---|---|---|
+| Linux de escritorio (X11 o Wayland) | Ubuntu 22.04+, Debian 12+ o equivalente | `cat /etc/os-release` |
+| Python | **3.13 recomendado**, mínimo 3.12 | `python3 --version` |
+| Espacio en disco | Brutos + Piezas horneadas + caché (cuente varias veces el tamaño del material) | `df -h` |
+| GPU (opcional) | NVIDIA con NVENC para codificar por hardware | `nvidia-smi` |
+
+### Python 3.13 si la distribución trae uno más viejo
+
+Ubuntu 22.04 / 24.04:
+
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.13 python3.13-venv python3.13-dev
+```
+
+Otras distribuciones: `pyenv install 3.13` o el paquete oficial de la distribución.
+
+---
+
+## 2. Dependencias del sistema
+
+```bash
+sudo apt update
+sudo apt install \
+    libmpv2 \
+    libgtk-3-0 libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+    zenity \
+    fonts-dejavu \
+    xdg-utils
+```
+
+| Paquete | Para qué | Si falta |
+|---|---|---|
+| `libmpv2` (en distribuciones viejas `libmpv1`) | Reproducción fluida (nivel 3: el pre-render del minuto) | La app sigue reproduciendo "en vivo" (nivel 2) y avisa en la barra inferior |
+| `libgtk-3-0`, `libgstreamer…` | Ventana de escritorio de Flet | La ventana no abre |
+| `zenity` | Selector de archivos y carpetas (importar, abrir, nuevo proyecto) | Los botones de importar/abrir no muestran el diálogo |
+| `fonts-dejavu` | Fuente de la interfaz y de los textos del video por defecto | Algunos símbolos se ven como cuadros |
+| `xdg-utils` | "Abrir la carpeta" de los renders | El botón no hace nada |
+
+En Fedora: `sudo dnf install mpv-libs gtk3 gstreamer1 zenity dejavu-sans-fonts xdg-utils`.
+En Arch: `sudo pacman -S mpv gtk3 gstreamer zenity ttf-dejavu xdg-utils`.
+
+> **libmpv con otro nombre**: si la ventana avisa que no encuentra `libmpv.so.1`
+> y la distribución solo trae `libmpv.so.2`, cree el enlace:
+> `sudo ln -s /usr/lib/x86_64-linux-gnu/libmpv.so.2 /usr/lib/x86_64-linux-gnu/libmpv.so.1`
+
+---
+
+## 3. Entorno virtual y dependencias de Python
+
+Desde la raíz del repositorio:
+
+```bash
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+`requirements.txt` fija las versiones probadas:
+
+```
+flet[desktop]==1.0.2    flet-video==1.0.2    flet-audio==1.0.2
+av==18.1.0              numpy==2.5.3
+opencv-python-headless==5.0.0.93             Pillow==12.3.0
+```
+
+`flet`, `flet-desktop`, `flet-video` y `flet-audio` se actualizan **juntos**:
+cada uno exige la misma versión exacta de `flet`.
+
+### Comprobar la instalación
+
+```bash
+python -c "import flet, flet_video, flet_audio, av, cv2, numpy, PIL; print('dependencias OK · av', av.__version__)"
+pip show flet | grep Version                     # debe decir 1.0.2
+python -c "import av; print([c for c in ('libx264','h264_nvenc','prores_ks','aac') if c in av.codecs_available])"
+python main.py --help
+```
+
+La primera vez que se abre la interfaz, Flet descarga su cliente de escritorio
+(unos 100 MB) en `~/.flet/`; hace falta conexión a internet solo esa vez.
+
+---
+
+## 4. PyCharm
+
+1. **Abrir** la carpeta del repositorio.
+2. *Settings → Project → Python Interpreter → Add Interpreter → Existing* →
+   `.venv/bin/python` (o crear el entorno aquí mismo y luego instalar
+   `requirements.txt` desde la terminal de PyCharm).
+3. *Run → Edit Configurations → + → Python*:
+   - **Script**: `main.py`
+   - **Working directory**: la raíz del repositorio
+   - **Parameters** (opcional): la ruta de un proyecto, por ejemplo `~/Videos/mi-serie`
+4. Ejecutar. Sin parámetros abre el último proyecto usado o la pantalla de inicio.
+
+Configuraciones útiles adicionales (mismo script, otros parámetros):
+
+| Nombre | Parameters |
+|---|---|
+| Nuevo proyecto | `--nuevo ~/Videos/mi-serie` |
+| Revisar disco | `--escanear ~/Videos/mi-serie` |
+| Render capítulo 1 | `--render ~/Videos/mi-serie --capitulo 1` |
+| Solo el audio de los minutos 0–5 | `--render ~/Videos/mi-serie --capitulo 1 --minutos 00-05 --solo-audio` |
+| Shorts desactualizados | `--shorts ~/Videos/mi-serie --capitulo 1` |
+| Registro detallado | agregar `--nivel-registro DEBUG` a cualquiera |
+
+---
+
+## 5. Primer uso en la interfaz
+
+```bash
+source .venv/bin/activate
+python main.py --nuevo ~/Videos/mi-serie      # crea cap0001 con min00…min23 y lo abre
+```
+
+1. **Importar** (icono ⬆ del navegador): los archivos se **copian** a `brutos/`.
+   Si el fps declarado no coincide con el medido, el Bruto aparece con aviso.
+2. Espacio **Taller**: elegir el Bruto, marcar entrada (I) y salida (O) en
+   fotogramas nativos, el fps interpretado y el método → **Crear Pieza** →
+   **Hornear** (barra inferior con el progreso).
+3. **Colocar en el cabezal** (capa destino de la barra de la timeline; con
+   **Global** marcado va a la pista Global del capítulo).
+4. Espacio **Minuto**: editar en la timeline, el monitor (asas) y el inspector.
+5. **Ctrl+S** guarda (renombra archivos, gemelos y guiones).
+6. Espacio **Render**: minuto actual, rango I–O o capítulo completo.
+
+Guía de cada parte:
+
+| Quiero… | Dónde |
+|---|---|
+| Preparar material (fps, cortes, escenas, silencios, sincronía, ruido) | [Taller](PROJECT.md#9-taller) |
+| Editar en la timeline (herramientas, grupo, rangos, congelar, separar audio) | [Timeline y edición](PROJECT.md#10-timeline-y-edición) |
+| Mover, animar, curvas, presets, transiciones y efectos | [Inspector](PROJECT.md#12-inspector-propiedades-animación-y-efectos) |
+| Títulos, plantillas y subtítulos `.srt` | [Texto y subtítulos](PROJECT.md#13-texto-y-subtítulos) |
+| Mezcla, bajar la música con la voz, sonoridad | [Audio](PROJECT.md#14-audio) |
+| Varios idiomas | [Idiomas](PROJECT.md#15-idiomas) |
+| Entregar para YouTube | [Render y entregables](PROJECT.md#16-render-y-entregables) |
+| Shorts verticales | [Shorts](PROJECT.md#17-shorts-verticales-916) |
+| Atajos de teclado y gestos | [Atajos y gestos](PROJECT.md#19-atajos-y-gestos) |
+
+---
+
+## 6. Dónde guarda cosas
+
+| Ruta | Contenido | ¿Se puede borrar? |
+|---|---|---|
+| `PROYECTO/` | Todo el proyecto ([PROJECT.md, sección 6](PROJECT.md#6-el-proyecto-en-disco)) | No |
+| `PROYECTO/.cache/` | Banco de vista previa, miniaturas, pre-renders, audio | Sí (se regenera) |
+| `PROYECTO/.autosave/` | Instantánea de recuperación | Sí, si guardó |
+| `PROYECTO/.papelera/` | Archivos reemplazados al guardar (permite deshacer tras guardar) | Sí, con la app cerrada |
+| `PROYECTO/.bloqueo` | Marca de proyecto abierto | Solo si la app está cerrada y quedó por un cierre forzado (la app lo detecta sola si el proceso ya no existe) |
+| `~/.config/editor/ajustes.json` | Proyectos recientes y ajustes del usuario | Sí |
+| `~/.config/editor/distribucion.json` | Tamaños de paneles y espacio activo | Sí (vuelve al de fábrica) |
+| `~/.config/editor/atajos.json` | Atajos propios (solo las claves que cambie) | Sí |
+| `~/.flet/` | Cliente de escritorio de Flet | Sí (se descarga de nuevo) |
+
+---
+
+## 7. Opcional: codificación por hardware (NVIDIA)
+
+Con una GPU NVIDIA y su controlador propietario, el render puede usar **NVENC**
+(el PyAV de `pip` ya trae `h264_nvenc`). Compruebe con `nvidia-smi` y active en
+el `_proyecto.json` del proyecto:
+
+```json
+"estandar": { "render": { "aceleracion": "nvenc" } }
+```
+
+Para que los proyectos nuevos nazcan así, cambie lo mismo en
+`config/estandar.json`. Sin NVENC se codifica por software (`libx264`).
+
+---
+
+## 8. Problemas frecuentes
+
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| `ModuleNotFoundError: flet` al ejecutar | PyCharm usa otro intérprete | Elegir `.venv/bin/python` (paso 4.2) |
+| La ventana no abre, error de GTK | Faltan librerías de escritorio | Paso 2 |
+| "La reproducción fluida no está disponible (¿falta libmpv?)" | Falta `libmpv` | `sudo apt install libmpv2` (o el enlace del paso 2) |
+| Importar / Abrir no muestran diálogo | Falta `zenity` | `sudo apt install zenity` |
+| "Proyecto en uso" al abrir | Otra ventana lo tiene abierto, o quedó `.bloqueo` de un cierre forzado en otro equipo | Cerrar la otra instancia; abrir en solo lectura; si está seguro, borrar `PROYECTO/.bloqueo` |
+| Al abrir pregunta "Recuperar trabajo" | La app se cerró sin guardar | **Restaurar** y luego Ctrl+S; **Descartar** borra la instantánea |
+| Los símbolos se ven como cuadros | Faltan fuentes | `sudo apt install fonts-dejavu` |
+| Sin sonido al reproducir | Salida de audio del sistema | La imagen sigue a tiempo real; revise el mezclador del sistema |
+| Render lento | Codificación por software | NVENC (sección 7); los minutos al día no se vuelven a renderizar |
