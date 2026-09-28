@@ -21,7 +21,7 @@ La arquitectura completa, las decisiones y las épicas están en
 ## Requisitos
 
 - Linux (Debian/Ubuntu como referencia).
-- Python 3.12 o superior.
+- Python 3.13 recomendado (mínimo 3.12).
 - Dependencias de sistema para la interfaz y el video: ver PROJECT.md, sección 15.4.
 
 ## Instalación

@@ -1,4 +1,4 @@
-"""Marcadores y estado de las capas del capítulo.
+"""Marcadores y estado de las capas del capítulo (incluida su pista de idioma).
 
 Marcador: una nota en un fotograma del capítulo (también es un punto de imán).
 EstadoCapa: ocultar, silenciar, bloquear o escuchar en solo una capa. Las
@@ -32,6 +32,9 @@ class EstadoCapa:
     silenciada: bool = False
     bloqueada: bool = False
     solo: bool = False
+    # Pista de idioma (código ISO 639-1: "es", "en"…). Vacío = común a todos los
+    # idiomas (música y efectos). Solo tiene sentido en capas A.
+    idioma: str = ""
 
 
 def clave_capa(codigo: str, en_global: bool) -> str:

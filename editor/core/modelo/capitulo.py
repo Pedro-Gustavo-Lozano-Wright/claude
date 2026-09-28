@@ -131,11 +131,22 @@ class Capitulo:
     def se_ve(self, elemento: Elemento) -> bool:
         return self.estado_capa(elemento).visible
 
-    def se_oye(self, elemento: Elemento) -> bool:
+    def se_oye(self, elemento: Elemento, idioma: str | None = None) -> bool:
+        """¿Suena este Elemento? Con `idioma`, solo lo común y las capas de ese idioma.
+
+        Sin `idioma` (edición) suena todo; el render por idioma mezcla la pista
+        común (música y efectos) más el diálogo de ese idioma.
+        """
         estado = self.estado_capa(elemento)
         if estado.silenciada:
             return False
+        if idioma is not None and estado.idioma and estado.idioma != idioma:
+            return False
         return estado.solo or not self._hay_solo()
+
+    def idiomas(self) -> list[str]:
+        """Idiomas con pista propia en este capítulo."""
+        return sorted({estado.idioma for estado in self.capas.values() if estado.idioma})
 
     def editable(self, elemento: Elemento) -> bool:
         return not elemento.estado.bloqueado and not self.estado_capa(elemento).bloqueada
@@ -160,7 +171,7 @@ class Capitulo:
         candidatos.extend(self.global_.visuales_activos_en(f))
         return sorted((e for e in candidatos if self.se_ve(e)), key=clave_apilado)
 
-    def sonoros_activos_en(self, f: int) -> list[Elemento]:
+    def sonoros_activos_en(self, f: int, idioma: str | None = None) -> list[Elemento]:
         if not granularidad.dentro_del_capitulo(f):
             return []
         candidatos = [
@@ -168,7 +179,7 @@ class Capitulo:
             if e.suena and e.activo_en(f)
         ]
         candidatos.extend(self.global_.sonoros_activos_en(f))
-        return [e for e in candidatos if self.se_oye(e)]
+        return [e for e in candidatos if self.se_oye(e, idioma)]
 
     def que_afecta_al_minuto(self, numero: int) -> list[Elemento]:
         """Todo lo que influye en el render de un minuto (base de su huella, PROJECT.md 13.2)."""

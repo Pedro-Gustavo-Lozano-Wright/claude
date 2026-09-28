@@ -35,6 +35,9 @@ class Proyecto:
     capitulos: dict[int, Capitulo] = field(default_factory=dict)
     ids: GeneradorIds = field(default_factory=GeneradorIds)
     referencias: IndiceReferencias = field(default_factory=IndiceReferencias)
+    # Idiomas del proyecto (ISO 639-1). El primero es el principal: el de la vista
+    # previa y el del render por defecto.
+    idiomas: list[str] = field(default_factory=lambda: ["es"])
     cargador_capitulo: CargadorCapitulo | None = field(default=None, repr=False, compare=False)
 
     # --- IDs ---------------------------------------------------------------------
@@ -126,6 +129,10 @@ class Proyecto:
         """Reconstruye el índice con lo cargado; las copias de capítulos sin cargar
         se conocen por las referencias guardadas en cada `_pieza.json` (E5)."""
         self.referencias.reconstruir(self)
+
+    @property
+    def idioma_principal(self) -> str:
+        return self.idiomas[0] if self.idiomas else ""
 
     @property
     def nombre_carpeta(self) -> str:

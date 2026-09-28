@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 4. Fase A (E0–E4) implementada y auditada: base transversal, tiempo, espacio y modelo.
+- **Estado:** revisión 5. Fase A (E0–E4) implementada y auditada. Siguiente bloque: Fase B (E5 disco + E6 comandos).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2, 3 y 4](#0-cambios-de-las-revisiones-2-3-y-4)
+0. [Cambios de las revisiones 2 a 5](#0-cambios-de-las-revisiones-2-a-5)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -39,10 +39,20 @@ documento, se corrige uno de los dos de forma explícita.
 21. [Riesgos y decisiones abiertas](#21-riesgos-y-decisiones-abiertas)
 22. [Contratos de integración núcleo ↔ pantallas](#22-contratos-de-integración-núcleo--pantallas)
 23. [Casos de uso futuros contemplados](#23-casos-de-uso-futuros-contemplados)
+24. [Funciones tomadas de editores equivalentes](#24-funciones-tomadas-de-editores-equivalentes)
 
 ---
 
-## 0. Cambios de las revisiones 2, 3 y 4
+## 0. Cambios de las revisiones 2 a 5
+
+### Revisión 5: versiones, pistas de idioma y funciones de otros editores
+
+| # | Cambio | Sección |
+|---|---|---|
+| V1 | **Flet 1.0.2** en los cuatro paquetes (`flet`, `flet-desktop` vía el extra, `flet-video`, `flet-audio`); APIs verificadas iguales que en 1.0.1 | 17 |
+| V2 | **Python 3.13 recomendado** (mínimo 3.12) | 15.4 |
+| V3 | **Pistas de idioma**: cada capa A puede tener idioma; la pista común (música y efectos) suena en todos; render con varias pistas de audio o un archivo por idioma; subtítulos por idioma | 13.6 |
+| V4 | Funciones de Premiere, DaVinci Resolve, Final Cut, CapCut, Kdenlive y Shotcut repartidas en las épicas | 24 |
 
 ### Revisión 4: auditoría de integración
 
@@ -276,7 +286,7 @@ nombre dice en qué instante del capítulo empieza y cuánto dura.
 
 | Aspecto | Convención |
 |---|---|
-| Python | 3.12 o superior, con anotaciones de tipo |
+| Python | 3.13 recomendado (mínimo 3.12), con anotaciones de tipo |
 | Módulos y funciones | `snake_case` en español sin tildes (`nomenclatura.py`, `evaluar()`) |
 | Clases | `PascalCase` en español sin tildes (`Capitulo`, `Elemento`) |
 | Constantes | `MAYUSCULAS` (`LIENZO_ANCHO`) |
@@ -1056,6 +1066,28 @@ ampliación.
   (misma lógica de huellas).
 - El monitor muestra una **guía 9:16** sobre el lienzo para colocar la ventana.
 
+### 13.6 Pistas de idioma
+
+Modelo profesional de doblaje: **diálogo por idioma + pista común**.
+
+| Capa A | `idioma` | Suena en |
+|---|---|---|
+| Música, efectos, ambiente | vacío (común) | Todas las versiones |
+| Diálogo en español | `es` | Versión `es` |
+| Diálogo en inglés | `en` | Versión `en` |
+
+- El idioma se asigna **por capa** del capítulo (`EstadoCapa.idioma`), para minutos y para Global (`GA1`, `GA2`…). Así "A1 = español, A2 = inglés" vale para los 24 minutos.
+- El proyecto declara sus idiomas (`Proyecto.idiomas`); el primero es el **principal**.
+- **Edición y vista previa**: se escucha el idioma elegido en el transporte (por defecto el principal) más la pista común. Cambiar de idioma no toca el modelo; es estado de la app.
+- **Mezcla** (E8): `Capitulo.sonoros_activos_en(f, idioma)` devuelve lo común más ese idioma.
+- **Render** (E10), a elegir en el perfil:
+  - **Un archivo con varias pistas de audio** (una por idioma, con su etiqueta de idioma en los metadatos); el video se codifica una sola vez.
+  - **Un archivo por idioma**: `cap0001_completo_v002_es.mp4`, `cap0001_completo_v002_en.mp4`.
+  - **Solo audio por idioma** (WAV o AAC), para entregar a plataformas.
+- **Subtítulos por idioma**: capas T marcadas con idioma, exportables a `.srt` y como pista de subtítulos dentro del MP4 (sin quemar en la imagen), o quemados si se prefiere.
+- **Shorts**: se renderizan en el idioma principal o en todos.
+- **Huellas**: el audio de cada idioma tiene su propia huella; cambiar el diálogo en inglés no invalida la versión en español.
+
 ---
 
 ## 14. Flujo de dependencias
@@ -1206,7 +1238,7 @@ conecta su parte.
 
 **Entorno**
 
-- Python 3.12 o superior en un entorno virtual (`.venv/`) creado desde PyCharm.
+- **Python 3.13 recomendado** (mínimo 3.12, lo exige numpy 2.5; 3.14 también tiene paquetes de todas las dependencias) en un entorno virtual (`.venv/`) creado desde PyCharm.
 - Configuración de ejecución de PyCharm: script `main.py`, directorio de
   trabajo la raíz del repositorio; parámetros opcionales según 15.1 (por
   ejemplo, la ruta de un proyecto de prueba).
@@ -1229,7 +1261,9 @@ y `h264_nvenc` / `hevc_nvenc`. **No** incluye VAAPI; para usarlo:
 y `pip install av==18.1.0 --no-binary av` (usa el FFmpeg del sistema).
 
 Flet 1.0 necesita el extra `desktop` (`flet[desktop]`) para abrir la ventana de
-escritorio; ya está en `requirements.txt`.
+escritorio; ya está en `requirements.txt`. `flet`, `flet-desktop`, `flet-video` y
+`flet-audio` se publican juntos y cada uno exige la misma versión exacta de `flet`:
+al actualizar, se cambian los cuatro a la vez.
 
 **Rutas**
 
@@ -1414,9 +1448,9 @@ con los keyframes de la ventana.
 `requirements.txt`:
 
 ```
-flet[desktop]==1.0.1
-flet-video==1.0.1
-flet-audio==1.0.1
+flet[desktop]==1.0.2
+flet-video==1.0.2
+flet-audio==1.0.2
 av==18.1.0
 numpy==2.5.3
 opencv-python-headless==5.0.0.93
@@ -1534,6 +1568,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | T6.6 Edición avanzada | Ripple con alcance minuto o capítulo, roll, slip (limitado por `margen_fuente`), slide. Todos compuestos |
 | T6.7 Capas y marcadores | Visible, silenciada, bloqueada, solo; marcadores (poner, mover, quitar) |
 | T6.8 Nivel superior | Mover o intercambiar minutos; `actualizar_fuente` tras volver a hornear (versión, `fuente_duracion`, reajuste de `fuente_entrada` si cambiaron las asas); comandos del Taller (agregar Bruto y Pieza, cambiar receta, interpretar fps); Shorts (crear, rango, ventana, keyframes) |
+| T6.10 Modos de colocación y rangos | Insertar / sobrescribir / rechazar al colocar o mover; edición de tres puntos; levantar y extraer un rango; cerrar huecos; congelar fotograma (24.1) |
 | T6.9 Reglas | Rechazar cambios sobre Elementos o capas bloqueados; rechazar lo que exceda la fuente (`excede_fuente`); el aviso de ripple de capítulo lo pide la app **antes** de ejecutar |
 
 ### Fase C — Motor y servicios
@@ -1557,7 +1592,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 |---|---|
 | T8.1 Rejilla exacta | 48 000 / 24 = **2000 muestras por fotograma**: audio y video se alinean sin redondeos |
 | T8.2 Mezcla | float32 estéreo; remuestreo de cada fuente a 48 kHz con `av.AudioResampler`; volumen y paneo con rampas por muestra (sin clics); fundidos; transiciones cruzadas cuando dos Elementos se solapan por una transición |
-| T8.3 Estados | Respeta `Capitulo.se_oye` (silenciar y solo) y `Elemento.suena` |
+| T8.3 Estados e idiomas | Respeta `Capitulo.se_oye` (silenciar, solo e idioma) y `Elemento.suena`; una mezcla por idioma: pista común + diálogo de ese idioma (13.6) |
 | T8.4 Salida | Limitador suave; WAV para vista previa, AAC para el render |
 
 **E9. Cola de tareas y servicios de medios (N4)**
@@ -1579,7 +1614,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | T10.2 Render de minuto | 1440 fotogramas exactos, solo video, fotograma clave inicial, parámetros idénticos entre minutos |
 | T10.3 Audio del capítulo | Una pasada del mezclador para el rango pedido |
 | T10.4 Ensamblado | Unir minutos **copiando paquetes** con PyAV (sin recodificar) y multiplexar el audio |
-| T10.5 Entregables | Minuto, rango, capítulo; versionado; registro en `_capitulo.json`; `RenderTerminado`; `main.py --render` |
+| T10.5 Entregables | Minuto, rango, capítulo; por idioma (varias pistas de audio etiquetadas en un archivo, o un archivo por idioma); versionado; registro en `_capitulo.json`; `RenderTerminado`; `main.py --render` |
 
 **E11. Vista previa (N4)**
 
@@ -1596,7 +1631,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 
 | Tarea | Detalle |
 |---|---|
-| T12.1 Arranque Flet 1.0 | `ft.run(principal)`; APIs confirmadas en 1.0.1: `Image(src=bytes)`, `page.run_task`, `page.run_thread`, `page.on_keyboard_event`, `canvas`, `GestureDetector`, `Video` con lista de reproducción, `Audio` asíncrono |
+| T12.1 Arranque Flet 1.0 | `ft.run(principal)`; APIs confirmadas en 1.0.1 y 1.0.2: `Image(src=bytes)`, `page.run_task`, `page.run_thread`, `page.on_keyboard_event`, `canvas`, `GestureDetector`, `Video` con lista de reproducción, `Audio` asíncrono |
 | T12.2 `EstadoApp` | Estado de la interfaz que **no** es del modelo ni se deshace (sección 22.1) |
 | T12.3 Puente de eventos | `app/estado.py` se suscribe al bus; los eventos que llegan desde hilos de trabajo se pasan al bucle de Flet con `page.run_task`; se agrupan para redibujar como máximo una vez por cuadro |
 | T12.4 Ventana | Secciones, `Divisor`, distribución y espacios de trabajo (Taller, Minuto, Capítulo, Shorts, Render) |
@@ -1605,27 +1640,27 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | T12.7 Teclado | `atajos.json` con **contextos de foco** (monitor, timeline, taller, campo de texto): en un campo de texto no se disparan atajos |
 | T12.8 Tema | Tokens de color y tipografía en `app/ui/recursos/temas/oscuro.json` (22.3) |
 
-**E13. Monitor y control espacial** — monitor con los 4 niveles, transporte, mesa de trabajo, reglas, asas (dibujadas en `canvas` al instante), ancla, imán (bordes, centro, otros Elementos, guías), márgenes seguros, guía 9:16, zoom del lienzo.
+**E13. Monitor y control espacial** — monitor con los 4 niveles, transporte con J K L, selector de idioma de escucha, mesa de trabajo, reglas, asas (dibujadas en `canvas` al instante), ancla, imán (bordes, centro, otros Elementos, guías), márgenes seguros, guía 9:16, zoom del lienzo.
 
-**E14. Timeline y mapa del capítulo** — capas con alto ajustable, zoom por granularidad, dibujo solo de lo visible, arrastre con fusión de comandos, herramientas (selección, cuchilla, ripple, roll, slip, slide), imán a cortes, marcadores y cabezal, desbordes fantasma, pistas Global, cabecera de capa (ver, silenciar, bloquear, solo), selección múltiple, seguir al cabezal al cruzar de minuto, mapa de 24 celdas con los dos estados.
+**E14. Timeline y mapa del capítulo** — capas con alto ajustable, zoom por granularidad, dibujo solo de lo visible, arrastre con fusión de comandos, herramientas (selección, cuchilla, ripple, roll, slip, slide), imán a cortes, marcadores y cabezal, desbordes fantasma, pistas Global, cabecera de capa (ver, silenciar, bloquear, solo), selección múltiple, seguir al cabezal al cruzar de minuto, activar/desactivar imán, entrada y salida en la timeline, búsqueda de Elementos, ir a la Pieza de origen, idioma de cada capa A en su cabecera, mapa de 24 celdas con los dos estados.
 
-**E15. Taller** — Brutos con fps y avisos; mini-timeline en fotogramas nativos; selector de `fps_interpretado` y método; tramos; horneado con progreso; ida y vuelta con el minuto.
+**E15. Taller** — Brutos con fps y avisos; detección de escenas y de silencios; sincronía de audio externo; mini-timeline en fotogramas nativos; selector de `fps_interpretado` y método; tramos; horneado con progreso; ida y vuelta con el minuto.
 
-**E16. Inspector, keyframes y curvas** — propiedades por grupo (espacio, audio, efectos, texto), rombo de keyframe por propiedad, navegación entre keyframes, editor de curvas bezier.
+**E16. Inspector, keyframes y curvas** — propiedades por grupo (espacio, audio, efectos, texto), rombo de keyframe por propiedad, navegación entre keyframes, editor de curvas bezier, panel de historial.
 
 ### Fase E — Capacidades creativas
 
-**E17. Efectos, transiciones y texto** — implementación de `TIPOS_EFECTO` y `TIPOS_TRANSICION`; LUT `.cube`; croma; títulos y subtítulos con animaciones de `ANIMACIONES_TEXTO`; velocidad y rampas (keyframes de velocidad).
+**E17. Efectos, transiciones y texto** — implementación de `TIPOS_EFECTO` y `TIPOS_TRANSICION`; LUT `.cube`; croma; máscaras; estabilización; animaciones de entrada y salida de clips; Ken Burns; plantillas de títulos y rótulos; títulos y subtítulos por idioma con animaciones de `ANIMACIONES_TEXTO`; importar `.srt`; monitores de señal; velocidad y rampas (keyframes de velocidad).
 
-**E18. Audio avanzado** — keyframes de volumen en la timeline, reducción automática de la música con voz, medidores de nivel.
+**E18. Audio avanzado** — keyframes de volumen en la timeline, reducción automática de la música con voz, medidores de nivel, normalización de sonoridad (−14 LUFS para YouTube), reducción de ruido, gestión de idiomas del proyecto.
 
-**E19. Cola de render y exportación** — panel de cola, perfiles, H.265 / 10 bits, NVENC; VAAPI solo con PyAV compilado contra el FFmpeg del sistema (15.4).
+**E19. Cola de render y exportación** — panel de cola, perfiles (YouTube 1080p, 720p, 4K, solo audio), render por idioma (varias pistas o un archivo por idioma), subtítulos `.srt` y en pista, capítulos de YouTube desde marcadores, H.265 / 10 bits, NVENC; VAAPI solo con PyAV compilado contra el FFmpeg del sistema (15.4).
 
 **E20. Shorts verticales 9:16** — modelo ya listo (E4); servicio de recomposición a 720×1280; espacio de trabajo Shorts; `main.py --shorts`.
 
 ### Fase F — Cierre
 
-**E21. Extras** — atajos editables desde la interfaz, plugins (código externo: solo desde `~/.config/editor/plugins/` y con aviso), subtítulos automáticos.
+**E21. Extras** — atajos editables desde la interfaz, plugins (código externo: solo desde `~/.config/editor/plugins/` y con aviso), gestor de proyecto (consolidar, limpiar Brutos sin uso, caché y papelera), plantillas de capítulo, subtítulos automáticos opcionales.
 
 **E22. Documentación final** — README completo y este documento al día.
 
@@ -1637,7 +1672,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | E1 | ✅ | `estandar`, `ajustes`, `eventos`, `utiles/` (registro, matemáticas, interpolación con curvas CSS y bezier) |
 | E2 | ✅ | `granularidad` (Instante, Duración, minutos, fps de fuentes) y `nomenclatura` (Elementos, Shorts, Brutos, Piezas, capítulos, minutos, renders, IDs) |
 | E3 | ✅ | `geometria` (Rect, imán), `transform` (Afin, Transform, recorte, compensación de ancla, ajuste inicial), `lienzo` (visibilidad, región de interés, márgenes, ventana vertical) |
-| E4 | ✅ | Modelo completo. La Pieza es por ahora una secuencia lineal de tramos; las capas dentro de una Pieza quedan para más adelante |
+| E4 | ✅ | Modelo completo (con idiomas por capa desde la revisión 5). La Pieza es por ahora una secuencia lineal de tramos; las capas dentro de una Pieza quedan para más adelante |
 | Revisión 4 | ✅ | Correcciones A1–A10 aplicadas; marcadores y estado de capas; carga perezosa de capítulos |
 | E5 en adelante | Pendiente | |
 
@@ -1686,7 +1721,7 @@ Metas, no garantías.
 | Micro-cortes al cruzar minutos en el nivel 3 | Unir el rango sin recodificar antes de reproducir |
 | Disco por materialización | Piezas cortas; aviso de espacio; posible modo de enlaces en el futuro |
 | Cascadas de renombres (ripple de capítulo, mover minuto) | Alcance por minuto por defecto; aviso previo; diario |
-| API de Flet cambiante | Versión fijada (`flet`, `flet-video` y `flet-audio` en 1.0.1); Flet aislado en `app/ui` |
+| API de Flet cambiante | Versión fijada (`flet`, `flet-video`, `flet-audio` y `flet-desktop` en 1.0.2, siempre iguales); Flet aislado en `app/ui` |
 | Latencia del reloj de audio (`get_current_position` asíncrono) | Extrapolar con `time.monotonic()` entre consultas (T11.3) |
 | VAAPI ausente en PyAV binario | NVENC o software; compilar PyAV contra el FFmpeg del sistema si hace falta |
 | Dependencias de sistema de Linux (libmpv, VAAPI) | Documentadas en 15.4; verificación en E0 |
@@ -1844,3 +1879,69 @@ No están en las épicas actuales, pero la arquitectura ya deja el hueco:
 | Varias pistas de idioma de audio | Capas A de Global |
 | Migrar proyectos a un formato nuevo | `version_esquema` |
 | Trabajo entre varios equipos | Bloqueo, diario y papelera |
+
+---
+
+## 24. Funciones tomadas de editores equivalentes
+
+Referentes: Adobe Premiere Pro, DaVinci Resolve, Final Cut Pro, CapCut, Kdenlive y
+Shotcut. Se eligieron las que mejoran el flujo por capítulos y minutos, la
+calidad de entrega o la velocidad de edición.
+
+### 24.1 Edición
+
+| Función | Referente | Qué aporta | Épica |
+|---|---|---|---|
+| **Modos insertar / sobrescribir** al colocar un Elemento | Premiere, Resolve, FCP | Hoy un solape se rechaza; con estos modos, insertar empuja lo siguiente (ripple) y sobrescribir recorta lo que tapa | E6 |
+| **Edición de tres puntos** (entrada y salida en fuente y timeline) | Premiere, Resolve | Colocar tramos exactos sin arrastrar | E6, E14 |
+| **Levantar / extraer** un rango marcado | Premiere | Quitar un rango dejando hueco o cerrándolo | E6 |
+| **Cerrar huecos** del minuto | Resolve, CapCut | Un paso para compactar | E6 |
+| **Congelar fotograma** | Premiere, CapCut | Elemento de imagen a partir de un fotograma | E6 |
+| **Reproducción J K L** (atrás, pausa, adelante, más rápido con repeticiones) | Todos | Navegación estándar profesional | E13 |
+| **Activar / desactivar imán** (tecla) | Todos | Control fino | E14 |
+| **Buscar Elementos** por nombre en capítulo y proyecto | Premiere, Resolve | Imprescindible con 1000 capítulos | E14 |
+| **Ir a la Pieza de origen** (match frame) | Premiere, FCP | Del minuto al Taller en el fotograma exacto | E14 |
+| **Panel de historial** | Premiere, Photoshop | Ver y saltar a cualquier paso de deshacer | E16 |
+
+### 24.2 Taller y medios
+
+| Función | Referente | Qué aporta | Épica |
+|---|---|---|---|
+| **Detección de escenas** al importar | Resolve, PySceneDetect | Divide un Bruto largo en tomas sugeridas | E15 |
+| **Detección de silencios** (cortes automáticos en voz) | CapCut, Descript | Acelera videos hablados | E15 |
+| **Sincronizar audio externo por forma de onda** | Premiere, Resolve | Micrófono separado alineado solo | E15 |
+| **Estabilización** | Resolve, Premiere | Horneada en la Pieza (OpenCV) | E17 |
+| **Revincular medios** | Todos | Brutos movidos o renombrados fuera del programa | E9 |
+
+### 24.3 Imagen
+
+| Función | Referente | Qué aporta | Épica |
+|---|---|---|---|
+| **Máscaras** (rectángulo, elipse, con difuminado, animables) | Premiere, Resolve | Recortes no rectangulares, desenfocar caras o logos | E17 |
+| **Animaciones de entrada y salida de clips** (no solo de texto) | CapCut | Zoom, deslizamiento, rebote en un clic | E17 |
+| **Efecto Ken Burns** automático en imágenes | FCP, iMovie | Fotos con movimiento | E17 |
+| **Plantillas de títulos y rótulos** (lower thirds) | Premiere, CapCut | Rótulos consistentes en todos los capítulos | E17 |
+| **Monitores de señal** (histograma, forma de onda, vectorscopio) | Resolve | Control de calidad de color por minuto | E17 |
+
+### 24.4 Audio
+
+| Función | Referente | Qué aporta | Épica |
+|---|---|---|---|
+| **Normalización de sonoridad (LUFS)** — −14 LUFS para YouTube | Resolve (Fairlight), Premiere | Volumen correcto y parejo entre capítulos; medición ITU-R BS.1770 con numpy | E18 |
+| **Reducción automática de la música con voz** (ducking) | Premiere, CapCut | Ya prevista | E18 |
+| **Reducción de ruido** básica | Resolve, Audacity | Voz más limpia | E18 |
+| **Pistas de idioma** y exportación por idioma | Resolve, plataformas de streaming | Doblaje y subtítulos | E8, E10, E18 (13.6) |
+
+### 24.5 Entrega y gestión
+
+| Función | Referente | Qué aporta | Épica |
+|---|---|---|---|
+| **Perfiles de exportación** (YouTube 1080p, 720p, 4K; solo audio) | Todos | Un clic por destino | E19 |
+| **Capítulos de YouTube** desde los marcadores (`00:00 Intro`…) | Resolve | Texto listo para la descripción del video | E19 |
+| **Subtítulos `.srt`** por idioma, importar y exportar | Todos | Accesibilidad y traducción | E17, E19 |
+| **Gestor de proyecto**: consolidar, quitar Brutos sin usar, vaciar caché y papelera | Premiere (Project Manager) | Controla el disco con la materialización | E21 |
+| **Plantilla de capítulo** (intro, cierre y Global comunes) | FCP, CapCut | Empezar cada capítulo con su estructura | E21 |
+
+Quedan fuera por ahora (se pueden sumar después): edición multicámara, seguimiento de
+movimiento (tracking) y subtítulos automáticos por reconocimiento de voz (ya
+previstos en E21 como opcionales, por lo pesado de sus dependencias).
