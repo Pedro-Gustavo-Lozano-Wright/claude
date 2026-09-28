@@ -1,6 +1,6 @@
-"""Importar archivos al proyecto (T9.3).
+"""Importar archivos al proyecto.
 
-Flujo (PROJECT.md, 22.5):
+Flujo:
 1. Hilo principal: `preparar_bruto` reserva ID y número y decide el tipo.
 2. Tarea de fondo: `copiar_y_analizar` copia a `brutos/` (comprobando espacio)
    y analiza: tamaño, fps declarado, fps **medido** por marcas de tiempo, fps

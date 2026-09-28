@@ -1,4 +1,4 @@
-"""Render final: minuto, rango o capítulo, con pistas de idioma (T10.2–T10.5).
+"""Render final: minuto, rango o capítulo, con pistas de idioma.
 
 1. Cada minuto del rango se renderiza (solo video, 1440 fotogramas exactos) y
    se guarda en `.cache/minutos/` con su huella en el nombre. Un minuto cuya
@@ -7,7 +7,7 @@
 3. Se ensamblan los minutos sin recodificar y se agregan las pistas.
 4. Se registra el resultado (estado automático) en el hilo principal.
 
-Idiomas, lo más simple (E21): **un solo video** con una pista de audio por
+Idiomas, lo más simple: **un solo video** con una pista de audio por
 idioma y, al lado, un `.srt` por idioma con los textos de sus capas T. Los
 capítulos de YouTube (marcadores) se escriben en un `.txt` para la descripción.
 
@@ -57,7 +57,7 @@ class PedidoRender:
     idiomas: list[str]
     perfil: str = VIDEO
     version: int = 1
-    # E20: sonoridad objetivo (LUFS integrados, p. ej. −14 para YouTube); None = sin normalizar.
+    # Sonoridad objetivo (LUFS integrados, p. ej. −14 para YouTube); None = sin normalizar.
     normalizar_lufs: float | None = None
 
     @classmethod

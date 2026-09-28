@@ -8,7 +8,7 @@ class ErrorModelo(ValueError):
 
 
 class Solapamiento(ErrorModelo):
-    """Dos Elementos ocuparían la misma capa al mismo tiempo (PROJECT.md, 6.6)."""
+    """Dos Elementos ocuparían la misma capa al mismo tiempo."""
 
     def __init__(self, id_nuevo: str, id_existente: str, capa: str) -> None:
         super().__init__(f"El Elemento {id_nuevo} se solapa con {id_existente} en la capa {capa}.")

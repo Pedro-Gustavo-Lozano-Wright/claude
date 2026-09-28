@@ -1,4 +1,4 @@
-"""Estructura en disco: rutas de todo el proyecto y creación de carpetas (T5.4).
+"""Estructura en disco: rutas de todo el proyecto y creación de carpetas.
 
 Las rutas se calculan siempre desde el modelo y la nomenclatura; nunca se
 escriben a mano en otro módulo.

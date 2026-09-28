@@ -1,7 +1,7 @@
 """Bruto: archivo original importado a `brutos/`. Nunca se modifica (tier T0).
 
 Guarda lo que se sabe del archivo y la interpretación de fps que eligió el
-usuario (PROJECT.md, 6.7).
+usuario.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ class Bruto:
     nombre: str
     tipo: TipoMedio
     extension: str
-    # Datos del análisis (E9).
+    # Datos del análisis.
     ancho: int = 0
     alto: int = 0
     fotogramas_nativos: int = 0          # duración en fotogramas de la propia fuente
@@ -44,7 +44,7 @@ class Bruto:
     # Decisión del usuario en el Taller.
     fps_interpretado: Fraction | None = None
     origen: str = ""                     # ruta desde la que se importó (informativa)
-    archivo: Path | None = None          # ruta en brutos/; la asigna proyecto_fs (E5)
+    archivo: Path | None = None          # ruta en brutos/; la asigna proyecto_fs
 
     @property
     def fps(self) -> Fraction | None:

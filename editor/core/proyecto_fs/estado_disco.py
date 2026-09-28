@@ -1,4 +1,4 @@
-"""Último estado conocido del disco (T5.8).
+"""Último estado conocido del disco.
 
 Lo que el programa leyó al abrir o escribió al guardar. El reconciliador lo
 compara con el modelo para saber qué mover, escribir o enviar a la papelera, y

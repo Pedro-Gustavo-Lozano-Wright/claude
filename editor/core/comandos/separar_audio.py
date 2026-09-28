@@ -1,7 +1,7 @@
-"""Separar el audio de un Elemento V en un Elemento A independiente (T6.4).
+"""Separar el audio de un Elemento V en un Elemento A independiente.
 
 El Elemento A referencia la misma Pieza; al guardar, su archivo WAV se extrae
-de la Pieza (materialización pendiente, E9). El Elemento V queda silenciado.
+de la Pieza (materialización pendiente). El Elemento V queda silenciado.
 """
 
 from __future__ import annotations

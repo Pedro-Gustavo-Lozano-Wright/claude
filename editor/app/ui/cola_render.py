@@ -1,4 +1,4 @@
-"""Tareas de fondo y renders (E10, E21).
+"""Tareas de fondo y renders.
 
 - `BarraTareas`: franja inferior de la ventana con la tarea en curso, su
   progreso y cuántas quedan; siempre visible. Varios renders pedidos seguidos

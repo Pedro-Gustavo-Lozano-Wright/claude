@@ -1,4 +1,4 @@
-"""Miniaturas y formas de onda para dibujar dentro de los Elementos de la timeline (E17).
+"""Miniaturas y formas de onda para dibujar dentro de los Elementos de la timeline.
 
 Lee lo que ya generan los servicios (`miniaturas.ruta_tira`, `forma_onda.ruta_onda`) y
 lo guarda en memoria. Si falta, pide generarlo una sola vez por archivo; al terminar,

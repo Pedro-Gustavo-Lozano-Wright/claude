@@ -1,4 +1,4 @@
-"""Pantalla de inicio: crear, abrir y proyectos recientes (T12.5)."""
+"""Pantalla de inicio: crear, abrir y proyectos recientes."""
 
 from __future__ import annotations
 

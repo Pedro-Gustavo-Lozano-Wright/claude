@@ -1,4 +1,4 @@
-"""Editor de curvas de keyframes (E16).
+"""Editor de curvas de keyframes.
 
 Dibuja el valor de una propiedad a lo largo del Elemento, con sus keyframes.
 Clic en un rombo: elegirlo; arrastrarlo en horizontal: moverlo en el tiempo

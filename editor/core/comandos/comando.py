@@ -1,4 +1,4 @@
-"""Contrato de los comandos (T6.1).
+"""Contrato de los comandos.
 
 Todo cambio del modelo pasa por un Comando: así deshacer y rehacer funcionan
 siempre. Reglas:

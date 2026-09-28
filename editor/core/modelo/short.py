@@ -1,4 +1,4 @@
-"""Shorts: recortes verticales 9:16 de un rango del capítulo (PROJECT.md, 13.5).
+"""Shorts: recortes verticales 9:16 de un rango del capítulo.
 
 La ventana vertical se mueve en horizontal sobre el lienzo 16:9 y puede
 animarse para seguir la acción. El render la recompone a 720×1280.

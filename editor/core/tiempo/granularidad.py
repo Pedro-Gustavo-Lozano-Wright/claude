@@ -2,7 +2,7 @@
 
 Internamente todo tiempo es un número entero de fotogramas a 24 fps. Minuto,
 segundo, fotograma, timecode y los fragmentos de nombre de archivo son vistas
-calculadas de ese número (PROJECT.md, sección 6).
+calculadas de ese número.
 
 Fragmentos de nombre:
     inicio    "min02_seg12f08"

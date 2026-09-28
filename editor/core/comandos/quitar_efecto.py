@@ -1,4 +1,4 @@
-"""Quitar un efecto de la pila de un Elemento (T6.5)."""
+"""Quitar un efecto de la pila de un Elemento."""
 
 from __future__ import annotations
 

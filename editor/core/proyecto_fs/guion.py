@@ -1,7 +1,7 @@
-"""`_guion.txt`: reflejo legible de un minuto (T5.10).
+"""`_guion.txt`: reflejo legible de un minuto.
 
 Se genera al guardar y nunca se lee: sirve para revisar el minuto con el
-programa cerrado (PROJECT.md, 8.7).
+programa cerrado.
 """
 
 from __future__ import annotations

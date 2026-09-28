@@ -1,4 +1,4 @@
-"""Comando compuesto: varios comandos como un solo paso de deshacer (T6.3).
+"""Comando compuesto: varios comandos como un solo paso de deshacer.
 
 Si uno falla, los ya ejecutados se deshacen en orden inverso y el modelo
 queda como estaba.

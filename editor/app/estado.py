@@ -1,4 +1,4 @@
-"""Estado de la aplicación y sesión de trabajo (E12, PROJECT.md 22.1).
+"""Estado de la aplicación y sesión de trabajo.
 
 - `EstadoApp`: cómo mira el usuario el proyecto (capítulo, cabezal, selección,
   herramienta, zoom…). No se deshace, no se guarda en el proyecto.
@@ -6,7 +6,7 @@
   historial, bus, cola de tareas, vista previa y guardado. Es el único punto
   por el que la interfaz toca el núcleo.
 
-Hilos (PROJECT.md 22.4 y 22.8): la interfaz y el modelo viven en el bucle de
+Hilos: la interfaz y el modelo viven en el bucle de
 Flet. Todo lo que llega desde una tarea de fondo entra por `en_principal`,
 que usa `page.run_task` (seguro entre hilos).
 """
@@ -158,7 +158,7 @@ class Sesion:
         self.ir_a(minuto * FOTOGRAMAS_POR_MINUTO + (self.estado.cabezal % FOTOGRAMAS_POR_MINUTO))
 
     def cambiar_capitulo(self, numero: int) -> bool:
-        """Un solo capítulo en memoria (E18): cambiar es cerrar uno y abrir otro.
+        """Un solo capítulo en memoria: cambiar es cerrar uno y abrir otro.
 
         Con cambios sin guardar no se cambia (la interfaz ofrece guardar antes). El
         historial empieza de nuevo: sus pasos eran del capítulo que se cierra.

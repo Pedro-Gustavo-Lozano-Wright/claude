@@ -1,4 +1,4 @@
-"""Definir o quitar la transición de entrada de un Elemento (T6.5).
+"""Definir o quitar la transición de entrada de un Elemento.
 
 La transición permite solapar al Elemento con el anterior de su capa durante
 su duración; al cambiarla se vuelve a validar el solape.

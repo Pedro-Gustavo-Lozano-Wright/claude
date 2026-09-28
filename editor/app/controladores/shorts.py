@@ -1,4 +1,4 @@
-"""Shorts verticales desde la interfaz (E22)."""
+"""Shorts verticales desde la interfaz."""
 
 from __future__ import annotations
 

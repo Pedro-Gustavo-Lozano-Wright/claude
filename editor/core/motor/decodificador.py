@@ -1,4 +1,4 @@
-"""Decodificación con PyAV (video, alfa incluido) y Pillow (imágenes) (T7.2).
+"""Decodificación con PyAV (video, alfa incluido) y Pillow (imágenes).
 
 - Búsqueda **exacta por fotograma**: se salta al fotograma clave anterior y se
   decodifica hasta el pedido. Si se pide el siguiente de lo ya decodificado, se

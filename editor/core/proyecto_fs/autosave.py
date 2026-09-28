@@ -1,4 +1,4 @@
-"""Autosave: instantánea del modelo en `.autosave/` (T5.11).
+"""Autosave: instantánea del modelo en `.autosave/`.
 
 No renombra ni mueve archivos de medios: solo guarda el estado del modelo
 cargado en memoria (proyecto, Taller y capítulos cargados). Al abrir, si la

@@ -1,4 +1,4 @@
-"""Timeline del minuto con capas y herramientas (E14, PROJECT.md 16.4 y 22.3).
+"""Timeline del minuto con capas y herramientas.
 
 Todo se dibuja en un `canvas` (solo lo visible); el cabezal es un contenedor
 aparte para moverlo sin redibujar las capas. Los gestos se traducen a
@@ -23,7 +23,8 @@ from editor.core.servicios import importacion
 from editor.core.estandar import FOTOGRAMAS_POR_CAPITULO, FOTOGRAMAS_POR_MINUTO, FPS
 from editor.core.modelo.bruto import TipoMedio
 from editor.core.modelo.capa import TipoCapa
-from editor.core.modelo.marcador import clave_capa
+from editor.core.modelo.marcador import COLORES_MARCADOR, clave_capa
+from editor.core.comandos.operaciones import ModoColocacion
 from editor.core.modelo.plantillas_texto import PLANTILLAS
 
 if TYPE_CHECKING:
@@ -103,7 +104,7 @@ class Timeline:
                 *self.botones_herramienta.values(),
                 ft.VerticalDivider(width=8),
                 self.boton_iman,
-                ft.IconButton(ft.Icons.BOOKMARK_ADD, tooltip="Marcador en el cabezal", icon_size=18,
+                ft.IconButton(ft.Icons.BOOKMARK_ADD, tooltip="Marcador en el cabezal: poner, nombrar, cambiar color o quitar (M: poner rápido)", icon_size=18,
                               on_click=lambda _: self._marcador()),
                 ft.PopupMenuButton(
                     icon=ft.Icons.TEXT_FIELDS, tooltip="Añadir texto en T1 (plantillas)",
@@ -113,6 +114,21 @@ class Timeline:
                 ),
                 ft.IconButton(ft.Icons.CROP, tooltip="Quitar el rango I–O (Shift: extraer)", icon_size=18,
                               on_click=lambda _: self._quitar_rango()),
+                ft.PopupMenuButton(
+                    icon=ft.Icons.MORE_HORIZ, tooltip="Más operaciones",
+                    items=[
+                        ft.PopupMenuItem(content="Pegar insertando (corre lo que sigue)",
+                                         on_click=lambda _: self._hacer(lambda: ctl.pegar(self.sesion, ModoColocacion.INSERTAR))),
+                        ft.PopupMenuItem(content="Pegar sobrescribiendo (recorta lo que tapa)",
+                                         on_click=lambda _: self._hacer(lambda: ctl.pegar(self.sesion, ModoColocacion.SOBRESCRIBIR))),
+                        ft.PopupMenuItem(content="Separar audio del video",
+                                         on_click=lambda _: self._hacer(lambda: ctl.separar_audio(self.sesion))),
+                        ft.PopupMenuItem(content="Congelar fotograma (2 s en el cabezal)",
+                                         on_click=lambda _: self._hacer(lambda: ctl.congelar_fotograma(self.sesion))),
+                        ft.PopupMenuItem(content="Cerrar huecos del minuto",
+                                         on_click=lambda _: self._hacer(lambda: ctl.cerrar_huecos(self.sesion))),
+                    ],
+                ),
                 self.capa_destino,
                 self.capa_destino_audio,
                 ft.Checkbox(label="Global", value=app.sesion.estado.destino_global,
@@ -413,7 +429,11 @@ class Timeline:
         x, y = evento.local_position.x, evento.local_position.y
         vista = self.vista()
         f = max(0, min(FOTOGRAMAS_POR_CAPITULO - 1, vista.f(x)))
-        if y < ALTO_REGLA:                 # la regla solo mueve el cabezal
+        if y < ALTO_REGLA:                 # la regla solo mueve el cabezal (y se pega a un marcador cercano)
+            cercano = min(self.sesion.capitulo.marcadores_en_rango(vista.inicio, vista.fin),
+                          key=lambda m: abs(vista.x(m.f) - x), default=None)
+            if cercano is not None and abs(vista.x(cercano.f) - x) <= 6:
+                f = cercano.f
             self.app.mover_cabezal_a(f)
             return
         elemento = self._elemento_en(x, y)
@@ -557,13 +577,40 @@ class Timeline:
         self.refrescar()
 
     def _marcador(self) -> None:
-        if ctl.poner_marcador(self.sesion):
-            self.refrescar()
+        """Sin marcador en el cabezal lo pone; en todo caso abre su nombre y color para editarlos."""
+        if ctl.marcador_en_cabezal(self.sesion) is None and not ctl.poner_marcador(self.sesion):
+            return
+        actual = ctl.marcador_en_cabezal(self.sesion)
+        if actual is None:
+            return
+        nombre = ft.TextField(value=actual.nombre, label="Nombre (título del capítulo de YouTube)", autofocus=True,
+                              on_focus=lambda _: self.app.enfocar("texto"))
+        color = ft.Dropdown(value=actual.color, label="Color", width=200,
+                            options=[ft.DropdownOption(key=c, text=c) for c in COLORES_MARCADOR])
+
+        def guardar() -> None:
+            self.app.enfocar("timeline")
+            if ctl.editar_marcador(self.sesion, nombre.value or "", color.value or actual.color):
+                self.app.refrescar("timeline")
+
+        def quitar() -> None:
+            self.app.enfocar("timeline")
+            if ctl.quitar_marcador(self.sesion):
+                self.app.refrescar("timeline")
+
+        self.app.raiz.dialogo(f"Marcador en {timecode.formatear(actual.f)}",
+                              ft.Column([nombre, color], tight=True, width=360),
+                              [("Guardar", guardar), ("Quitar", quitar), ("Cancelar", lambda: self.app.enfocar("timeline"))])
+        self.refrescar()
 
     def _texto(self, plantilla: str | None = None) -> None:
         texto = PLANTILLAS[plantilla].etiqueta if plantilla else "Título"
         if ctl.agregar_texto(self.sesion, texto, plantilla=plantilla):
             self.app.refrescar("timeline", "monitor", "inspector")
+
+    def _hacer(self, accion) -> None:
+        if accion():
+            self.app.refrescar("timeline", "monitor", "inspector", "mapa")
 
     def _quitar_rango(self) -> None:
         if ctl.quitar_rango(self.sesion, extraer=self.app.shift_presionado):

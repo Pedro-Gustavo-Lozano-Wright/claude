@@ -1,4 +1,4 @@
-"""Espacios de trabajo: tamaños y paneles visibles (PROJECT.md 16.2).
+"""Espacios de trabajo: tamaños y paneles visibles.
 
 Los valores por defecto están en `config/distribucion.json`; los cambios del
 usuario se guardan en `~/.config/editor/distribucion.json`.

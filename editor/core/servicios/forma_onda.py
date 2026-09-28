@@ -1,4 +1,4 @@
-"""Forma de onda: picos de audio por fotograma para dibujar en la timeline (T9.6).
+"""Forma de onda: picos de audio por fotograma para dibujar en la timeline.
 
 Un valor por fotograma (2000 muestras) y canal, entre 0 y 1, en
 `.cache/ondas/<clave>.json`. La clave es la misma que la del banco.

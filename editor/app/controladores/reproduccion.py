@@ -1,4 +1,4 @@
-"""Imágenes del monitor, reproducción y pre-render (E13, PROJECT.md 12 y 22.9).
+"""Imágenes del monitor, reproducción y pre-render.
 
 - Cada pedido de imagen es una tarea de prioridad 1 con `clave="monitor"`: si
   llega otro antes de que termine, el viejo se cancela (el cabezal manda).
@@ -100,7 +100,7 @@ def minuto_de(f: int) -> int:
     return min(23, f // FOTOGRAMAS_POR_MINUTO)
 
 
-# --- E19: monitores de señal ----------------------------------------------------------------
+# --- Monitores de señal ----------------------------------------------------------------
 
 BINS_HISTOGRAMA = 64
 COLUMNAS_ONDA, NIVELES_ONDA = 96, 48

@@ -1,4 +1,4 @@
-"""Reconciliador: hace que el disco refleje el modelo al guardar (T5.8, T5.9).
+"""Reconciliador: hace que el disco refleje el modelo al guardar.
 
 1. **Planificar**: compara el modelo cargado con el último estado conocido del
    disco y decide qué mover, renombrar, copiar, escribir o enviar a la papelera.
@@ -17,7 +17,7 @@ pisa archivos. Lo que se quita del modelo va a `.papelera/`.
 
 La materialización que exige convertir (extraer el audio de un video,
 normalizar una imagen) no se hace aquí: queda en `pendientes` para el
-servicio de guardado (E9), que usa el motor.
+servicio de guardado, que usa el motor.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class Conflicto:
 
 @dataclass(frozen=True)
 class Materializacion:
-    """Copia que requiere el motor: la resuelve el servicio de guardado (E9)."""
+    """Copia que requiere el motor: la resuelve el servicio de guardado."""
 
     capitulo: int
     id_elemento: str

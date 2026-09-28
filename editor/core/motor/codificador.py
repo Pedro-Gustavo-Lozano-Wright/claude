@@ -1,4 +1,4 @@
-"""Codificación de video y audio con PyAV (T7.7).
+"""Codificación de video y audio con PyAV.
 
 - Video a partir de imágenes RGB o RGBA (numpy), a 24 fps exactos.
 - Audio a partir de float32 (canales, muestras) a 48 kHz.

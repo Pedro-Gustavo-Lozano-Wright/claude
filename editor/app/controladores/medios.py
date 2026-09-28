@@ -1,4 +1,4 @@
-"""Importar archivos como Brutos (E12, PROJECT.md 22.9).
+"""Importar archivos como Brutos.
 
 preparar (principal) → copiar y analizar (tarea) → `AgregarBruto` + `BrutoImportado` (principal).
 """

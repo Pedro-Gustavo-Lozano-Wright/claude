@@ -1,4 +1,4 @@
-"""Ventana de un proyecto abierto: secciones, espacios de trabajo y órdenes (E12).
+"""Ventana de un proyecto abierto: secciones, espacios de trabajo y órdenes.
 
 Es el único lugar que conoce todos los paneles. Los paneles piden cosas a la
 ventana (mover el cabezal, seleccionar, refrescar partes) y la ventana:
@@ -7,7 +7,7 @@ ventana (mover el cabezal, seleccionar, refrescar partes) y la ventana:
 - escucha el bus (los eventos de tareas llegan de otros hilos y
   `Sesion.escuchar` los pasa al bucle de Flet);
 - traduce el teclado a acciones según el foco (`teclado.py`);
-- guarda, autoguarda y cierra con los diálogos de PROJECT.md 22.6.
+- guarda, autoguarda y cierra con sus diálogos (guardar, descartar, cancelar).
 """
 
 from __future__ import annotations
@@ -43,7 +43,6 @@ from editor.core.eventos import (
     CapituloCreado,
     ElementoCambiado,
     HistorialCambiado,
-    MedioFueraDeLinea,
     PiezaHorneada,
     PiezaModificada,
     ProyectoGuardado,
@@ -189,7 +188,6 @@ class Ventana:
         self.escuchar(ProyectoGuardado, lambda _e: self.refrescar("barra", "mapa"))
         self.escuchar(RenderTerminado, lambda _e: self.refrescar("render", "mapa"))
         self.escuchar(CapituloCreado, lambda _e: self.refrescar("navegador"))
-        self.escuchar(MedioFueraDeLinea, lambda e: self.aviso_breve(f"Medio fuera de línea: {e.ruta}"))
 
     # --- Redibujado agrupado -----------------------------------------------------------
 
@@ -425,7 +423,7 @@ class Ventana:
     # --- Avisos y diálogos -------------------------------------------------------------
 
     def avisar(self, texto_aviso: str) -> None:
-        """Regla del modelo violada o error: aviso breve que no cambia nada (22.6)."""
+        """Regla del modelo violada o error: aviso breve que no cambia nada."""
         self.raiz.avisar(texto_aviso)
 
     def aviso_breve(self, texto_aviso: str) -> None:

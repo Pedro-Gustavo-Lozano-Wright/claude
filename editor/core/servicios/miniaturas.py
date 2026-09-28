@@ -1,4 +1,4 @@
-"""Tira de miniaturas para dibujar un clip en la timeline (T9.6).
+"""Tira de miniaturas para dibujar un clip en la timeline.
 
 Se arma con imágenes del banco: una por segundo (hasta 60), a 96×54.
 """

@@ -1,4 +1,4 @@
-"""Cambiar una propiedad cualquiera de un Elemento por su ruta (T6.5).
+"""Cambiar una propiedad cualquiera de un Elemento por su ruta.
 
 Rutas con puntos sobre el Elemento, por ejemplo:
     "nombre", "espacio.x", "espacio.opacidad", "audio.volumen",

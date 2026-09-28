@@ -1,4 +1,4 @@
-"""Barra arrastrable que redimensiona paneles vecinos (PROJECT.md 16.1).
+"""Barra arrastrable que redimensiona paneles vecinos.
 
 El divisor no conoce los paneles: informa el desplazamiento en píxeles y quien
 lo usa ajusta los tamaños. Doble clic pliega o despliega el panel.

@@ -1,4 +1,4 @@
-"""Archivos de control: `_proyecto.json`, `_capitulo.json`, `_minuto.json`, `_pieza.json` (T5.2).
+"""Archivos de control: `_proyecto.json`, `_capitulo.json`, `_minuto.json`, `_pieza.json`.
 
 Todos llevan `version_esquema` para poder migrar proyectos en el futuro.
 """

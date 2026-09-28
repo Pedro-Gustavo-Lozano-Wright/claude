@@ -1,6 +1,6 @@
-"""Resolución de fuentes: qué archivo se lee para cada Elemento (T9.2).
+"""Resolución de fuentes: qué archivo se lee para cada Elemento.
 
-Orden (PROJECT.md, 22.8):
+Orden:
 1. La copia materializada en su minuto, si existe.
 2. Si todavía no se guardó: el horneado de su Pieza (mismo contenido).
 3. Si se colocó directo desde un Bruto: el Bruto.

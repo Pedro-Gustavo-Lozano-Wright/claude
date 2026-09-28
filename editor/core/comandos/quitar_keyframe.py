@@ -1,4 +1,4 @@
-"""Quitar keyframes (T6.5)."""
+"""Quitar keyframes."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Guardar y autoguardar (T11.4, PROJECT.md 10.3 y 22.5).
+"""Guardar y autoguardar.
 
 Guardar:
 1. Cerrar los archivos abiertos por la vista previa (sin lecturas de rutas viejas).

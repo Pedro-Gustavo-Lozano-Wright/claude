@@ -2,7 +2,7 @@
 
 La receta de una Pieza es una secuencia de tramos de Brutos, recortados en
 **fotogramas nativos** de cada fuente, más una transformación, efectos y el
-método de conversión a 24 fps (PROJECT.md, 6.7). Al hornearla (E9) se produce
+método de conversión a 24 fps. Al hornearla se produce
 un archivo normalizado con 1 s de asas a cada lado.
 
 En esta etapa la mini-timeline de la Pieza es lineal (tramos uno tras otro);
@@ -42,7 +42,7 @@ class AudioConformado(Enum):
     """Qué hacer con el audio cuando el método cambia la duración."""
 
     ESTIRAR_CON_TONO = "estirar_con_tono"   # remuestrear: el tono cambia con la duración
-    CONSERVAR_TONO = "conservar_tono"       # WSOLA (E20): misma altura, otra duración
+    CONSERVAR_TONO = "conservar_tono"       # WSOLA: misma altura, otra duración
     SILENCIAR = "silenciar"
 
 
@@ -74,7 +74,7 @@ class Horneado:
     asas_fin: int = ASAS_FOTOGRAMAS
     tiene_alfa: bool = False
     tiene_audio: bool = False
-    archivo: Path | None = None     # la asigna proyecto_fs (E5)
+    archivo: Path | None = None     # la asigna proyecto_fs
 
     @property
     def fotogramas_utiles(self) -> int:

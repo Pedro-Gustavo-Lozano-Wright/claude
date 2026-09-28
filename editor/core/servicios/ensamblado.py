@@ -1,4 +1,4 @@
-"""Unir minutos sin recodificar y agregar las pistas de audio (T10.4).
+"""Unir minutos sin recodificar y agregar las pistas de audio.
 
 El video de cada minuto se copia paquete a paquete (sin recodificar) con sus
 marcas de tiempo desplazadas; el audio del rango se codifica aparte, en una

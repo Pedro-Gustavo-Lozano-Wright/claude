@@ -1,7 +1,7 @@
 """El lienzo 1280×720 y la regla del marco espacial.
 
 Lo que está dentro del lienzo se ve; lo que está fuera existe pero no se
-procesa (PROJECT.md, sección 4.1). Este módulo calcula qué parte de cada
+procesa. Este módulo calcula qué parte de cada
 Elemento cae dentro, para descartar lo invisible y transformar solo la región
 de interés.
 """
@@ -99,7 +99,7 @@ class Lienzo:
     # --- Ventana vertical de los Shorts ----------------------------------------
 
     def ventana_vertical(self, x: float, zoom: float = 1.0) -> Rect:
-        """Ventana 9:16 sobre el lienzo (PROJECT.md, 13.5).
+        """Ventana 9:16 sobre el lienzo.
 
         Con zoom 1 ocupa toda la altura (405×720). Con zoom > 1 es más pequeña y
         queda centrada en vertical. `x` es su borde izquierdo y se limita para

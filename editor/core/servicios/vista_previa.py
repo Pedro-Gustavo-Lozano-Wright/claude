@@ -1,4 +1,4 @@
-"""Vista previa en 4 niveles con el audio como reloj maestro (E11, PROJECT.md 12).
+"""Vista previa en 4 niveles con el audio como reloj maestro.
 
 | Nivel | Uso | Fuente de píxeles | Salida |
 |---|---|---|---|
@@ -7,7 +7,7 @@
 | 4 | Pausa | Archivos reales, calidad final | JPEG en bytes |
 
 El núcleo no conoce Flet: entrega bytes y rutas. `RelojAudio` compensa que
-`Audio.get_current_position()` sea asíncrono y tenga latencia (T11.3).
+`Audio.get_current_position()` sea asíncrono y tenga latencia.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ class ServicioVistaPrevia:
 
     def fotograma_ventana(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], ventana,
                           idioma: str | None = None) -> bytes:
-        """Vista previa de un Short: el fotograma visto a través de su ventana vertical (E22)."""
+        """Vista previa de un Short: el fotograma visto a través de su ventana vertical."""
         return a_jpeg(self._rapido.componer(capitulo, f, tamano, ventana=ventana, idioma=idioma), self.calidad_jpeg)
 
     def imagen_exacta(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], idioma: str | None = None):
@@ -131,13 +131,13 @@ class ServicioVistaPrevia:
         return destino
 
     def minutos_listos(self, capitulo: Capitulo, idioma: str | None) -> dict[int, bool]:
-        """Para la barra verde/roja del mapa (PROJECT.md, 12.4)."""
+        """Para la barra verde/roja del mapa."""
         return {m: self.ruta_prerender(capitulo, m, idioma).exists() for m in range(len(capitulo.minutos))}
 
 
 @dataclass
 class RelojAudio:
-    """Posición del reproductor de audio estimada entre consultas (T11.3).
+    """Posición del reproductor de audio estimada entre consultas.
 
     `sincronizar` se llama con cada respuesta de `get_current_position()`;
     `fotograma()` extrapola con el reloj monotónico mientras tanto.

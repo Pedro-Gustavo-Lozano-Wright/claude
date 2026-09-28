@@ -1,4 +1,4 @@
-"""Banco de fotogramas de vista previa, nivel 0 (T9.6, PROJECT.md 12.1).
+"""Banco de fotogramas de vista previa, nivel 0.
 
 Cada archivo de video (horneado de Pieza o su copia) tiene un banco en
 `.cache/banco/<clave>/`: imágenes de 256×144 a 10 fps (JPEG, o WebP si hay

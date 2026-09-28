@@ -1,4 +1,4 @@
-"""Historial de deshacer y rehacer (T6.2).
+"""Historial de deshacer y rehacer.
 
 Uno solo por proyecto. Publica en el bus los eventos que las pantallas y las
 huellas necesitan después de cada ejecución, deshacer o rehacer.

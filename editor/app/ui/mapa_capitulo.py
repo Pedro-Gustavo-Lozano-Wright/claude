@@ -1,4 +1,4 @@
-"""Mapa de los 24 minutos con sus estados (E14, PROJECT.md 22.3).
+"""Mapa de los 24 minutos con sus estados.
 
 Cada celda muestra dos ejes a la vez:
 - relleno = trabajo (vacío / en progreso / listo);

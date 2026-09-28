@@ -1,6 +1,6 @@
-"""Abrir, crear, guardar y cerrar proyectos (E12).
+"""Abrir, crear, guardar y cerrar proyectos.
 
-Secuencia de apertura (PROJECT.md 22.5): bloqueo → diario pendiente →
+Secuencia de apertura: bloqueo → diario pendiente →
 `_proyecto.json` → Taller → cargador de capítulos → ¿autosave más reciente?
 Los diálogos (solo lectura, restaurar) los decide la interfaz con lo que
 devuelven estas funciones.
@@ -92,7 +92,7 @@ def guardar(sesion: Sesion, forzar: bool = False) -> ResultadoGuardado:
     return sesion.guardado.guardar(forzar=forzar)
 
 
-# --- Idiomas del proyecto (E18) ---------------------------------------------------------
+# --- Idiomas del proyecto ---------------------------------------------------------
 
 def cambiar_idiomas(sesion: Sesion, idiomas: list[str]) -> bool:
     """El primero es el principal. Se deshace; las capas A que usen un idioma quitado lo impiden."""
@@ -106,7 +106,7 @@ def cambiar_idiomas(sesion: Sesion, idiomas: list[str]) -> bool:
     return False
 
 
-# --- Mantenimiento (E18) ----------------------------------------------------------------
+# --- Mantenimiento ----------------------------------------------------------------
 
 def tamanos(sesion: Sesion) -> dict[str, int]:
     assert sesion.proyecto.raiz is not None

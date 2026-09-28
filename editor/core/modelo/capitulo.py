@@ -1,7 +1,7 @@
 """Capítulo: exactamente 24 minutos (34 560 fotogramas) más Global y Shorts.
 
 El capítulo es la línea de tiempo real y continua; los minutos son ventanas
-sobre ella (PROJECT.md, 5.2). Por eso el capítulo:
+sobre ella. Por eso el capítulo:
 
 - ubica cada Elemento en el minuto donde empieza;
 - aplica la regla de no solapamiento entre minutos (desbordes incluidos);
@@ -172,7 +172,7 @@ class Capitulo:
     def se_ve_en_idioma(self, elemento: Elemento, idioma: str | None) -> bool:
         """Textos de una capa T con idioma (subtítulos): solo se ven al ver ese idioma.
 
-        Sin `idioma` (imagen común del render) no se dibujan: son pistas de subtítulos (E21).
+        Sin `idioma` (imagen común del render) no se dibujan: son pistas de subtítulos.
         """
         if not elemento.es_texto:
             return True
@@ -221,7 +221,7 @@ class Capitulo:
         return resultado
 
     def que_afecta_al_minuto(self, numero: int) -> list[Elemento]:
-        """Todo lo que influye en el render de un minuto (base de su huella, PROJECT.md 13.2)."""
+        """Todo lo que influye en el render de un minuto (base de su huella)."""
         inicio, fin = granularidad.rango_minuto(numero)
         return list(self.minuto(numero)) + self.desbordes_hacia(numero) + self.global_.en_rango(inicio, fin)
 

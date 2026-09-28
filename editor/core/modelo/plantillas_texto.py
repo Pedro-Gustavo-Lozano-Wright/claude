@@ -1,4 +1,4 @@
-"""Plantillas de títulos y rótulos (E19).
+"""Plantillas de títulos y rótulos.
 
 Una plantilla fija estilo, posición y animaciones de un texto nuevo; después el
 texto es un Elemento T como cualquier otro. Los que se centran usan una caja de

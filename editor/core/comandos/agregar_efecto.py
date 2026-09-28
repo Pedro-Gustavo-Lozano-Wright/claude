@@ -1,4 +1,4 @@
-"""Agregar efectos, cambiar sus parámetros y reordenarlos (T6.5)."""
+"""Agregar efectos, cambiar sus parámetros y reordenarlos."""
 
 from __future__ import annotations
 

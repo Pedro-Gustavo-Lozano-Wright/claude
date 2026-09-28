@@ -1,10 +1,10 @@
-"""Gemelo .json de cada Elemento y receta .json de cada Short (T5.3).
+"""Gemelo .json de cada Elemento y receta .json de cada Short.
 
 Regla de lectura: **el nombre del archivo manda** en inicio, duración, capa,
 nombre descriptivo, ID y extensión (es la historia, y el usuario puede haberlo
 renombrado a mano). El gemelo aporta todo lo demás: espacio, keyframes,
 efectos, transición, audio, texto. Si falta el gemelo, el Elemento se rescata
-solo con el nombre y valores por defecto (PROJECT.md, 10.1).
+solo con el nombre y valores por defecto.
 """
 
 from __future__ import annotations

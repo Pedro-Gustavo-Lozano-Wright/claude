@@ -1,4 +1,4 @@
-"""Minuto: ventana de 60 s del capítulo, con su carpeta minNN (PROJECT.md, 5.2).
+"""Minuto: ventana de 60 s del capítulo, con su carpeta minNN.
 
 Un Elemento vive en el minuto donde empieza, aunque se desborde al siguiente.
 """
@@ -17,7 +17,7 @@ from editor.core.tiempo.nomenclatura import codigo_minuto
 
 
 class EstadoTrabajo(Enum):
-    """Eje manual (PROJECT.md, 13.3); VACIO se deduce solo."""
+    """Eje manual; VACIO se deduce solo."""
 
     VACIO = "vacio"
     EN_PROGRESO = "en_progreso"

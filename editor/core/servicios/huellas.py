@@ -1,9 +1,9 @@
-"""Huellas y estado de render de cada minuto (T10.1, PROJECT.md 13.2).
+"""Huellas y estado de render de cada minuto.
 
 La huella de video de un minuto resume todo lo que cambia su imagen: sus
 Elementos, los desbordes que entran desde minutos anteriores, lo de Global que
 lo cruza, el estado de las capas, la firma de cada archivo fuente y el
-estándar. La huella de audio se calcula por idioma (13.6): cambiar el diálogo
+estándar. La huella de audio se calcula por idioma: cambiar el diálogo
 en inglés no invalida la versión en español.
 """
 

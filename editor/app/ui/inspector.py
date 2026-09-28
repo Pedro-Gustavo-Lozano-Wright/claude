@@ -1,4 +1,4 @@
-"""Propiedades del Elemento seleccionado, keyframes e historial (E16).
+"""Propiedades del Elemento seleccionado, keyframes e historial.
 
 Cada propiedad animable muestra su valor **en el cabezal**, un rombo (◆ hay
 keyframe aquí, ◇ no) y flechas para saltar al keyframe anterior o siguiente.
@@ -263,7 +263,7 @@ class Inspector:
         return ft.GestureDetector(content=fila, on_tap=lambda _: self._activar(propiedad, indice_efecto))
 
     def _presets(self, elemento) -> list[ft.Control]:
-        """Atajos de animación (E19) y de audio (E20); cada uno es un paso de deshacer."""
+        """Atajos de animación y de audio; cada uno es un paso de deshacer."""
         botones: list[ft.Control] = []
         sesion = self.sesion
         refrescar = lambda hecho: hecho and self.app.refrescar("inspector", "monitor", "timeline")  # noqa: E731

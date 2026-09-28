@@ -1,6 +1,6 @@
-"""Colocar Elementos: agregar, duplicar y pegar (T6.4, T6.10).
+"""Colocar Elementos: agregar, duplicar y pegar.
 
-Modos de colocación (PROJECT.md, 24.1):
+Modos de colocación:
 - RECHAZAR: si choca con otro de su capa, no se hace.
 - SOBRESCRIBIR: recorta, divide o quita lo que tapa en su capa.
 - INSERTAR: divide lo que cruza el punto en su capa y corre hacia la derecha

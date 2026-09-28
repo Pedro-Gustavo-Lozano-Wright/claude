@@ -1,4 +1,4 @@
-"""Punto de entrada único del editor (PROJECT.md, sección 15).
+"""Punto de entrada único del editor.
 
     python main.py                                  interfaz
     python main.py RUTA_PROYECTO                    interfaz con ese proyecto
@@ -6,9 +6,7 @@
     python main.py --render RUTA --capitulo 1 [--minutos 00-05] [--solo-audio]
     python main.py --escanear RUTA_PROYECTO
     python main.py --shorts RUTA --capitulo 1
-
-El main crece por épicas: cada modo avisa qué épica lo completa mientras no
-esté implementado.
+    python main.py --fotograma RUTA --capitulo 1 --tiempo 02:12.08 [--salida f.png]
 """
 
 from __future__ import annotations
@@ -27,7 +25,6 @@ registro = obtener_registro("editor")
 
 SALIDA_OK = 0
 SALIDA_ERROR = 1
-SALIDA_PENDIENTE = 2
 
 
 @dataclass
@@ -104,11 +101,6 @@ def arrancar(argumentos: argparse.Namespace) -> Contexto:
     configurar_registro(argumentos.nivel_registro or ajustes.nivel_registro)
     estandar = Estandar.cargar(ruta_config(ARCHIVO_ESTANDAR))
     return Contexto(ajustes=ajustes, estandar_por_defecto=estandar, bus=BusEventos())
-
-
-def pendiente(modo: str, epica: str) -> int:
-    registro.warning("El modo %s todavía no está implementado (épica %s).", modo, epica)
-    return SALIDA_PENDIENTE
 
 
 def modo_nuevo(contexto: Contexto, ruta: Path) -> int:
@@ -236,7 +228,7 @@ def modo_fotograma(contexto: Contexto, ruta: Path, capitulo: int, tiempo: str, s
 
 
 def modo_shorts(contexto: Contexto, ruta: Path, capitulo: int) -> int:
-    """Renderiza los Shorts del capítulo que no estén al día (E22)."""
+    """Renderiza los Shorts del capítulo que no estén al día."""
     from editor.core.servicios import shorts
     from editor.core.tareas.cola import ejecutar_ahora
 
@@ -264,7 +256,7 @@ def modo_shorts(contexto: Contexto, ruta: Path, capitulo: int) -> int:
 
 
 def modo_interfaz(contexto: Contexto, ruta: Path | None) -> int:
-    """Ventana de escritorio de Flet (E12–E16). Sin ruta: el último proyecto o la pantalla de inicio."""
+    """Ventana de escritorio de Flet. Sin ruta: el último proyecto o la pantalla de inicio."""
     try:
         from editor.app.aplicacion import lanzar
     except ImportError as error:

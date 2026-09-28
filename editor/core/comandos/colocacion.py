@@ -1,4 +1,4 @@
-"""Operaciones de rango: cerrar huecos, levantar y extraer, congelar fotograma (T6.10)."""
+"""Operaciones de rango: cerrar huecos, levantar y extraer, congelar fotograma."""
 
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ class QuitarRango(EdicionCapitulo):
 
 
 class CongelarFotograma(EdicionCapitulo):
-    """Crea un Elemento que muestra fijo el fotograma `f` de otro (PROJECT.md, 24.1).
+    """Crea un Elemento que muestra fijo el fotograma `f` de otro.
 
     Usa la misma fuente; la transformación evaluada en `f` queda como estática.
     """

@@ -1,4 +1,4 @@
-"""Subtítulos `.srt` (E19): leer para crear Elementos de texto y escribir desde una capa T.
+"""Subtítulos `.srt`: leer para crear Elementos de texto y escribir desde una capa T.
 
 Los tiempos se redondean al fotograma de 24 fps. Leer tolera BOM, CRLF,
 etiquetas <i>/<b> (se quitan) y numeraciones faltantes.
@@ -81,7 +81,7 @@ def escribir_srt(capitulo: Capitulo, codigo_capa: str, ruta: Path, en_global: bo
 
 def srt_de_idioma(capitulo: Capitulo, idioma: str, inicio: int, fin: int) -> str | None:
     """Subtítulos de un idioma (textos de las capas T con ese idioma) en el rango, con tiempos
-    desde `inicio`. None si no hay ninguno. Es lo que acompaña al render (E21)."""
+    desde `inicio`. None si no hay ninguno. Es lo que acompaña al render."""
     textos = [
         e for e in list(capitulo.elementos_de_minutos()) + list(capitulo.global_)
         if e.es_texto and e.texto is not None and capitulo.estado_capa(e).idioma == idioma

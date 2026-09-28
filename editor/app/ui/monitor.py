@@ -1,4 +1,4 @@
-"""Monitor con el lienzo, la vista previa y el control espacial (E13, PROJECT.md 12 y 16.3).
+"""Monitor con el lienzo, la vista previa y el control espacial.
 
 Capas del monitor (de abajo hacia arriba):
     mesa de trabajo → imagen (niveles 2 y 4) o video (nivel 3) → canvas con
@@ -115,7 +115,7 @@ class Monitor:
             options=[ft.DropdownOption(key=k, text=k) for k in ZOOMS_LIENZO], on_select=self._cambiar_zoom,
         )
         self.estado_texto = texto_suave("")
-        # Medidores de nivel (E20) y monitores de señal (E19).
+        # Medidores de nivel y monitores de señal.
         self.medidor = cv.Canvas(shapes=[], height=8, expand=True)
         self._pcm: dict[str, np.ndarray] = {}
         self.senal = cv.Canvas(shapes=[], height=ALTO_SENAL, width=2 * ANCHO_SENAL + 12)

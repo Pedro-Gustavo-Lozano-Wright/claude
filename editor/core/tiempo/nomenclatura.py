@@ -1,4 +1,4 @@
-"""Nomenclatura única de carpetas y archivos (PROJECT.md, sección 3).
+"""Nomenclatura única de carpetas y archivos.
 
 Convierte en ambos sentidos entre los nombres del disco y los datos que
 expresan, y genera los IDs estables del proyecto.

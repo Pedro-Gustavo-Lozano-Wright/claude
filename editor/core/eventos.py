@@ -1,8 +1,7 @@
 """Bus de eventos: el flujo inverso del núcleo hacia las capas superiores.
 
 Los niveles inferiores publican eventos sin conocer a quién le interesan; los
-niveles superiores se suscriben. Así el núcleo nunca importa la interfaz
-(PROJECT.md, sección 14.3).
+niveles superiores se suscriben. Así el núcleo nunca importa la interfaz.
 
 Una suscripción a una clase recibe también los eventos de sus subclases.
 Los manejadores se ejecutan en el hilo que publica; la capa `app` es la
@@ -122,19 +121,7 @@ class BancoListo(Evento):
     id_fuente: str
 
 
-@dataclass(frozen=True)
-class MedioFueraDeLinea(Evento):
-    id_referencia: str
-    ruta: str
-
-
 # --- Render -------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class MinutoInvalidado(Evento):
-    capitulo: int
-    minuto: int
-
 
 @dataclass(frozen=True)
 class TareaProgreso(Evento):
@@ -152,13 +139,6 @@ class TareaTerminada(Evento):
     tipo: str
     exito: bool
     mensaje: str = ""
-
-
-@dataclass(frozen=True)
-class RenderProgreso(Evento):
-    id_trabajo: str
-    fraccion: float
-    descripcion: str = ""
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 """Contenido de los Elementos de texto (capas T).
 
-Un Elemento T no tiene archivo de medios: su gemelo .json es el contenido
-(PROJECT.md, 8.5). Las fuentes tipográficas viven en `recursos/fuentes/`.
+Un Elemento T no tiene archivo de medios: su gemelo .json es el contenido.
+Las fuentes tipográficas viven en `recursos/fuentes/`.
 """
 
 from __future__ import annotations

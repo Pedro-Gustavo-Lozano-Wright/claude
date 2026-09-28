@@ -1,6 +1,6 @@
 """Estándar HD720-24: el único formato de edición y render del editor.
 
-Las constantes de este módulo son fijas por diseño (PROJECT.md, sección 4):
+Las constantes de este módulo son fijas por diseño:
 lienzo 1280×720 en 16:9, 24 fps, capítulos de exactamente 24 minutos.
 La clase `Estandar` agrupa los parámetros de codificación que sí se pueden
 ajustar por proyecto; cada proyecto guarda su propia copia en `_proyecto.json`.

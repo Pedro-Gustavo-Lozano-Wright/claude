@@ -1,4 +1,4 @@
-"""Shorts verticales 9:16 (E22).
+"""Shorts verticales 9:16.
 
 Cada fotograma se compone directamente a 720×1280 a través de la ventana
 vertical del Short (`Compositor.componer(ventana=...)`): la misma calidad que el

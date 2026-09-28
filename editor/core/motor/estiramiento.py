@@ -1,4 +1,4 @@
-"""Cambiar la duración del audio sin cambiar el tono (E20): WSOLA.
+"""Cambiar la duración del audio sin cambiar el tono: WSOLA.
 
 Se corta la señal en ventanas solapadas; cada ventana se toma de la posición de
 entrada que le corresponde (± una tolerancia) donde mejor continúa la anterior,

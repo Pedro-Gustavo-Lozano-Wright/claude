@@ -21,14 +21,14 @@ from editor.core.tiempo import granularidad
 
 
 class Alcance(Enum):
-    """Hasta dónde llega un ripple (PROJECT.md, 6.5)."""
+    """Hasta dónde llega un ripple."""
 
     MINUTO = "minuto"
     CAPITULO = "capitulo"
 
 
 class ModoColocacion(Enum):
-    """Qué pasa si un Elemento cae sobre otros de su capa (PROJECT.md, 24.1)."""
+    """Qué pasa si un Elemento cae sobre otros de su capa."""
 
     RECHAZAR = "rechazar"
     SOBRESCRIBIR = "sobrescribir"

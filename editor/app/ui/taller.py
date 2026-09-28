@@ -1,4 +1,4 @@
-"""Vista del Taller: Brutos → Piezas → horneado (E15, PROJECT.md 16.5).
+"""Vista del Taller: Brutos → Piezas → horneado.
 
 Con un Bruto elegido: visor en fotogramas **nativos**, marcas de entrada y
 salida (I / O con el foco en el Taller), fps interpretado y método de
@@ -206,7 +206,7 @@ class Taller:
         self.info.controls = info
         self.acciones.controls = acciones
 
-    # --- Análisis (E17): escenas, silencios y audio externo -------------------------------
+    # --- Análisis: escenas, silencios y audio externo -------------------------------
 
     def _analisis(self, bruto) -> list[ft.Control]:
         filas: list[ft.Control] = [ft.Divider()]

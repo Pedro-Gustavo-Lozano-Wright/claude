@@ -1,6 +1,6 @@
-"""Cola de tareas de fondo con prioridades y cancelación (T9.1).
+"""Cola de tareas de fondo con prioridades y cancelación.
 
-Reglas (PROJECT.md, 22.8):
+Reglas:
 - Una tarea **nunca** toca el modelo vivo ni llama a `proyecto.capitulo()`:
   recibe una instantánea (copia) de lo que necesita al crearse.
 - Informa progreso por el bus (`TareaProgreso`, `TareaTerminada`).

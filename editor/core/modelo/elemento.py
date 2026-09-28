@@ -1,11 +1,11 @@
-"""El Elemento: bloque fundamental del editor (PROJECT.md, sección 8).
+"""El Elemento: bloque fundamental del editor.
 
 Una ventana de tiempo sobre un archivo, colocada en el lienzo y en la
 timeline, cuyas propiedades son parámetros animables.
 
 El Elemento sabe responder qué aporta en un fotograma (activo o no, qué
 fotograma de su fuente, con qué transformación y volumen). La obtención de la
-imagen y la mezcla son del motor (E7).
+imagen y la mezcla son del motor.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from editor.core.tiempo.granularidad import Duracion, Instante
 from editor.core.tiempo.nomenclatura import NombreElemento
 
 PROPIEDADES_AUDIO_ANIMABLES = ("volumen", "paneo")
-# Rampas de velocidad (E19): keyframes de "velocidad" (siempre positiva; la reversa no se anima).
+# Rampas de velocidad: keyframes de "velocidad" (siempre positiva; la reversa no se anima).
 PROPIEDADES_TIEMPO_ANIMABLES = ("velocidad",)
 VELOCIDAD_MINIMA, VELOCIDAD_MAXIMA = 0.05, 8.0
 
@@ -145,7 +145,7 @@ class Elemento:
     estado: EstadoElemento = field(default_factory=EstadoElemento)
     texto: ContenidoTexto | None = None
     en_global: bool = False
-    # Ruta del archivo materializado en disco; la asigna proyecto_fs (E5).
+    # Ruta del archivo materializado en disco; la asigna proyecto_fs.
     archivo: Path | None = None
 
     def __post_init__(self) -> None:
@@ -279,7 +279,7 @@ class Elemento:
 
     @property
     def suena(self) -> bool:
-        """Aporta audio a la mezcla: capas A, o V con audio y sin silenciar (PROJECT.md, 8.4)."""
+        """Aporta audio a la mezcla: capas A, o V con audio y sin silenciar."""
         if self.audio.silenciado or self.es_texto:
             return False
         return self.capa.tipo is TipoCapa.AUDIO or self.tiene_audio

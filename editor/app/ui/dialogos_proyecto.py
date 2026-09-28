@@ -1,4 +1,4 @@
-"""Diálogos del menú Proyecto (E18): idiomas, atajos y mantenimiento."""
+"""Diálogos del menú Proyecto: idiomas, atajos y mantenimiento."""
 
 from __future__ import annotations
 

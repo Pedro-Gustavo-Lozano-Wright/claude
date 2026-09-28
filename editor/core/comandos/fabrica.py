@@ -1,4 +1,4 @@
-"""Construcción de Elementos nuevos a partir de Piezas, Brutos o texto (T6.4).
+"""Construcción de Elementos nuevos a partir de Piezas, Brutos o texto.
 
 El Elemento nace con su ID ya asignado: el comando que lo agrega es así
 determinista al rehacer.
@@ -77,7 +77,7 @@ def elemento_desde_bruto(
     """Imagen o audio colocados directamente (sin pasar por una Pieza).
 
     Al materializarse se normalizan: imágenes a PNG y audio a WAV 48 kHz.
-    Para un Bruto de audio, `fotogramas_nativos` se mide a 24 fps (E9).
+    Para un Bruto de audio, `fotogramas_nativos` se mide a 24 fps.
     """
     if bruto.tipo is TipoMedio.VIDEO:
         raise ErrorModelo("Un video se coloca a través de una Pieza del Taller.")

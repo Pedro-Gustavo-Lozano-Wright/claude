@@ -1,4 +1,4 @@
-"""Análisis de medios para el Taller (E17): escenas, silencios y sincronía de audio.
+"""Análisis de medios para el Taller: escenas, silencios y sincronía de audio.
 
 Todo corre en tareas de fondo y devuelve datos simples; nada toca el modelo.
 
@@ -138,7 +138,7 @@ def desfase_con_archivo(referencia: np.ndarray, ruta_externa: Path, contexto: Co
     return desfase(mono, externo)
 
 
-# --- E19: movimiento de cámara para estabilizar -------------------------------------------
+# --- Movimiento de cámara para estabilizar -------------------------------------------
 
 def movimiento(ruta: Path, desde: int, hasta: int, contexto: Contexto, suavizado: int = 15) -> dict[int, tuple[float, float, float]]:
     """Corrección por fotograma [desde, hasta) del archivo (24 fps): (dx, dy, grados) que la anulan.
@@ -187,7 +187,7 @@ def movimiento(ruta: Path, desde: int, hasta: int, contexto: Contexto, suavizado
     return {k: (float(c[0]), float(c[1]), float(c[2])) for k, c in enumerate(correccion)}
 
 
-# --- E20: sonoridad (ITU-R BS.1770 / EBU R128) ---------------------------------------------
+# --- Sonoridad (ITU-R BS.1770 / EBU R128) ---------------------------------------------
 
 # Coeficientes del filtro K de BS.1770-4 a 48 kHz: (b0, b1, b2, a1, a2).
 _ESTANTE = (1.53512485958697, -2.69169618940638, 1.19839281085285, -1.69065929318241, 0.73248077421585)
@@ -252,7 +252,7 @@ def ganancia_para(lufs_medidos: float, objetivo: float = -14.0, pico_db: float =
     return round(ganancia, 2)
 
 
-# --- E20: voz para bajar la música (ducking) -------------------------------------------------
+# --- Voz para bajar la música (ducking) -------------------------------------------------
 
 def actividad(muestras: np.ndarray, umbral_db: float = -38.0, ventana_s: float = 0.05,
               retencion_s: float = 0.4) -> np.ndarray:

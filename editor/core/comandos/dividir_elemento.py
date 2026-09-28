@@ -1,4 +1,4 @@
-"""Dividir Elementos en un fotograma (cuchilla) (T6.4).
+"""Dividir Elementos en un fotograma (cuchilla).
 
 Sin IDs explícitos corta todo lo editable que pasa por ese fotograma, en
 minutos y en Global.

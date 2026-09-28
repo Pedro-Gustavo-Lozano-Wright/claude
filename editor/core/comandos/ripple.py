@@ -1,6 +1,6 @@
-"""Ripple: recortar un borde y correr lo que sigue para no dejar hueco (T6.6).
+"""Ripple: recortar un borde y correr lo que sigue para no dejar hueco.
 
-Alcance (PROJECT.md, 6.5):
+Alcance:
 - MINUTO (por defecto): se corre lo que empieza en el mismo minuto.
 - CAPITULO: se corre todo lo posterior del capítulo (renombres en cascada al
   guardar; la interfaz debe confirmarlo antes).

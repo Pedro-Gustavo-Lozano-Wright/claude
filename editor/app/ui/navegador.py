@@ -1,4 +1,4 @@
-"""Árbol Proyecto → Capítulos → Minutos, Brutos y Taller (E12, T12.5).
+"""Árbol Proyecto → Capítulos → Minutos, Brutos y Taller.
 
 Los capítulos se cargan al elegirlos (carga perezosa del proyecto); los
 minutos muestran los mismos dos ejes de estado que el mapa.

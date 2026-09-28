@@ -1,4 +1,4 @@
-"""Compositor: arma la imagen de un fotograma del capítulo (T7.4).
+"""Compositor: arma la imagen de un fotograma del capítulo.
 
 Para cada Elemento visible en f, de abajo hacia arriba
 (`Capitulo.visuales_activos_en`):
@@ -94,7 +94,7 @@ def _ajustes_transicion(transiciones: list[TransicionActiva]) -> dict[str, _Ajus
             if p > 0.5:
                 saliente.opacidad = 0.0
         else:
-            ajuste.opacidad = p  # tipos de plugins sin implementación visual: fundido
+            ajuste.opacidad = p  # tipo sin dibujo propio: se comporta como un fundido
         ajustes[activa.entrante.id] = ajuste
     return ajustes
 
@@ -276,7 +276,7 @@ class Compositor:
             destino[:] = color + destino * (1 - alfa)
 
     def _fuera_de_linea(self, lienzo: np.ndarray, elemento: Elemento, f: int, base: Afin) -> None:
-        """Marco rojo semitransparente donde iría un medio que falta (PROJECT.md, 8.6)."""
+        """Marco rojo semitransparente donde iría un medio que falta."""
         transform = elemento.transform_en(f)
         ancho = elemento.ancho or LIENZO_ANCHO // 4
         alto = elemento.alto or LIENZO_ALTO // 4

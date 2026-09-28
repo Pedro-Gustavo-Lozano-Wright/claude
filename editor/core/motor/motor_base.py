@@ -1,4 +1,4 @@
-"""Interfaz común de las fuentes de imagen (T7.1).
+"""Interfaz común de las fuentes de imagen.
 
 Una fuente entrega fotogramas RGBA **no premultiplicados** en `uint8`, con forma
 (alto, ancho, 4). El compositor los premultiplica al mezclar. Cualquier motor

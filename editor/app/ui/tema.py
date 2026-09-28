@@ -1,4 +1,4 @@
-"""Tokens de color y tipografía (PROJECT.md 22.3).
+"""Tokens de color y tipografía.
 
 Se leen de `recursos/temas/<nombre>.json`; si falta un token se usa el valor
 por defecto del tema oscuro, así un tema incompleto nunca rompe la interfaz.

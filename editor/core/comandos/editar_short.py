@@ -1,4 +1,4 @@
-"""Shorts verticales: crear, quitar, cambiar rango y ventana, keyframes (T6.8)."""
+"""Shorts verticales: crear, quitar, cambiar rango y ventana, keyframes."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Mover Elementos en el tiempo, de capa, de minuto o de capítulo (T6.4).
+"""Mover Elementos en el tiempo, de capa, de minuto o de capítulo.
 
 `MoverElemento` usa valores absolutos: los arrastres se fusionan en un solo
 paso de deshacer.

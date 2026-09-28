@@ -1,4 +1,4 @@
-"""Edición en la timeline: geometría, imán y comandos por herramienta (E14).
+"""Edición en la timeline: geometría, imán y comandos por herramienta.
 
 La timeline de un minuto muestra 60 s (1440 fotogramas); con más zoom, una
 ventana menor que se desplaza. Este módulo traduce píxeles ↔ fotogramas y
@@ -11,6 +11,8 @@ import copy
 from dataclasses import dataclass
 
 from editor.app.estado import Sesion
+from editor.core.comandos.colocacion import CerrarHuecos, CongelarFotograma
+from editor.core.comandos.separar_audio import SepararAudio
 from editor.core.comandos import (
     INICIO,
     FIN,
@@ -25,6 +27,7 @@ from editor.core.comandos import (
     PegarElementos,
     PonerKeyframe,
     PonerMarcador,
+    QuitarMarcador,
     QuitarElementos,
     QuitarRango,
     RecortarElemento,
@@ -245,8 +248,50 @@ def duplicar(sesion: Sesion) -> bool:
     return sesion.ejecutar(DuplicarElemento(sesion.estado.capitulo, elemento, elemento.fin))
 
 
+def separar_audio(sesion: Sesion) -> bool:
+    """El audio del video seleccionado pasa a un Elemento A (capa de destino de audio); el video queda mudo."""
+    elemento = sesion.seleccionado()
+    if elemento is None or elemento.capa.tipo is not TipoCapa.VIDEO:
+        sesion.avisar("Elija un Elemento de video con sonido.")
+        return False
+    capa = Capa.desde_codigo(sesion.estado.capa_destino_audio)
+    return sesion.ejecutar(lambda: SepararAudio(sesion.estado.capitulo, elemento.id, capa))
+
+
+def congelar_fotograma(sesion: Sesion, segundos: int = 2) -> bool:
+    """Inserta en el cabezal una imagen fija del fotograma actual del Elemento seleccionado (corre lo que sigue)."""
+    elemento = sesion.seleccionado()
+    f = sesion.estado.cabezal
+    if elemento is None or not elemento.es_visual or elemento.es_texto or not elemento.contiene(f):
+        sesion.avisar("Elija un video o imagen bajo el cabezal.")
+        return False
+    return sesion.ejecutar(lambda: CongelarFotograma(sesion.estado.capitulo, elemento.id, f, f, segundos * FPS,
+                                                     modo=ModoColocacion.INSERTAR))
+
+
+def cerrar_huecos(sesion: Sesion) -> bool:
+    """Compacta el minuto actual: en cada capa, cada Elemento empieza donde termina el anterior."""
+    return sesion.ejecutar(lambda: CerrarHuecos(sesion.estado.capitulo, sesion.estado.minuto))
+
+
 def poner_marcador(sesion: Sesion, nombre: str = "") -> bool:
     return sesion.ejecutar(PonerMarcador(sesion.estado.capitulo, Marcador(sesion.estado.cabezal, nombre)))
+
+
+def marcador_en_cabezal(sesion: Sesion) -> Marcador | None:
+    f = sesion.estado.cabezal
+    return next((m for m in sesion.capitulo.marcadores if m.f == f), None)
+
+
+def editar_marcador(sesion: Sesion, nombre: str, color: str) -> bool:
+    """Pone (o reemplaza) el marcador del cabezal con ese nombre y color. El nombre es el título
+    del capítulo de YouTube que empieza ahí."""
+    return sesion.ejecutar(lambda: PonerMarcador(sesion.estado.capitulo,
+                                                 Marcador(sesion.estado.cabezal, nombre.strip(), color=color)))
+
+
+def quitar_marcador(sesion: Sesion) -> bool:
+    return sesion.ejecutar(QuitarMarcador(sesion.estado.capitulo, sesion.estado.cabezal))
 
 
 def intercambiar_minutos(sesion: Sesion, a: int, b: int) -> bool:
@@ -286,7 +331,7 @@ def agregar_texto(sesion: Sesion, texto: str = "Título", codigo_capa: str = "T1
     return False
 
 
-# --- E17: búsqueda, transiciones y volumen en la timeline -------------------------------
+# --- Búsqueda, transiciones y volumen en la timeline -------------------------------
 
 def buscar(sesion: Sesion, texto: str, desde_id: str | None = None) -> Elemento | None:
     """Siguiente Elemento del capítulo cuyo nombre contiene `texto` (en orden de tiempo, circular)."""

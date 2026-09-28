@@ -1,7 +1,7 @@
 """Efectos: una pila ordenada de operaciones sobre la imagen de un Elemento.
 
 El modelo solo describe el efecto (tipo y parámetros). La implementación de
-cada tipo vive en `core/motor/efectos/` (épicas E7 y E19).
+cada tipo vive en `core/motor/efectos/`.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from editor.core.modelo.keyframe import Animacion
 
-# Tipos previstos (PROJECT.md, E19).
+# Tipos de efecto disponibles.
 BRILLO = "brillo"
 CONTRASTE = "contraste"
 SATURACION = "saturacion"
@@ -46,7 +46,7 @@ class DescriptorEfecto:
     opciones: tuple[tuple[str, str], ...] = ()   # (nombre, valor por defecto)
 
 
-# Registro ampliable: los plugins (E23) agregan sus tipos con `registrar_tipo_efecto`.
+# Registro ampliable: `registrar_tipo_efecto` agrega tipos nuevos con su descriptor.
 _DESCRIPTORES: dict[str, DescriptorEfecto] = {
     d.tipo: d for d in (
         DescriptorEfecto(BRILLO, "Brillo", (Parametro("valor", -1, 1, 0),)),

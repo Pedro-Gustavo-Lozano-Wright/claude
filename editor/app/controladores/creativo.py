@@ -1,4 +1,4 @@
-"""Acciones creativas (E19): presets de animación, estabilizar, plantillas de texto y subtítulos."""
+"""Acciones creativas: presets de animación, estabilizar, plantillas de texto y subtítulos."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Presets de animación (E19): Ken Burns, entradas y salidas de clips, estabilización.
+"""Presets de animación: Ken Burns, entradas y salidas de clips, estabilización.
 
 Todos producen comandos ya existentes (keyframes y ancla) agrupados en un solo
 paso de deshacer. Los keyframes quedan editables como cualquier otro.

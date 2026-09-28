@@ -1,8 +1,8 @@
-"""Intercambiar el contenido de dos minutos completos (T6.8).
+"""Intercambiar el contenido de dos minutos completos.
 
 Todo lo que empieza en un minuto pasa al otro conservando su posición dentro
 del minuto. Implica renombrar y mover sus archivos al guardar: la interfaz
-debe confirmarlo antes (PROJECT.md, 22.6).
+debe confirmarlo antes.
 """
 
 from __future__ import annotations

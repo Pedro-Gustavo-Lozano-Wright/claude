@@ -1,4 +1,4 @@
-"""Trim: cambiar la entrada o la salida de un Elemento sin mover a los vecinos (T6.4).
+"""Trim: cambiar la entrada o la salida de un Elemento sin mover a los vecinos.
 
 Valores absolutos (el nuevo borde en fotogramas del capítulo): los arrastres
 se fusionan en un solo paso.

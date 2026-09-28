@@ -1,4 +1,4 @@
-"""Estado de capas, marcadores, título del capítulo y estado de los minutos (T6.7)."""
+"""Estado de capas, marcadores, título del capítulo y estado de los minutos."""
 
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ class CambiarTituloCapitulo(EdicionEstadoCapitulo):
 
 
 class MarcarMinuto(EdicionEstadoCapitulo):
-    """Estado de trabajo manual del minuto (listo) y sus notas (PROJECT.md, 13.3)."""
+    """Estado de trabajo manual del minuto (listo) y sus notas."""
 
     descripcion = "Estado del minuto"
 

@@ -1,4 +1,4 @@
-"""Caché LRU de fotogramas decodificados con límite en MB (T7.3)."""
+"""Caché LRU de fotogramas decodificados con límite en MB."""
 
 from __future__ import annotations
 

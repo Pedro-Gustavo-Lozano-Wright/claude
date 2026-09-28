@@ -1,4 +1,4 @@
-"""Capítulos de YouTube desde los marcadores (E21).
+"""Capítulos de YouTube desde los marcadores.
 
 YouTube los lee de la descripción del video: una línea `M:SS Título` por
 capítulo, el primero en 0:00, al menos 3 y cada uno de 10 s o más. Si falta

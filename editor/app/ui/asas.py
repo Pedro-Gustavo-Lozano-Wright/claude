@@ -1,4 +1,4 @@
-"""Control espacial: asas, ancla, imán y guías (E13, PROJECT.md 16.3).
+"""Control espacial: asas, ancla, imán y guías.
 
 Geometría pura (sin Flet salvo el dibujo): convierte entre píxeles del
 monitor y píxeles del lienzo, detecta qué asa hay bajo el puntero y calcula la

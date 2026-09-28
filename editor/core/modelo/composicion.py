@@ -1,8 +1,8 @@
 """Composición: una línea de tiempo con Elementos en capas.
 
-Minuto y Global son composiciones sobre la rejilla del capítulo
-(PROJECT.md, 5.1). La composición guarda los Elementos y aplica la regla de
-no solapamiento dentro de una capa (6.6); el capítulo aplica esa misma regla
+Minuto y Global son composiciones sobre la rejilla del capítulo.
+La composición guarda los Elementos y aplica la regla de
+no solapamiento dentro de una capa; el capítulo aplica esa misma regla
 entre minutos, porque un Elemento puede desbordarse al minuto siguiente.
 """
 

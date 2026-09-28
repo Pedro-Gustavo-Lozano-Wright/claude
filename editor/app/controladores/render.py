@@ -1,4 +1,4 @@
-"""Renderizar entregables desde la interfaz (E10, E21)."""
+"""Renderizar entregables desde la interfaz."""
 
 from __future__ import annotations
 

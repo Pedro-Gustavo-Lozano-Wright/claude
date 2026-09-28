@@ -1,4 +1,4 @@
-"""Slip: cambiar qué parte de la fuente se ve sin mover el Elemento (T6.6).
+"""Slip: cambiar qué parte de la fuente se ve sin mover el Elemento.
 
 Valor absoluto (la nueva entrada de la fuente); el límite es el material que
 tiene la fuente, asas incluidas (`margen_fuente`).

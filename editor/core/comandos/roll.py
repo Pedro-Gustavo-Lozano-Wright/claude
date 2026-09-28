@@ -1,4 +1,4 @@
-"""Roll: mover el corte entre dos Elementos contiguos de la misma capa (T6.6).
+"""Roll: mover el corte entre dos Elementos contiguos de la misma capa.
 
 La duración total no cambia: lo que gana uno lo pierde el otro. Valor
 absoluto (el nuevo punto de corte), así que los arrastres se fusionan.

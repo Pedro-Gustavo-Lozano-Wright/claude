@@ -1,4 +1,4 @@
-"""Acciones del Taller: Piezas, fps, horneado, colocación (E15) y análisis de medios (E17)."""
+"""Acciones del Taller: Piezas, fps, horneado, colocación y análisis de medios."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from fractions import Fraction
 import numpy as np
 
 from editor.app.estado import Sesion
+from editor.core.eventos import BancoListo
 from editor.core.comandos.agregar_elemento import AgregarElemento
 from editor.core.comandos.fabrica import elemento_desde_bruto, elemento_desde_pieza
 from editor.core.comandos.operaciones import ModoColocacion
@@ -39,7 +40,7 @@ def crear_pieza(sesion: Sesion, id_bruto: str, entrada: int, salida: int,
             nombre=normalizar_nombre(nombre or bruto.nombre),
             tramos=[TramoFuente(id_bruto, entrada, salida)],
             metodo_fps=metodo,
-            # Si el método cambia la duración, el audio se estira sin cambiar el tono (E20).
+            # Si el método cambia la duración, el audio se estira sin cambiar el tono.
             audio_conformado=AudioConformado.CONSERVAR_TONO,
         )
     except ErrorModelo as error:
@@ -107,7 +108,7 @@ def preparar_vista_previa(sesion: Sesion, archivo, al_terminar=None) -> None:
     """Banco, miniaturas y forma de onda de un archivo (tareas de fondo).
 
     Video: las tres cosas. Imagen: nada (se lee directo). Audio: solo la forma de onda.
-    `al_terminar()` corre en el hilo de Flet (la timeline lo usa para redibujar).
+    Al terminar publica `BancoListo`; `al_terminar()` corre después en el hilo de Flet.
     """
     if archivo is None:
         return
@@ -124,12 +125,18 @@ def preparar_vista_previa(sesion: Sesion, archivo, al_terminar=None) -> None:
         forma_onda.generar(raiz, archivo, contexto)
         return archivo
 
+    def terminar(_resultado, error) -> None:
+        if error is not None:
+            return
+        sesion.bus.publicar(BancoListo(str(archivo)))   # monitor y timeline pasan a usar el banco nuevo
+        if al_terminar is not None:
+            al_terminar()
+
     sesion.tarea(Tarea("banco", f"Vista previa de {archivo.name}", trabajo, prioridad=BANCO_VISIBLE,
-                       clave=f"banco-{archivo}"),
-                 (lambda _resultado, error: al_terminar() if error is None else None) if al_terminar else None)
+                       clave=f"banco-{archivo}"), terminar)
 
 
-# --- E17: análisis en el Taller ---------------------------------------------------------
+# --- Análisis en el Taller ---------------------------------------------------------
 
 def detectar_escenas(sesion: Sesion, id_bruto: str, al_terminar) -> None:
     """Cortes de plano del Bruto (fotogramas nativos) → `al_terminar(lista)` en el hilo de Flet."""

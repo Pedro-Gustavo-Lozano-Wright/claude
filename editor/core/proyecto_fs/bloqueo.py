@@ -1,4 +1,4 @@
-"""Bloqueo del proyecto: una sola instancia puede editarlo a la vez (T5.5).
+"""Bloqueo del proyecto: una sola instancia puede editarlo a la vez.
 
 El archivo `.bloqueo` guarda PID, equipo y fecha. Si lo tiene otro proceso
 vivo, la segunda instancia abre en solo lectura. Si el proceso ya no existe

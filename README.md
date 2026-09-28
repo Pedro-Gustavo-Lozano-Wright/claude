@@ -5,21 +5,10 @@ Editor de video de escritorio para Linux, escrito en **Python** con la interfaz 
 carpeta por minuto y nombres de archivo que dicen en qué instante aparece cada
 elemento.
 
-Este README explica cómo **instalar y usar** el programa. La arquitectura, las
-decisiones y el plan de épicas están en **[PROJECT.md](PROJECT.md)**.
-
-## Estado
-
-| Fase | Épicas | Estado |
-|---|---|---|
-| A — Fundamentos | E0–E4 | ✅ |
-| B — Persistencia y edición | E5–E6 | ✅ |
-| C — Motor y servicios | E7–E11 | ✅ Verificado con medios reales |
-| D — Interfaz | E12–E16 | ✅ Recorrida en Chromium |
-| E — Completar la edición | E17 Timeline y Taller completos · E18 Proyecto, idiomas y mantenimiento | ✅ |
-| F — Capacidades creativas | E19 Efectos, transiciones y texto · E20 Audio avanzado | ✅ |
-| G — Entrega | E21 Render y exportación · E22 Shorts 9:16 | ✅ |
-| H — Extensión y cierre | E23 Plugins y plantillas · E24 Rendimiento, empaquetado y documentación | **Siguiente: E23** |
+Este README explica cómo **instalar** el programa y dar los primeros pasos.
+Todo lo demás (conceptos, cada pantalla, edición, render, Shorts, formato en
+disco y arquitectura) está en **[PROJECT.md](PROJECT.md)**, la documentación
+central del proyecto.
 
 ## Modos de `main.py`
 
@@ -33,7 +22,7 @@ python main.py --fotograma RUTA --capitulo 1 --tiempo 02:12.08 --salida f.png  #
 python main.py --shorts RUTA --capitulo 1         # renderiza los Shorts que no están al día
 ```
 
-Mientras un modo no esté implementado, `main.py` indica qué épica lo completa.
+Detalle de cada modo: [PROJECT.md, sección 20](PROJECT.md#20-modos-sin-interfaz).
 
 ## Estructura
 
@@ -175,34 +164,19 @@ python main.py --nuevo ~/Videos/mi-serie      # crea cap0001 con min00…min23 y
 5. **Ctrl+S** guarda (renombra archivos, gemelos y guiones).
 6. Espacio **Render**: minuto actual, rango I–O o capítulo completo.
 
-Más herramientas:
+Guía de cada parte:
 
-- **Un capítulo a la vez**: para cambiar de capítulo (o crear uno) se guarda antes.
-- Taller: **Buscar escenas** y **Buscar silencios** marcan puntos de corte; un audio
-  externo se **alinea** con el sonido del Elemento elegido en la timeline.
-- Timeline: selección múltiple con Shift (se mueve y se recorta junta), **Alt + arrastrar** en un
-  audio cambia su volumen, **Ctrl+F** busca por nombre.
-- Menú **☰ Proyecto**: idiomas del proyecto, atajos de teclado y mantenimiento
-  (caché, papelera, Brutos sin uso).
-- Inspector: **Ken Burns**, **Estabilizar**, animaciones de entrada y salida
-  (fundido, deslizar, zoom), efectos **Máscara** y **Viñeta**, transición
-  **Fundido a negro**, **rampas de velocidad** (rombo en la fila Velocidad) y
-  **Bajar con la voz** en un audio de música.
-- Timeline: botón **T** con plantillas (título, rótulo, subtítulo, créditos); las
-  capas T pueden tener idioma (solo se ven al ver ese idioma).
-- Navegador: **importar `.srt`** a una capa T de un idioma.
-- Taller: **Reducir ruido** en un Bruto de audio (crea un Bruto nuevo); al
-  conformar se **conserva el tono** por defecto.
-- Monitor: botón ♥ muestra **medidores de nivel**, histograma RGB y forma de onda.
-- Render: **video 720p** o **solo audio**, **normalizar a −14 LUFS** (YouTube) y medir
-  la sonoridad antes. Entrega **un video** con una pista de audio por idioma y, al
-  lado, un **`.srt` por idioma** (textos de las capas T de ese idioma) y un `.txt` con
-  los **capítulos de YouTube** sacados de los marcadores (botón para verlos y copiarlos).
-- Espacio **Shorts**: marcar I–O y pulsar **+**; mover y ampliar la ventana 9:16,
-  **Keyframe aquí** para que siga la acción, **Renderizar** (720×1280, audio y
-  subtítulos del primer idioma, en `capNNNN/shorts/`).
-
-Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revisión-8).
+| Quiero… | Dónde |
+|---|---|
+| Preparar material (fps, cortes, escenas, silencios, sincronía, ruido) | [Taller](PROJECT.md#9-taller) |
+| Editar en la timeline (herramientas, grupo, rangos, congelar, separar audio) | [Timeline y edición](PROJECT.md#10-timeline-y-edición) |
+| Mover, animar, curvas, presets, transiciones y efectos | [Inspector](PROJECT.md#12-inspector-propiedades-animación-y-efectos) |
+| Títulos, plantillas y subtítulos `.srt` | [Texto y subtítulos](PROJECT.md#13-texto-y-subtítulos) |
+| Mezcla, bajar la música con la voz, sonoridad | [Audio](PROJECT.md#14-audio) |
+| Varios idiomas | [Idiomas](PROJECT.md#15-idiomas) |
+| Entregar para YouTube | [Render y entregables](PROJECT.md#16-render-y-entregables) |
+| Shorts verticales | [Shorts](PROJECT.md#17-shorts-verticales-916) |
+| Atajos de teclado y gestos | [Atajos y gestos](PROJECT.md#19-atajos-y-gestos) |
 
 ---
 
@@ -210,7 +184,7 @@ Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revi
 
 | Ruta | Contenido | ¿Se puede borrar? |
 |---|---|---|
-| `PROYECTO/` | Todo el proyecto (ver PROJECT.md, sección 9) | No |
+| `PROYECTO/` | Todo el proyecto ([PROJECT.md, sección 6](PROJECT.md#6-el-proyecto-en-disco)) | No |
 | `PROYECTO/.cache/` | Banco de vista previa, miniaturas, pre-renders, audio | Sí (se regenera) |
 | `PROYECTO/.autosave/` | Instantánea de recuperación | Sí, si guardó |
 | `PROYECTO/.papelera/` | Archivos reemplazados al guardar (permite deshacer tras guardar) | Sí, con la app cerrada |
@@ -222,20 +196,18 @@ Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revi
 
 ---
 
-## 7. Opcional: codificación por hardware
+## 7. Opcional: codificación por hardware (NVIDIA)
 
-- **NVIDIA (NVENC)**: basta el controlador propietario; el PyAV de `pip` ya trae
-  `h264_nvenc` / `hevc_nvenc`. Compruebe con `nvidia-smi`.
-- **Intel / AMD (VAAPI)**: el PyAV de `pip` **no** trae VAAPI. Hay que compilarlo
-  contra el FFmpeg del sistema:
+Con una GPU NVIDIA y su controlador propietario, el render puede usar **NVENC**
+(el PyAV de `pip` ya trae `h264_nvenc`). Compruebe con `nvidia-smi` y active en
+el `_proyecto.json` del proyecto:
 
-  ```bash
-  sudo apt install vainfo libva-dev ffmpeg \
-      libavcodec-dev libavformat-dev libavdevice-dev libavfilter-dev \
-      libswscale-dev libswresample-dev pkg-config
-  vainfo                                  # debe listar perfiles H.264
-  pip install av==18.1.0 --no-binary av   # dentro del .venv
-  ```
+```json
+"estandar": { "render": { "aceleracion": "nvenc" } }
+```
+
+Para que los proyectos nuevos nazcan así, cambie lo mismo en
+`config/estandar.json`. Sin NVENC se codifica por software (`libx264`).
 
 ---
 
@@ -251,4 +223,4 @@ Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revi
 | Al abrir pregunta "Recuperar trabajo" | La app se cerró sin guardar | **Restaurar** y luego Ctrl+S; **Descartar** borra la instantánea |
 | Los símbolos se ven como cuadros | Faltan fuentes | `sudo apt install fonts-dejavu` |
 | Sin sonido al reproducir | Salida de audio del sistema | La imagen sigue a tiempo real; revise el mezclador del sistema |
-| Render lento | Codificación por software | NVENC o VAAPI (sección 7) |
+| Render lento | Codificación por software | NVENC (sección 7); los minutos al día no se vuelven a renderizar |

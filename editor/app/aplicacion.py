@@ -1,4 +1,4 @@
-"""Aplicación Flet: arranque, inicio ↔ proyecto, diálogos y cierre (E12, PROJECT.md 15 y 22.5).
+"""Aplicación Flet: arranque, inicio ↔ proyecto, diálogos y cierre.
 
 `lanzar()` lo llama `main.py`. La función de Flet (`principal`) crea una
 `Aplicacion` por ventana; esta muestra la pantalla de inicio o la `Ventana`

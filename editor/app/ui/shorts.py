@@ -1,4 +1,4 @@
-"""Espacio de trabajo Shorts (E22).
+"""Espacio de trabajo Shorts.
 
 A la izquierda la lista de Shorts del capítulo con su estado de render; en el
 centro la vista vertical (lo que se verá en el Short en el cabezal); a la

@@ -1,9 +1,9 @@
-"""Serialización canónica del modelo a JSON (T5.1).
+"""Serialización canónica del modelo a JSON.
 
 Una sola forma de convertir cada tipo a datos JSON y de vuelta. Es canónica
 (claves ordenadas, sin espacios variables) para que el mismo modelo produzca
 siempre el mismo texto: así se detecta qué gemelos cambiaron y se calculan las
-huellas de render (E10) sin falsos positivos.
+huellas de render sin falsos positivos.
 
 Solo convierte datos; leer y escribir archivos es cosa de `gemelo`,
 `manifiestos` y `diario`.

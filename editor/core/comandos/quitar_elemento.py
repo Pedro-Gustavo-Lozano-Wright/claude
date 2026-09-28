@@ -1,4 +1,4 @@
-"""Quitar Elementos, con o sin ripple (T6.4).
+"""Quitar Elementos, con o sin ripple.
 
 Con ripple, lo que viene después **en la misma capa** se corre hacia la
 izquierda para cerrar el hueco, dentro del alcance elegido.

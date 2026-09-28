@@ -1,4 +1,4 @@
-"""Abrir proyectos y cargar capítulos desde el disco (T5.6).
+"""Abrir proyectos y cargar capítulos desde el disco.
 
 - Abrir lee `_proyecto.json` y el Taller, y deja inyectado en el Proyecto un
   cargador de capítulos: cada capítulo se lee recién cuando se necesita.

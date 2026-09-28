@@ -1,4 +1,4 @@
-"""Ediciones del proyecto entero (E18): idiomas.
+"""Ediciones del proyecto entero: idiomas.
 
 Los idiomas del proyecto son las pistas de audio del render ("spa", "eng"…).
 El primero es el idioma principal. Quitar un idioma que todavía usa alguna capa A

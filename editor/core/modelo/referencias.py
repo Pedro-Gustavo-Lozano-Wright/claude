@@ -1,4 +1,4 @@
-"""Índice de referencias: Bruto → Piezas → Elementos → Minutos (PROJECT.md, 10.4).
+"""Índice de referencias: Bruto → Piezas → Elementos → Minutos.
 
 Sirve para saber qué copias materializadas hay que actualizar cuando se
 vuelve a hornear una Pieza, qué depende de algo antes de borrarlo y qué

@@ -1,4 +1,4 @@
-"""Hornear una Pieza: tramos → 24 fps → transformación y efectos → archivo (T9.4).
+"""Hornear una Pieza: tramos → 24 fps → transformación y efectos → archivo.
 
 - Cada tramo se decodifica en fotogramas **nativos** de su Bruto (con el fps
   interpretado) y se convierte a 24 fps con el método de la Pieza.
@@ -224,7 +224,7 @@ def aplicar_horneado(
     capitulos |= {u.capitulo for u in proyecto.referencias.ubicaciones_de_fuente(id_pieza)}
     capitulos = {n for n in capitulos if proyecto.existe_capitulo(n)}
     if capitulos:
-        # Fuera del historial: el horneado es estado automático y no se deshace (PROJECT.md, 22.7).
+        # Fuera del historial: el horneado es estado automático y no se deshace.
         actualizar_fuente(pieza, asas_anteriores, sorted(capitulos)).ejecutar(proyecto)
         if bus is not None:
             bus.publicar(ProyectoModificado())

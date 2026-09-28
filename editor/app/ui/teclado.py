@@ -1,4 +1,4 @@
-"""Atajos de teclado con contextos de foco (T12.7).
+"""Atajos de teclado con contextos de foco.
 
 `config/atajos.json` (o su copia en `~/.config/editor/`) asocia acciones a
 combinaciones como "Ctrl+Shift+Z". Flet entrega la etiqueta de la tecla

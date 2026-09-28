@@ -1,4 +1,4 @@
-"""Transformación espacial de un Elemento (T6.5)."""
+"""Transformación espacial de un Elemento."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Audio avanzado desde la interfaz (E20): ducking, sonoridad y reducción de ruido."""
+"""Audio avanzado desde la interfaz: ducking, sonoridad y reducción de ruido."""
 
 from __future__ import annotations
 

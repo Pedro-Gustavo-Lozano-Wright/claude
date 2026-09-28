@@ -1,4 +1,4 @@
-"""Procesos de audio que generan un archivo nuevo (E20): reducción de ruido.
+"""Procesos de audio que generan un archivo nuevo: reducción de ruido.
 
 El resultado se importa como un Bruto nuevo: el original queda intacto y el
 cambio se ve (y se deshace) como cualquier importación.

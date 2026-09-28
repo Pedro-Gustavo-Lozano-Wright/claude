@@ -1,4 +1,4 @@
-"""Conversión de fotogramas nativos a 24 fps (T7.6, PROJECT.md 6.7).
+"""Conversión de fotogramas nativos a 24 fps.
 
 Entrada: los fotogramas del tramo en orden, cada uno con su instante en
 segundos. Salida: los fotogramas a 24 fps según el método:

@@ -1,4 +1,4 @@
-"""Mantenimiento del proyecto (E18): espacio en disco, tamaños, caché, papelera y Brutos sin uso.
+"""Mantenimiento del proyecto: espacio en disco, tamaños, caché, papelera y Brutos sin uso.
 
 - `comprobar_espacio` se llama antes de hornear y renderizar (importar ya lo hace).
 - `limpiar_parciales` borra al abrir los restos de trabajos interrumpidos (renders,

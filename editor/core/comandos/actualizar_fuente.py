@@ -1,4 +1,4 @@
-"""Actualizar las copias de una Pieza después de volver a hornearla (T6.8).
+"""Actualizar las copias de una Pieza después de volver a hornearla.
 
 Cada Elemento que es copia de la Pieza toma la versión nueva, su duración de
 fuente y sus datos de medio. Si las asas de inicio cambiaron, `fuente_entrada`
@@ -6,7 +6,7 @@ se corrige para que siga viéndose el mismo tramo. El archivo materializado se
 reemplaza en el siguiente guardado (la versión distinta lo delata).
 
 Las copias pueden estar en capítulos no cargados: quien llama (el servicio de
-horneado, E9) indica qué capítulos tocar, según las copias de `_pieza.json`.
+horneado) indica qué capítulos tocar, según las copias de `_pieza.json`.
 """
 
 from __future__ import annotations

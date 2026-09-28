@@ -1,8 +1,8 @@
-"""Transiciones: se guardan en el Elemento entrante (PROJECT.md, 8.3).
+"""Transiciones: se guardan en el Elemento entrante.
 
 Su duración es el solape permitido con el Elemento anterior de la misma capa.
-Cada tipo tiene un descriptor (como los efectos) para que la interfaz y los
-plugins (E23) lo traten igual.
+Cada tipo tiene un descriptor (como los efectos) para que la interfaz los
+muestre a todos igual.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ class DescriptorTransicion:
     usa_direccion: bool = False
 
 
-# Registro ampliable: los plugins (E23) agregan sus tipos con `registrar_tipo_transicion`.
+# Registro ampliable: `registrar_tipo_transicion` agrega tipos nuevos con su descriptor.
 _DESCRIPTORES: dict[str, DescriptorTransicion] = {
     d.tipo: d for d in (
         DescriptorTransicion(FUNDIDO, "Fundido"),

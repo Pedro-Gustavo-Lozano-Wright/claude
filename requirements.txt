@@ -1,4 +1,4 @@
-# Python 3.13 recomendado (mínimo 3.12, lo exige numpy). Solo Linux (dependencias de sistema en PROJECT.md, 15.4).
+# Python 3.13 recomendado (mínimo 3.12, lo exige numpy). Solo Linux (dependencias de sistema en README.md, sección 2).
 # Las piezas de Flet deben ir en la misma versión: flet-video, flet-audio y flet-desktop fijan flet==<misma>.
 flet[desktop]==1.0.2   # el extra desktop trae el cliente de escritorio (sin él no abre ventana)
 flet-video==1.0.2      # reproducción fluida del pre-render (nivel 3)

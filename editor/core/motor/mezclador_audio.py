@@ -1,7 +1,7 @@
-"""Mezclador de audio (E8).
+"""Mezclador de audio.
 
 Rejilla exacta: 48 000 / 24 = **2000 muestras por fotograma**, así audio y
-video se alinean sin redondeos (T8.1).
+video se alinean sin redondeos.
 
 Para un rango de fotogramas del capítulo mezcla todo lo que suena
 (`Capitulo.sonoros_activos_en`, que respeta silencio, solo e idioma):

@@ -2,8 +2,8 @@
 
 Los capítulos se cargan **bajo demanda**: el proyecto conoce qué capítulos
 existen (`indice_capitulos`) y pide cada uno a un cargador inyectado por
-`proyecto_fs` (E5) cuando se necesita. Así el modelo no depende del disco
-(PROJECT.md, 14.2) y abrir un proyecto con 1000 capítulos es inmediato.
+`proyecto_fs` cuando se necesita. Así el modelo no depende del disco
+ y abrir un proyecto con 1000 capítulos es inmediato.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class Proyecto:
     def registrar_ids_cargados(self) -> None:
         """Reserva los IDs presentes en lo cargado en memoria.
 
-        Los IDs de capítulos sin cargar se reservan desde `_proyecto.json` (E5).
+        Los IDs de capítulos sin cargar se reservan desde `_proyecto.json`.
         """
         for bruto in self.taller.brutos.values():
             self.ids.registrar(bruto.id)
@@ -134,7 +134,7 @@ class Proyecto:
 
     def reconstruir_referencias(self) -> None:
         """Reconstruye el índice con lo cargado; las copias de capítulos sin cargar
-        se conocen por las referencias guardadas en cada `_pieza.json` (E5)."""
+        se conocen por las referencias guardadas en cada `_pieza.json`."""
         self.referencias.reconstruir(self)
 
     @property

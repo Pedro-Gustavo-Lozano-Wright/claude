@@ -1,4 +1,4 @@
-"""Diario de operaciones de disco (T5.7).
+"""Diario de operaciones de disco.
 
 Un guardado es una secuencia de operaciones. Antes de tocar nada se escribe el
 plan completo en `.diario/plan.json`; después se ejecuta paso a paso,

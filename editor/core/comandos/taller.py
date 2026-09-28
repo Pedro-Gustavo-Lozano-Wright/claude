@@ -1,8 +1,8 @@
-"""Comandos del Taller: Brutos y Piezas (T6.8).
+"""Comandos del Taller: Brutos y Piezas.
 
-Importar un archivo (copiarlo y analizarlo) es un servicio (E9); el comando
+Importar un archivo (copiarlo y analizarlo) es un servicio; el comando
 solo registra el Bruto resultante en el modelo. Cambiar la receta de una Pieza
-la marca como no horneada; hornear también es un servicio (E9).
+la marca como no horneada; hornear también es un servicio.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from editor.core.tiempo.nomenclatura import es_nombre_valido
 class _EdicionTaller(Comando):
     """Guarda una copia del Bruto o la Pieza antes de cambiarlo; deshacer la restaura.
 
-    El horneado es estado automático (PROJECT.md, 22.7): deshacer y rehacer nunca
+    El horneado es estado automático: deshacer y rehacer nunca
     lo revierten. Se conserva el de la Pieza en memoria y, si deshacer la quita,
     se guarda aparte para devolvérselo al rehacer.
     """
@@ -111,7 +111,7 @@ class QuitarBruto(_EdicionTaller):
 
 
 class InterpretarFps(_EdicionTaller):
-    """Fija el fps con el que se interpreta un Bruto (PROJECT.md, 6.7). None = volver al medido."""
+    """Fija el fps con el que se interpreta un Bruto. None = volver al medido."""
 
     descripcion = "Interpretar fps"
 

@@ -1,4 +1,4 @@
-"""Poner y mover keyframes (T6.5).
+"""Poner y mover keyframes.
 
 `propiedad` es una propiedad animable del Elemento (espacio o audio) o, con
 `indice_efecto`, un parámetro de uno de sus efectos. `f` es relativo al

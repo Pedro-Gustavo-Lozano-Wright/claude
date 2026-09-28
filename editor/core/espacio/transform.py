@@ -1,6 +1,6 @@
 """Transformación espacial de un Elemento en píxeles del lienzo.
 
-Todas las propiedades se combinan en una sola matriz afín (PROJECT.md, 7.3):
+Todas las propiedades se combinan en una sola matriz afín:
 
     M = Trasladar(x, y) · Rotar(rotacion) · Escalar(escala_x, escala_y) · Trasladar(-ancla_x, -ancla_y)
 
@@ -122,7 +122,7 @@ class Recorte:
 
 @dataclass(frozen=True)
 class Transform:
-    """Puesta en escena de un Elemento sobre el lienzo (PROJECT.md, 7.2)."""
+    """Puesta en escena de un Elemento sobre el lienzo."""
 
     x: float = 0.0
     y: float = 0.0

@@ -1,4 +1,4 @@
-"""Slide: mover un Elemento ajustando a sus vecinos contiguos (T6.6).
+"""Slide: mover un Elemento ajustando a sus vecinos contiguos.
 
 El contenido del Elemento no cambia. El vecino anterior (que terminaba justo
 donde empezaba) se alarga o acorta por su salida; el siguiente (que empezaba

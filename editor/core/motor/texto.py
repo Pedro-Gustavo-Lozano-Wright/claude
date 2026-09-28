@@ -1,10 +1,10 @@
-"""Dibujo de textos con Pillow (T7.5).
+"""Dibujo de textos con Pillow.
 
 El texto se dibuja al tamaño del destino (nítido en vista previa, Shorts o
 4K) y se devuelve en RGBA no premultiplicado. Su tamaño natural en el lienzo
 es el de la imagen dividido por la escala.
 
-Animaciones de entrada y salida (PROJECT.md, E19): fundido, deslizar arriba o
+Animaciones de entrada y salida: fundido, deslizar arriba o
 abajo, escribir (letra a letra) y escala.
 """
 

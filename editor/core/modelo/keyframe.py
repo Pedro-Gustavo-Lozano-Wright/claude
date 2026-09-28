@@ -1,7 +1,7 @@
 """Keyframes: valores de un parámetro a lo largo del tiempo.
 
 Los fotogramas de un keyframe son **relativos al inicio del Elemento** (o del
-Short), así que mover el Elemento no obliga a reescribirlos (PROJECT.md, 6.2).
+Short), así que mover el Elemento no obliga a reescribirlos.
 La curva de un keyframe gobierna el tramo que va desde él hasta el siguiente.
 """
 
