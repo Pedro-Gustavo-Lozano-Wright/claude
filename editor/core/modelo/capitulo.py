@@ -240,8 +240,9 @@ class Capitulo:
 
     def siguiente_version(self, desde: int | None, hasta: int | None) -> int:
         """Versión siguiente para un entregable con ese alcance."""
-        versiones = [
-            r.nombre.version for r in self.renders
-            if r.nombre.desde == desde and r.nombre.hasta == hasta
-        ]
+        def alcance(inicio: int | None, fin: int | None) -> tuple[int | None, int | None]:
+            return inicio, fin if fin is not None else inicio
+
+        objetivo = alcance(desde, hasta)
+        versiones = [r.nombre.version for r in self.renders if alcance(r.nombre.desde, r.nombre.hasta) == objetivo]
         return max(versiones, default=0) + 1

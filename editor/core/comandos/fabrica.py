@@ -135,6 +135,7 @@ def elemento_texto(
         tiempo=TiempoElemento(inicio=inicio, duracion=duracion, fuente_entrada=0),
         fuente=ReferenciaFuente(TipoFuente.TEXTO),
         texto=ContenidoTexto(texto=texto),
-        espacio=Transform(x=LIENZO.ancho / 2, y=LIENZO.alto * 0.8),
+        # Tercio inferior izquierdo, dentro del margen seguro de títulos (10 %).
+        espacio=Transform(x=LIENZO.ancho * 0.1, y=LIENZO.alto * 0.78),
         en_global=en_global,
     )

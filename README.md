@@ -13,7 +13,7 @@ La arquitectura completa, las decisiones y las épicas están en
 |---|---|---|
 | A — Fundamentos | E0 fundación · E1 base transversal · E2 tiempo y nomenclatura · E3 espacio · E4 modelo | ✅ Código escrito y auditado (revisión 4) |
 | B — Persistencia y edición | E5 disco · E6 comandos | ✅ Código escrito |
-| C — Motor y servicios | E7–E11 | Pendiente |
+| C — Motor y servicios | E7–E11 | ✅ Código escrito y verificado con medios reales |
 | D — Interfaz | E12–E16 | Pendiente |
 | E — Capacidades creativas | E17–E20 | Pendiente |
 | F — Cierre | E21–E22 | Pendiente |
@@ -42,7 +42,8 @@ python main.py                                    # interfaz (E12)
 python main.py RUTA_PROYECTO                      # interfaz con un proyecto (E12)
 python main.py --nuevo RUTA_PROYECTO              # crear proyecto ✅
 python main.py --escanear RUTA_PROYECTO           # revisar el proyecto en disco ✅
-python main.py --render RUTA --capitulo 1 --minutos 00-05   # render sin interfaz (E10)
+python main.py --render RUTA --capitulo 1 --minutos 00-05   # render sin interfaz ✅ (--por-idioma: un archivo por idioma)
+python main.py --fotograma RUTA --capitulo 1 --tiempo 02:12.08 --salida f.png  # exportar un fotograma ✅
 python main.py --shorts RUTA --capitulo 1         # Shorts verticales (E20)
 ```
 

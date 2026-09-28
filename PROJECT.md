@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 6. Fases A (E0–E4) y B (E5–E6) implementadas y auditadas. Siguiente bloque: Fase C (motor y servicios, E7–E11).
+- **Estado:** revisión 7. Fases A, B y C (E0–E11) implementadas y verificadas con medios reales. Siguiente bloque: Fase D (interfaz, E12–E16).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 6](#0-cambios-de-las-revisiones-2-a-6)
+0. [Cambios de las revisiones 2 a 7](#0-cambios-de-las-revisiones-2-a-7)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,37 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 6
+## 0. Cambios de las revisiones 2 a 7
+
+### Revisión 7: Fase C (motor y servicios) implementada
+
+**Verificación con medios reales** (sintéticos, fuera del repositorio): video de
+30 fps con audio, PNG con transparencia y música WAV.
+
+| Qué se comprobó | Resultado |
+|---|---|
+| Análisis al importar | 30 fps declarado y medido, sin fps variable, alfa del PNG, duración de la música |
+| Horneado 30 → 24 fps | Tramo de 3 s = 72 fotogramas + 24 de asa a cada lado; conformar, mezcla e interpolación también |
+| Composición | Exacta al fotograma (se ve el fotograma nativo esperado), escala "llenar", PNG con alfa girado y con opacidad animada, texto con contorno, efecto de saturación |
+| Render de un minuto | 1280×720, 24 fps, **1440 fotogramas, 60,00 s**, dos pistas de audio etiquetadas `spa` y `eng` |
+| Caché de minutos | Segundo render del mismo minuto: 1,5 s en vez de 26,7 s |
+| Vista previa nivel 2 (banco, 256×144) | ~**218 fps** en el contenedor de desarrollo (el objetivo era 10–15) |
+| Fotograma exacto 1280×720 (nivel 4) | ~130 ms |
+| Cola de tareas | Prioridades, reemplazo por clave, errores informados sin detener la cola |
+| `main.py` | `--render` (con `--por-idioma`), `--fotograma`, `--escanear` |
+
+**Corregido durante la implementación**: versiones de render que confundían
+"minuto 5" con "rango 5-5"; un render nuevo podía pisar un archivo existente no
+registrado; el archivo horneado viejo quedaba huérfano al cambiar de formato;
+posición inicial de los textos (ahora en el tercio inferior izquierdo).
+
+**Límites conocidos (para épicas posteriores)**
+
+| Límite | Dónde se mejora |
+|---|---|
+| Cambiar velocidad o conformar cambia el tono del audio (estiramiento simple) | E18 (estiramiento que conserve el tono) |
+| Una Pieza con tramos de distinta relación de aspecto se estira al tamaño del primero | E15 (ajuste por tramo) |
+| Sin VAAPI en el PyAV binario | 15.4 (compilar PyAV) |
 
 ### Revisión 6: auditoría de la Fase B e integración con la Fase C
 
@@ -1705,7 +1735,12 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | Revisión 4 | ✅ | Correcciones A1–A10 aplicadas; marcadores y estado de capas; carga perezosa de capítulos |
 | E5 | ✅ | `serializacion`, `gemelo`, `manifiestos`, `estructura`, `bloqueo`, `estado_disco` (nuevo: último estado conocido), `diario`, `escaner` (carga perezosa e `Informe`), `reconciliador` (fases A/B/C, papelera, conflictos, materialización simple), `guion`, `autosave`; `main.py --nuevo` y `--escanear` |
 | E6 | ✅ | `comando` (contrato, `EdicionCapitulo` con deshacer por instantáneas, IDs reservados, fusión de gestos), `compuesto`, `historial` (marca de guardado, eventos), `operaciones` y `fabrica` (nuevos), y los comandos de T6.4–T6.10, capas y marcadores (`capas.py`), rangos (`colocacion.py`) y Taller (`taller.py`) |
-| E7 en adelante | Pendiente | |
+| E7 | ✅ | `motor_base`, `decodificador` (búsqueda exacta, reapertura si el archivo cambia), `cache_fotogramas`, `compositor` (descarte, región de interés, transiciones, modos de mezcla, ventana para Shorts), `texto` (con animaciones), `efectos/` (registro ampliable: brillo, contraste, saturación, temperatura, desenfoque, nitidez, croma, LUT), `conversion_fps` (5 métodos), `codificador` (H.264, NVENC, ProRes 4444, AAC, WAV) |
+| E8 | ✅ | `mezclador_audio`: 2000 muestras por fotograma, velocidad y reversa, rampas de volumen y paneo, cruces por transición, idiomas, limitador |
+| E9 | ✅ | `tareas/cola` y servicios `fuentes`, `importacion` (fps medido y fps variable), `horneado` (+ `aplicar_horneado`), `banco` (+ `GestorFuentesBanco`), `miniaturas`, `forma_onda` |
+| E10 | ✅ | `huellas` (video por minuto, audio por idioma), `render` (caché de minutos, modos `pistas` y `archivos`, `registrar`), `ensamblado` (sin recodificar, faststart); `main.py --render` y `--fotograma` |
+| E11 | ✅ | `vista_previa` (niveles 1–4, audio por rango, pre-render por minuto, `RelojAudio`) y `guardado` (materialización pendiente, autosave) |
+| E12 en adelante | Pendiente | |
 
 ### Decisiones tomadas al implementar la Fase B
 
@@ -1744,9 +1779,9 @@ Metas, no garantías.
 |---|---|
 | Banco al hornear | Más rápido que el tiempo real |
 | Scrubbing | < 50 ms |
-| Vista previa en vivo | 256×144 a 640×360 · 10–15 fps · 3–4 capas de video · audio sincronizado |
+| Vista previa en vivo | 256×144 a 640×360 · 10–15 fps · 3–4 capas de video · audio sincronizado (**medido: ~218 fps a 256×144** con 3 capas) |
 | Vista previa fluida | 960×540 · 24 fps |
-| Fotograma exacto en pausa | ~150–300 ms |
+| Fotograma exacto en pausa | ~150–300 ms (**medido: ~130 ms a 1280×720**) |
 | Timeline | 200–300 Elementos fluidos |
 | Render final | 720p por defecto, hasta 4K · H.264 / H.265 · hardware si hay GPU |
 | Deshacer | 100 pasos |
@@ -1946,6 +1981,23 @@ API del núcleo que usa la Fase C:
 | Ventana de un Short | `Short.rect_en(f)` |
 | Lo que afecta a un minuto | `Capitulo.que_afecta_al_minuto(n)` + `serializacion.huella(...)` |
 | Resultado del guardado | `ResultadoGuardado.pendientes` / `.errores` / `.conflictos` |
+
+### 22.9 Cómo usa la interfaz (Fase D) la Fase C
+
+| Necesidad de la pantalla | Llamada | Dónde corre |
+|---|---|---|
+| Imagen del monitor al mover el cabezal o editar | `ServicioVistaPrevia.fotograma_rapido(copia_capitulo, f, tamaño)` → bytes JPEG | Tarea prioridad 1 con `clave="monitor"` (la nueva reemplaza a la vieja) |
+| Imagen en pausa | `fotograma_exacto(...)` | Tarea prioridad 1, `clave="monitor"` |
+| Reproducción fluida | `prerender_minuto(...)` → `.mp4` para `flet_video.Video` | Tarea prioridad 3 (minuto actual) o 5 (resto), `clave` por minuto |
+| Audio del transporte | `audio(capitulo, inicio, fin, idioma)` → `.wav` para `flet_audio.Audio` + `RelojAudio` | Tarea prioridad 3 |
+| Tras importar | `importacion.preparar_bruto` (principal) → `copiar_y_analizar` (tarea) → `AgregarBruto` + `BrutoImportado` (principal) | — |
+| Tras hornear | `horneado.hornear` (tarea) → `aplicar_horneado` (principal) → `banco.generar`, `miniaturas`, `forma_onda` (tareas) → `ServicioVistaPrevia.actualizar_taller` | — |
+| Guardar | `ServicioGuardado.guardar()`; `en_hilo_principal` = función que usa `page.run_thread` | Principal |
+| Renderizar | `render.PedidoRender.crear` (principal) → `renderizar` (tarea prioridad 6) → `render.registrar` (principal) | — |
+| Minutos listos para reproducir | `minutos_listos(capitulo, idioma)` → barra verde/roja del mapa | Principal (solo comprueba archivos) |
+
+Regla: todo `al_terminar` de una tarea llega en un hilo de trabajo; la app lo
+pasa al hilo de Flet antes de tocar el modelo o la interfaz.
 
 ---
 

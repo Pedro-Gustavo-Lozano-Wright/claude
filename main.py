@@ -77,6 +77,10 @@ def crear_analizador() -> argparse.ArgumentParser:
     modos.add_argument("--render", type=Path, metavar="RUTA", help="renderizar sin interfaz")
     modos.add_argument("--escanear", type=Path, metavar="RUTA", help="reconstruir el modelo desde el disco")
     modos.add_argument("--shorts", type=Path, metavar="RUTA", help="renderizar los Shorts desactualizados")
+    modos.add_argument("--fotograma", type=Path, metavar="RUTA", help="exportar un fotograma a PNG")
+    analizador.add_argument("--tiempo", help="instante para --fotograma: MM:SS.FF (p. ej. 02:12.08)")
+    analizador.add_argument("--salida", type=Path, help="archivo PNG para --fotograma")
+    analizador.add_argument("--por-idioma", action="store_true", help="con --render: un archivo por idioma")
     analizador.add_argument("--capitulo", type=numero_capitulo, help="capítulo para --render y --shorts")
     analizador.add_argument("--minutos", type=rango_minutos, help="rango de minutos para --render, p. ej. 00-05")
     analizador.add_argument("--nivel-registro", default=None, help="DEBUG, INFO, WARNING o ERROR")
@@ -84,11 +88,13 @@ def crear_analizador() -> argparse.ArgumentParser:
 
 
 def validar_argumentos(analizador: argparse.ArgumentParser, argumentos: argparse.Namespace) -> None:
-    sin_interfaz = argumentos.render or argumentos.escanear or argumentos.shorts or argumentos.nuevo
+    sin_interfaz = argumentos.render or argumentos.escanear or argumentos.shorts or argumentos.nuevo or argumentos.fotograma
     if sin_interfaz and argumentos.proyecto is not None:
         analizador.error("La ruta del proyecto se indica en el propio modo, no como argumento suelto.")
-    if (argumentos.render or argumentos.shorts) and argumentos.capitulo is None:
-        analizador.error("--render y --shorts necesitan --capitulo.")
+    if (argumentos.render or argumentos.shorts or argumentos.fotograma) and argumentos.capitulo is None:
+        analizador.error("--render, --shorts y --fotograma necesitan --capitulo.")
+    if argumentos.fotograma and not argumentos.tiempo:
+        analizador.error("--fotograma necesita --tiempo MM:SS.FF.")
     if argumentos.minutos is not None and not argumentos.render:
         analizador.error("--minutos solo se usa con --render.")
 
@@ -146,9 +152,87 @@ def modo_escanear(contexto: Contexto, ruta: Path) -> int:
     return SALIDA_OK
 
 
-def modo_render(contexto: Contexto, ruta: Path, capitulo: int, minutos: range | None) -> int:
-    alcance = "capítulo completo" if minutos is None else f"minutos {minutos.start:02d}-{minutos.stop - 1:02d}"
-    return pendiente(f"--render {ruta} (capítulo {capitulo}, {alcance})", "E10")
+def _abrir_para_servicio(ruta: Path):
+    from editor.core.proyecto_fs.bloqueo import ProyectoBloqueado
+    from editor.core.proyecto_fs.escaner import NoEsProyecto, abrir_proyecto
+
+    try:
+        return abrir_proyecto(ruta)
+    except (NoEsProyecto, ProyectoBloqueado) as error:
+        registro.error("%s", error)
+        return None
+
+
+def _progreso_en_consola(contexto: Contexto) -> None:
+    from editor.core.eventos import TareaProgreso
+
+    ultimo = {"texto": ""}
+
+    def mostrar(evento: TareaProgreso) -> None:
+        texto = f"{evento.descripcion} {round(evento.fraccion * 100):3d} %"
+        if texto != ultimo["texto"]:
+            ultimo["texto"] = texto
+            print(f"\r{texto:<60}", end="", flush=True)
+
+    contexto.bus.suscribir(TareaProgreso, mostrar)
+
+
+def modo_render(contexto: Contexto, ruta: Path, capitulo: int, minutos: range | None, por_idioma: bool = False) -> int:
+    from editor.core.servicios import render
+    from editor.core.tareas.cola import ejecutar_ahora
+
+    apertura = _abrir_para_servicio(ruta)
+    if apertura is None:
+        return SALIDA_ERROR
+    try:
+        proyecto = apertura.proyecto
+        if not proyecto.existe_capitulo(capitulo):
+            registro.error("No existe el capítulo %d.", capitulo)
+            return SALIDA_ERROR
+        desde = None if minutos is None else minutos.start
+        hasta = None if minutos is None else minutos.stop - 1
+        pedido = render.PedidoRender.crear(
+            proyecto, capitulo, desde, hasta, modo=render.ARCHIVOS if por_idioma else render.PISTAS
+        )
+        _progreso_en_consola(contexto)
+        resultado = ejecutar_ahora(lambda c: render.renderizar(pedido, c), "render", contexto.bus)
+        render.registrar(proyecto, apertura.estado, resultado, contexto.bus)
+        print()
+        for archivo in resultado.archivos:
+            print(f"Render: {archivo}")
+        return SALIDA_OK
+    finally:
+        apertura.cerrar()
+
+
+def modo_fotograma(contexto: Contexto, ruta: Path, capitulo: int, tiempo: str, salida: Path | None) -> int:
+    import re
+
+    from PIL import Image
+
+    from editor.core.motor.compositor import FINAL, Compositor
+    from editor.core.motor.decodificador import GestorFuentes
+    from editor.core.proyecto_fs.escaner import NoEsProyecto, abrir_proyecto
+    from editor.core.servicios.fuentes import ResolutorFuentes
+    from editor.core.tiempo.granularidad import componer
+
+    coincidencia = re.fullmatch(r"(\d{1,2}):(\d{2})\.(\d{2})", tiempo)
+    if coincidencia is None:
+        registro.error("Tiempo inválido: %s (formato MM:SS.FF)", tiempo)
+        return SALIDA_ERROR
+    f = componer(*(int(g) for g in coincidencia.groups()))
+    try:
+        apertura = abrir_proyecto(ruta, solo_lectura=True)
+    except NoEsProyecto as error:
+        registro.error("%s", error)
+        return SALIDA_ERROR
+    proyecto = apertura.proyecto
+    compositor = Compositor(GestorFuentes(), ResolutorFuentes.desde(proyecto), proyecto.raiz / "recursos", FINAL)
+    imagen = compositor.componer(proyecto.capitulo(capitulo), f, (proyecto.estandar.lienzo_ancho, proyecto.estandar.lienzo_alto))
+    destino = salida or Path(f"cap{capitulo:04d}_{tiempo.replace(':', '').replace('.', 'f')}.png")
+    Image.fromarray(imagen).save(destino)
+    print(f"Fotograma: {destino}")
+    return SALIDA_OK
 
 
 def modo_shorts(contexto: Contexto, ruta: Path, capitulo: int) -> int:
@@ -171,7 +255,9 @@ def main(argv: list[str] | None = None) -> int:
     if argumentos.escanear:
         return modo_escanear(contexto, argumentos.escanear)
     if argumentos.render:
-        return modo_render(contexto, argumentos.render, argumentos.capitulo, argumentos.minutos)
+        return modo_render(contexto, argumentos.render, argumentos.capitulo, argumentos.minutos, argumentos.por_idioma)
+    if argumentos.fotograma:
+        return modo_fotograma(contexto, argumentos.fotograma, argumentos.capitulo, argumentos.tiempo, argumentos.salida)
     if argumentos.shorts:
         return modo_shorts(contexto, argumentos.shorts, argumentos.capitulo)
     return modo_interfaz(contexto, argumentos.proyecto)
