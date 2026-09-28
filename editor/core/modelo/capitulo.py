@@ -26,6 +26,15 @@ from editor.core.tiempo import granularidad
 from editor.core.tiempo.nomenclatura import NombreRender, codigo_capitulo, validar_numero_capitulo
 
 
+@dataclass(frozen=True)
+class TransicionActiva:
+    """Dos Elementos de una misma capa que se solapan por una transición en un fotograma."""
+
+    saliente: Elemento
+    entrante: Elemento
+    progreso: float  # 0.0 al empezar la transición, 1.0 al terminar
+
+
 @dataclass
 class RegistroRender:
     """Entregable ya producido (minuto, rango o capítulo completo)."""
@@ -180,6 +189,26 @@ class Capitulo:
         ]
         candidatos.extend(self.global_.sonoros_activos_en(f))
         return [e for e in candidatos if self.se_oye(e, idioma)]
+
+    def transiciones_activas(self, f: int) -> list[TransicionActiva]:
+        """Transiciones en curso en f: el compositor mezcla ambos lados según `progreso`."""
+        resultado = []
+        activos = self.visuales_activos_en(f) + self.sonoros_activos_en(f)
+        vistos: set[str] = set()
+        for entrante in activos:
+            transicion = entrante.transicion_entrada
+            if entrante.id in vistos or transicion is None or f >= entrante.inicio + transicion.duracion:
+                continue
+            vistos.add(entrante.id)
+            saliente = next(
+                (e for e in activos if e.id != entrante.id and e.capa == entrante.capa
+                 and e.en_global == entrante.en_global and e.inicio < entrante.inicio),
+                None,
+            )
+            if saliente is not None:
+                progreso = (f - entrante.inicio + 1) / transicion.duracion
+                resultado.append(TransicionActiva(saliente, entrante, min(1.0, max(0.0, progreso))))
+        return resultado
 
     def que_afecta_al_minuto(self, numero: int) -> list[Elemento]:
         """Todo lo que influye en el render de un minuto (base de su huella, PROJECT.md 13.2)."""

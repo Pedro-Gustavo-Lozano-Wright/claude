@@ -16,7 +16,7 @@ from editor.core.modelo.pieza import Pieza
 from editor.core.modelo.proyecto import Proyecto
 from editor.core.modelo.short import Short
 from editor.core.proyecto_fs import guion
-from editor.core.proyecto_fs.manifiestos import capitulo_a_datos, minuto_a_datos, proyecto_a_datos
+from editor.core.proyecto_fs.manifiestos import capitulo_a_datos, minuto_a_datos, proyecto_a_datos, renders_a_datos
 from editor.core.proyecto_fs.serializacion import escribir_json_atomico, escribir_texto_atomico
 from editor.core.tiempo import nomenclatura as nom
 
@@ -37,6 +37,10 @@ def carpeta_pieza(raiz: Path, pieza: Pieza) -> Path:
 
 def ruta_manifiesto_pieza(raiz: Path, pieza: Pieza) -> Path:
     return carpeta_pieza(raiz, pieza) / nom.ARCHIVO_PIEZA
+
+
+def ruta_manifiesto_horneado(raiz: Path, pieza: Pieza) -> Path:
+    return carpeta_pieza(raiz, pieza) / nom.ARCHIVO_HORNEADO
 
 
 def ruta_horneado(raiz: Path, pieza: Pieza) -> Path | None:
@@ -72,6 +76,10 @@ def ruta_manifiesto_minuto(raiz: Path, capitulo: int, minuto: int) -> Path:
 
 def ruta_guion(raiz: Path, capitulo: int, minuto: int) -> Path:
     return nom.carpeta_minuto(raiz, capitulo, minuto) / nom.ARCHIVO_GUION
+
+
+def ruta_renders(raiz: Path, capitulo: int) -> Path:
+    return nom.carpeta_render(raiz, capitulo) / nom.ARCHIVO_RENDERS
 
 
 def ruta_receta_short(raiz: Path, capitulo: int, short: Short) -> Path:
@@ -128,6 +136,7 @@ def crear_carpetas_capitulo(raiz: Path, capitulo: Capitulo) -> None:
     for carpeta in (nom.carpeta_global, nom.carpeta_render, nom.carpeta_shorts):
         carpeta(raiz, numero).mkdir(parents=True, exist_ok=True)
     escribir_json_atomico(ruta_manifiesto_capitulo(raiz, numero), capitulo_a_datos(capitulo))
+    escribir_json_atomico(ruta_renders(raiz, numero), renders_a_datos(capitulo))
     for minuto in capitulo.minutos:
         escribir_json_atomico(ruta_manifiesto_minuto(raiz, numero, minuto.numero), minuto_a_datos(minuto))
         escribir_texto_atomico(ruta_guion(raiz, numero, minuto.numero), guion.generar(capitulo, minuto.numero))

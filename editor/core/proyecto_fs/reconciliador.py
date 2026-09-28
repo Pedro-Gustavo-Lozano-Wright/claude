@@ -42,9 +42,11 @@ from editor.core.proyecto_fs.gemelo import elemento_a_datos, short_a_datos
 from editor.core.proyecto_fs.manifiestos import (
     Copia,
     capitulo_a_datos,
+    horneado_a_datos,
     minuto_a_datos,
     pieza_a_datos,
     proyecto_a_datos,
+    renders_a_datos,
 )
 from editor.core.proyecto_fs.serializacion import huella, huella_texto, json_legible
 from editor.core.tiempo import nomenclatura as nom
@@ -86,6 +88,8 @@ class ResultadoGuardado:
     operaciones: int = 0
     conflictos: list[Conflicto] = field(default_factory=list)
     pendientes: list[Materializacion] = field(default_factory=list)
+    # Pasos del diario que no se pudieron completar (el resto sí se aplicó).
+    errores: list[str] = field(default_factory=list)
 
 
 class SoloLectura(PermissionError):
@@ -228,6 +232,7 @@ def _planificar_capitulo(c: _Constructor, capitulo: Capitulo, huerfanos: dict[st
         _planificar_elemento(c, numero, elemento, registro_elemento)
 
     _planificar_control(c, estructura.ruta_manifiesto_capitulo(raiz, numero), capitulo_a_datos(capitulo), estado_cap.control)
+    _planificar_control(c, estructura.ruta_renders(raiz, numero), renders_a_datos(capitulo), estado_cap.control)
     for minuto in capitulo.minutos:
         _planificar_control(
             c, estructura.ruta_manifiesto_minuto(raiz, numero, minuto.numero), minuto_a_datos(minuto), estado_cap.control
@@ -306,7 +311,9 @@ def _planificar_materializacion(c: _Constructor, capitulo: int, elemento: Elemen
     if elemento.fuente.tipo is TipoFuente.PIEZA:
         pieza = taller.piezas.get(elemento.fuente.ref)
         if pieza is not None and pieza.horneado is not None and pieza.horneado.archivo is not None:
-            origen = pieza.horneado.archivo
+            # Ruta que tendrá tras este guardado: la carpeta de la Pieza puede moverse
+            # en el mismo plan (renombre), y las copias se hacen después de los movimientos.
+            origen = estructura.ruta_horneado(c.raiz, pieza)
             extension_origen = pieza.horneado.extension
     elif elemento.fuente.tipo is TipoFuente.BRUTO:
         bruto = taller.brutos.get(elemento.fuente.ref)
@@ -358,15 +365,16 @@ def _planificar_taller(c: _Constructor) -> None:
     for pieza in taller.piezas.values():
         carpeta_nueva = c.rel(estructura.carpeta_pieza(raiz, pieza))
         conocido = c.estado.piezas.get(pieza.id)
-        if conocido is not None:
-            carpeta_vieja = Path(conocido.ruta).parent.as_posix()
-            if carpeta_vieja != carpeta_nueva and c.existe(carpeta_vieja):
-                c.mover(carpeta_vieja, carpeta_nueva)
-                if pieza.horneado is not None:
-                    nombre_viejo = f"{Path(carpeta_vieja).name}.{pieza.horneado.extension}"
-                    nombre_nuevo = pieza.nombre_archivo().archivo(pieza.horneado.extension)
-                    c.fase_c.append(Operacion(MOVER, f"{carpeta_nueva}/{nombre_nuevo}", f"{carpeta_nueva}/{nombre_viejo}"))
-        else:
+        carpeta_vieja = _carpeta_actual_de_pieza(c, pieza)
+        movida = False
+        if carpeta_vieja is not None and carpeta_vieja != carpeta_nueva and c.existe(carpeta_vieja):
+            c.mover(carpeta_vieja, carpeta_nueva)
+            movida = True
+            if pieza.horneado is not None:
+                nombre_viejo = f"{Path(carpeta_vieja).name}.{pieza.horneado.extension}"
+                nombre_nuevo = pieza.nombre_archivo().archivo(pieza.horneado.extension)
+                c.fase_c.append(Operacion(MOVER, f"{carpeta_nueva}/{nombre_nuevo}", f"{carpeta_nueva}/{nombre_viejo}"))
+        elif carpeta_vieja is None:
             c.carpeta(raiz / carpeta_nueva)
         datos = pieza_a_datos(pieza, _copias_actuales(c.proyecto, c.estado, pieza.id))
         destino = f"{carpeta_nueva}/{nom.ARCHIVO_PIEZA}"
@@ -375,9 +383,44 @@ def _planificar_taller(c: _Constructor) -> None:
                 c.verificar(conocido.ruta, conocido.firma)
             c.escribir(destino, json_legible(datos), {destino, conocido.ruta} if conocido else {destino})
 
+        datos_horneado = horneado_a_datos(pieza.horneado)
+        destino_horneado = f"{carpeta_nueva}/{nom.ARCHIVO_HORNEADO}"
+        conocido_horneado = c.estado.horneados.get(pieza.id)
+        en_su_lugar = conocido_horneado is not None and (
+            movida or Path(conocido_horneado.ruta).parent.as_posix() == carpeta_nueva
+        )
+        if not en_su_lugar or conocido_horneado is None or conocido_horneado.huella != huella(datos_horneado):
+            if conocido_horneado is not None:
+                c.verificar(conocido_horneado.ruta, conocido_horneado.firma)
+            propias = {destino_horneado} | ({conocido_horneado.ruta} if conocido_horneado else set())
+            c.escribir(destino_horneado, json_legible(datos_horneado), propias)
+
     for identificador, relativa in c.estado.brutos.items():
         if identificador not in taller.brutos and c.existe(relativa):
             c.a_papelera(relativa)
+
+
+def _carpeta_actual_de_pieza(c: _Constructor, pieza) -> str | None:
+    """Dónde está hoy la carpeta de la Pieza en disco (puede tener su nombre anterior).
+
+    Se busca por la receta guardada, por el `_horneado.json` escrito por el servicio
+    o por el archivo horneado: una Pieza horneada y renombrada antes del primer
+    guardado solo se conoce por estos dos últimos.
+    """
+    candidatos = []
+    if pieza.id in c.estado.piezas:
+        candidatos.append(Path(c.estado.piezas[pieza.id].ruta).parent.as_posix())
+    if pieza.id in c.estado.horneados:
+        candidatos.append(Path(c.estado.horneados[pieza.id].ruta).parent.as_posix())
+    if pieza.horneado is not None and pieza.horneado.archivo is not None:
+        try:
+            candidatos.append(c.rel(pieza.horneado.archivo.parent))
+        except ValueError:
+            pass
+    for candidato in candidatos:
+        if c.existe(candidato):
+            return candidato
+    return None
 
 
 def _planificar_proyecto(c: _Constructor) -> None:
@@ -404,11 +447,13 @@ def guardar(proyecto: Proyecto, estado: EstadoDisco, solo_lectura: bool = False,
     if plan.conflictos and not forzar:
         diario.limpiar_restos()
         return ResultadoGuardado(False, 0, plan.conflictos, plan.pendientes)
-    if plan.operaciones:
-        diario.ejecutar(plan.operaciones)
+    errores = diario.ejecutar(plan.operaciones) if plan.operaciones else []
     refrescar_estado(proyecto, estado)
-    registro.info("Proyecto guardado: %d operaciones, %d pendientes.", len(plan.operaciones), len(plan.pendientes))
-    return ResultadoGuardado(True, len(plan.operaciones), plan.conflictos, plan.pendientes)
+    registro.info(
+        "Proyecto guardado: %d operaciones, %d pendientes, %d errores.",
+        len(plan.operaciones), len(plan.pendientes), len(errores),
+    )
+    return ResultadoGuardado(True, len(plan.operaciones), plan.conflictos, plan.pendientes, errores)
 
 
 def refrescar_estado(proyecto: Proyecto, estado: EstadoDisco) -> None:
@@ -442,6 +487,8 @@ def refrescar_estado(proyecto: Proyecto, estado: EstadoDisco) -> None:
         estado_cap.control.clear()
         ruta = estructura.ruta_manifiesto_capitulo(raiz, numero)
         estado_cap.control[estructura.relativa(raiz, ruta)] = registro_archivo(ruta, huella(capitulo_a_datos(capitulo)))
+        ruta = estructura.ruta_renders(raiz, numero)
+        estado_cap.control[estructura.relativa(raiz, ruta)] = registro_archivo(ruta, huella(renders_a_datos(capitulo)))
         for minuto in capitulo.minutos:
             ruta = estructura.ruta_manifiesto_minuto(raiz, numero, minuto.numero)
             estado_cap.control[estructura.relativa(raiz, ruta)] = registro_archivo(ruta, huella(minuto_a_datos(minuto)))
@@ -454,11 +501,15 @@ def refrescar_estado(proyecto: Proyecto, estado: EstadoDisco) -> None:
         }
 
     estado.piezas.clear()
+    estado.horneados.clear()
     for pieza in proyecto.taller.piezas.values():
         copias = _copias_actuales(proyecto, estado, pieza.id)
         estado.copias_piezas[pieza.id] = copias
         estado.piezas[pieza.id] = registro_archivo(
             estructura.ruta_manifiesto_pieza(raiz, pieza), huella(pieza_a_datos(pieza, copias))
+        )
+        estado.horneados[pieza.id] = registro_archivo(
+            estructura.ruta_manifiesto_horneado(raiz, pieza), huella(horneado_a_datos(pieza.horneado))
         )
         if pieza.horneado is not None:
             ruta = estructura.ruta_horneado(raiz, pieza)

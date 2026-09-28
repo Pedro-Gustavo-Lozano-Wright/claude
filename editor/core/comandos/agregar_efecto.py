@@ -6,7 +6,7 @@ import copy
 
 from editor.core.comandos.comando import EdicionCapitulo, EdicionRechazada
 from editor.core.modelo.capitulo import Capitulo
-from editor.core.modelo.efecto import TIPOS_EFECTO, Efecto
+from editor.core.modelo.efecto import Efecto, es_tipo_efecto
 from editor.core.modelo.proyecto import Proyecto
 
 
@@ -15,7 +15,7 @@ class AgregarEfecto(EdicionCapitulo):
 
     def __init__(self, capitulo: int, id_elemento: str, efecto: Efecto, indice: int | None = None) -> None:
         super().__init__(capitulo)
-        if efecto.tipo not in TIPOS_EFECTO:
+        if not es_tipo_efecto(efecto.tipo):
             raise ValueError(f"Efecto desconocido: {efecto.tipo!r}")
         self.id_elemento = id_elemento
         self.efecto = copy.deepcopy(efecto)

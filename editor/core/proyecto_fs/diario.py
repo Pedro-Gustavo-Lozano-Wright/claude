@@ -86,13 +86,14 @@ class Diario:
 
     # --- Ejecución ---------------------------------------------------------------
 
-    def ejecutar(self, operaciones: list[Operacion]) -> None:
+    def ejecutar(self, operaciones: list[Operacion]) -> list[str]:
+        """Aplica el plan. Devuelve los pasos que fallaron (los demás se aplicaron)."""
         if self.hay_pendiente():
             raise ErrorDiario("Hay un plan anterior sin completar; hay que recuperarlo primero.")
         self.carpeta.mkdir(parents=True, exist_ok=True)
         escribir_json_atomico(self.ruta_plan, [asdict(op) for op in operaciones])
         self._escribir_progreso(0)
-        self._continuar(operaciones, 0)
+        return self._continuar(operaciones, 0)
 
     def recuperar(self) -> int:
         """Completa un plan interrumpido. Devuelve cuántas operaciones quedaban."""
@@ -108,11 +109,22 @@ class Diario:
         self._continuar(operaciones, hechas)
         return restantes
 
-    def _continuar(self, operaciones: list[Operacion], desde: int) -> None:
+    def _continuar(self, operaciones: list[Operacion], desde: int) -> list[str]:
+        """Un paso que no se puede completar se registra y se sigue con el resto.
+
+        Así un plan nunca queda trabado para siempre; lo que falló aparece como
+        medio fuera de línea o conflicto en el siguiente escaneo.
+        """
+        errores: list[str] = []
         for indice in range(desde, len(operaciones)):
-            self._aplicar(operaciones[indice])
+            try:
+                self._aplicar(operaciones[indice])
+            except (ErrorDiario, OSError) as error:
+                registro.error("Paso %d del guardado falló: %s", indice, error)
+                errores.append(str(error))
             self._escribir_progreso(indice + 1)
         self._terminar()
+        return errores
 
     def _aplicar(self, op: Operacion) -> None:
         destino = self.raiz / op.destino

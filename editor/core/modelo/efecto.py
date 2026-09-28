@@ -21,6 +21,21 @@ NITIDEZ = "nitidez"
 CROMA = "croma"
 TIPOS_EFECTO = (BRILLO, CONTRASTE, SATURACION, TEMPERATURA, LUT, DESENFOQUE, NITIDEZ, CROMA)
 
+# Registro ampliable: los plugins (E21) agregan sus tipos aquí.
+_tipos_registrados: set[str] = set(TIPOS_EFECTO)
+
+
+def registrar_tipo_efecto(tipo: str) -> None:
+    _tipos_registrados.add(tipo)
+
+
+def es_tipo_efecto(tipo: str) -> bool:
+    return tipo in _tipos_registrados
+
+
+def tipos_efecto() -> list[str]:
+    return sorted(_tipos_registrados)
+
 
 @dataclass
 class Efecto:

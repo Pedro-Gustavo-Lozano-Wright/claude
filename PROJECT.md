@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 5. Fases A (E0–E4) y B (E5–E6) implementadas. Siguiente bloque: Fase C (motor y servicios, E7–E11).
+- **Estado:** revisión 6. Fases A (E0–E4) y B (E5–E6) implementadas y auditadas. Siguiente bloque: Fase C (motor y servicios, E7–E11).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 5](#0-cambios-de-las-revisiones-2-a-5)
+0. [Cambios de las revisiones 2 a 6](#0-cambios-de-las-revisiones-2-a-6)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,30 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 5
+## 0. Cambios de las revisiones 2 a 6
+
+### Revisión 6: auditoría de la Fase B e integración con la Fase C
+
+Se ejecutó un recorrido temporal (fuera del repositorio) con **todos los comandos**,
+guardado, deshacer y rehacer de 43 pasos, reapertura y casos límite.
+
+**Errores reales corregidos**
+
+| # | Hallazgo | Corrección |
+|---|---|---|
+| B1 | El estado automático (renders, horneado) estaba mezclado con lo que edita el usuario: un render se perdía al cerrar sin guardar, o guardarlo persistía ediciones no deseadas | Archivos propios: `render/_renders.json` y `_horneado.json`, escritos en el momento por `proyecto_fs/automatico.py` (22.7) |
+| B2 | Una Pieza horneada y renombrada antes del primer guardado perdía su carpeta y su horneado | El reconciliador localiza la carpeta real por receta, `_horneado.json` o archivo horneado |
+| B3 | Las copias hacia los minutos buscaban el horneado en la ruta vieja cuando la carpeta de la Pieza se movía en el mismo guardado | Se copia desde la ruta final (las copias van después de los movimientos) |
+| B4 | Un paso del diario que fallaba dejaba el plan trabado para siempre | El paso se registra como error y se sigue; `ResultadoGuardado.errores` |
+| B5 | Deshacer y rehacer "crear Pieza" perdía su horneado | Los comandos del Taller conservan siempre el horneado vigente |
+| B6 | Deshacer podía devolver a un Elemento una versión de Pieza cuyo archivo ya no existe | `sincronizar_con_fuente` al restaurar |
+| B7 | Importar o hornear sin guardar dejaba archivos huérfanos invisibles | El escáner los informa (`brutos_sin_registrar`, `taller_sin_receta`) |
+| B8 | Los nombres de render no admitían idioma | `cap0001_completo_v002_en.mp4` y Shorts `…_v001_es.mp4` |
+| B9 | Los tipos de efecto y transición eran listas fijas: los plugins no podrían agregar | Registros ampliables (`registrar_tipo_efecto`, `registrar_tipo_transicion`) |
+| B10 | El compositor no tenía cómo saber qué transición está en curso | `Capitulo.transiciones_activas(f)` con saliente, entrante y progreso |
+
+Verificadas como **reglas correctas** (no errores): roll sin material de fuente,
+cambios sobre capas bloqueadas y solapes se rechazan sin tocar el modelo.
 
 ### Revisión 5: versiones, pistas de idioma y funciones de otros editores
 
@@ -722,7 +745,8 @@ MiSerie/                                    ← PROYECTO
 │   └── imagen/  bru0003_logo__0f3a6b.png
 ├── taller/                                 T1 · sandbox
 │   └── pie0001_puerta-abre__5e1c3a/
-│       ├── _pieza.json                     receta + versión + referencias
+│       ├── _pieza.json                     receta + copias (lo que edita el usuario)
+│       ├── _horneado.json                  estado automático: resultado del horneado
 │       └── pie0001_puerta-abre__5e1c3a.mov   horneado normalizado (.mp4 si es opaco)
 ├── recursos/
 │   ├── fuentes/                            .ttf / .otf usados por los textos
@@ -742,8 +766,10 @@ MiSerie/                                    ← PROYECTO
 │   │   └── min00_seg14f00_dur03s00_T1_titulo-capitulo__d4e25c.json
 │   ├── min01/ … min23/
 │   ├── render/
+│   │   ├── _renders.json                   estado automático: entregables y últimos renders
 │   │   ├── cap0001_min00_v003.mp4
-│   │   └── cap0001_completo_v002.mp4
+│   │   ├── cap0001_completo_v002.mp4
+│   │   └── cap0001_completo_v002_en.mp4    versión por idioma
 │   └── shorts/                             ← recortes verticales 9:16
 │       ├── min02_seg10f00_dur45s00_momento-clave__b71c4d.json       receta
 │       └── min02_seg10f00_dur45s00_momento-clave__b71c4d_v001.mp4   720×1280
@@ -1406,6 +1432,7 @@ con los keyframes de la ventana.
     │   │   ├── serializacion.py         conversión canónica (también para huellas)
     │   │   ├── estructura.py  gemelo.py  manifiestos.py  bloqueo.py
     │   │   ├── estado_disco.py          último estado conocido del disco
+    │   │   ├── automatico.py            escribe en el momento renders y horneados
     │   │   ├── diario.py  reconciliador.py  escaner.py
     │   │   ├── guion.py  autosave.py
     │   ├── motor/                       N3
@@ -1692,7 +1719,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | Materialización | El reconciliador copia cuando la fuente tiene la misma extensión; extraer audio y convertir formatos quedan en `pendientes` para el servicio de guardado (E9) |
 | Guardar sin cambios | 0 operaciones: solo se escribe lo que cambió (comparación por huella) |
 | Bloqueo | También impide abrir dos veces el proyecto desde el mismo proceso |
-| Verificación | Sin tests en el repositorio. Se ejecutó un recorrido temporal fuera del repo (crear, editar, guardar, deshacer tras guardar, reabrir, intercambiar minutos, conflicto externo, bloqueo) que encontró y corrigió 3 fallos |
+| Verificación | Sin tests en el repositorio. Recorridos temporales fuera del repo: el primero (crear, editar, guardar, deshacer tras guardar, reabrir, intercambiar minutos, conflicto externo, bloqueo) corrigió 3 fallos; el de la revisión 6 (todos los comandos, 43 pasos de deshacer y rehacer) corrigió B1–B10 |
 
 ### Dependencias entre épicas
 
@@ -1778,6 +1805,7 @@ No se deshace, no dispara huellas ni renders y no se guarda en el proyecto.
 | `capitulo`, `minuto` | Dónde está el usuario | Último por proyecto, en `~/.config/editor/` |
 | `cabezal` | Fotograma del capítulo | Igual |
 | `seleccion` | IDs de Elementos (del capítulo actual) o de un Short | — |
+| `idioma_escucha` | Idioma que suena en la vista previa (por defecto el principal) | — |
 | `herramienta` | Selección, cuchilla, ripple, roll, slip, slide | — |
 | `zoom_timeline`, `desplazamiento_timeline` | Nivel de granularidad y posición | — |
 | `zoom_lienzo` | 25 %, 50 %, 100 %, encajar | — |
@@ -1878,6 +1906,46 @@ Cursores por herramienta; el cabezal y los marcadores con su color en todas las 
 | Medio fuera de línea | Marco rojo en vista previa; acción "rematerializar" si existe la Pieza |
 | Espacio en disco insuficiente | Antes de importar, hornear o renderizar |
 | Error en una tarea de fondo | `TareaTerminada(exito=False)`; aviso con el mensaje; la tarea se puede reintentar |
+
+### 22.7 Estado del usuario y estado automático
+
+| | Estado del usuario | Estado automático |
+|---|---|---|
+| Qué es | Lo que el usuario edita: Elementos, capas, marcadores, Shorts, recetas, títulos | Lo que producen los servicios: horneados, renders, entregables, análisis de Brutos, archivo materializado |
+| Cómo cambia | Solo con comandos (se deshace) | Solo los servicios (no se deshace) |
+| Cuándo se escribe | Al guardar (reconciliador) | En el momento (`proyecto_fs/automatico.py`) |
+| Dónde | Gemelos, `_capitulo.json`, `_minuto.json`, `_pieza.json`, recetas de Shorts, `_proyecto.json` | `render/_renders.json`, `_horneado.json` |
+
+Reglas: deshacer nunca revierte estado automático; los servicios nunca escriben
+archivos del usuario.
+
+### 22.8 Reglas de integración para la Fase C
+
+| Regla | Motivo |
+|---|---|
+| Las tareas de fondo **nunca** llaman a `proyecto.capitulo()` ni modifican el modelo | La carga perezosa y los comandos solo corren en el hilo principal; los trabajadores reciben instantáneas (`copy.deepcopy`) |
+| Un capítulo con pasos en el historial o sin guardar **no se descarga** | Los comandos lo necesitan para deshacer |
+| La interfaz y los servicios se refieren a los Elementos **por ID** | Deshacer restaura copias, no los mismos objetos |
+| `Elemento.archivo` puede estar vacío o desactualizado | Es estado automático; el motor resuelve siempre con `servicios/fuentes.py` (T9.2) y comprueba que exista |
+| Horneado → `automatico.guardar_horneado` → `actualizar_fuente(pieza, asas_anteriores, capítulos)` → `PiezaHorneada` | Los capítulos salen de las copias de `_pieza.json` (`EstadoDisco.copias_piezas`) |
+| Render → `automatico.guardar_renders` → `RenderTerminado` | El registro no depende de que el usuario guarde |
+| Las `Materializacion` pendientes del guardado las resuelve el servicio de guardado | Extraer audio y convertir formatos necesitan el motor |
+
+API del núcleo que usa la Fase C:
+
+| Necesidad | Llamada |
+|---|---|
+| Qué se ve en f | `Capitulo.visuales_activos_en(f)` (ya ordenado de abajo hacia arriba, respeta capas ocultas) |
+| Qué suena en f | `Capitulo.sonoros_activos_en(f, idioma)` (respeta silencio, solo e idioma) |
+| Transiciones en curso | `Capitulo.transiciones_activas(f)` |
+| Fotograma de la fuente | `Elemento.fotograma_fuente(f)` (velocidad, reversa y congelado incluidos) |
+| Transformación y matriz | `Elemento.transform_en(f).matriz_a_resolucion(factor)` |
+| Visibilidad y región | `Lienzo.visibilidad(...)`, `Lienzo.region_interes(..., factor)` |
+| Volumen y paneo | `Elemento.volumen_en(f)`, `Elemento.paneo_en(f)` |
+| Efectos | `Efecto.valores_en(f_local)` |
+| Ventana de un Short | `Short.rect_en(f)` |
+| Lo que afecta a un minuto | `Capitulo.que_afecta_al_minuto(n)` + `serializacion.huella(...)` |
+| Resultado del guardado | `ResultadoGuardado.pendientes` / `.errores` / `.conflictos` |
 
 ---
 

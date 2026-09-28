@@ -90,6 +90,30 @@ def minutos_de(elemento: Elemento) -> set[int]:
     return set(elemento.minutos_cruzados)
 
 
+def sincronizar_con_fuente(proyecto: Proyecto, elemento: Elemento) -> None:
+    """Alinea los datos de la fuente con el horneado vigente de su Pieza.
+
+    El horneado es estado automático: una copia restaurada al deshacer no debe
+    volver a una versión cuyo archivo ya fue reemplazado.
+    """
+    from editor.core.modelo.capa import TipoCapa
+    from editor.core.modelo.elemento import ReferenciaFuente, TipoFuente
+
+    if elemento.fuente.tipo is not TipoFuente.PIEZA:
+        return
+    pieza = proyecto.taller.piezas.get(elemento.fuente.ref)
+    if pieza is None or pieza.horneado is None or pieza.horneado.version == elemento.fuente.version:
+        return
+    horneado = pieza.horneado
+    elemento.fuente = ReferenciaFuente(TipoFuente.PIEZA, pieza.id, horneado.version)
+    elemento.tiempo.fuente_duracion = horneado.fotogramas
+    elemento.tiene_audio = horneado.tiene_audio
+    if elemento.capa.tipo is not TipoCapa.AUDIO:
+        elemento.extension = horneado.extension
+        elemento.ancho, elemento.alto = horneado.ancho, horneado.alto
+        elemento.tiene_alfa = horneado.tiene_alfa
+
+
 def insertar_directo(capitulo: Capitulo, elemento: Elemento) -> None:
     """Inserta sin validar: solo para restaurar un estado que ya fue válido."""
     capitulo.contenedor_de(elemento).elementos[elemento.id] = elemento
@@ -192,7 +216,9 @@ class EdicionCapitulo(Comando):
         for identificador in ids:
             quitar_si_esta(capitulo, identificador)
         for elemento in self._antes.values():
-            insertar_directo(capitulo, copy.deepcopy(elemento))
+            restaurado = copy.deepcopy(elemento)
+            sincronizar_con_fuente(proyecto, restaurado)
+            insertar_directo(capitulo, restaurado)
         self._registrar(proyecto, capitulo, ids)
 
     @staticmethod

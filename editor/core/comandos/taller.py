@@ -21,12 +21,26 @@ from editor.core.tiempo.nomenclatura import es_nombre_valido
 
 
 class _EdicionTaller(Comando):
-    """Guarda una copia del Bruto o la Pieza antes de cambiarlo; deshacer la restaura."""
+    """Guarda una copia del Bruto o la Pieza antes de cambiarlo; deshacer la restaura.
+
+    El horneado es estado automático (PROJECT.md, 22.7): deshacer y rehacer nunca
+    lo revierten. Se conserva el de la Pieza en memoria y, si deshacer la quita,
+    se guarda aparte para devolvérselo al rehacer.
+    """
 
     def __init__(self) -> None:
         self._brutos_antes: dict[str, Bruto | None] = {}
         self._piezas_antes: dict[str, Pieza | None] = {}
         self._afectados = Afectados()
+        self._horneados_retirados: dict[str, object] = {}
+
+    def _con_horneado_vigente(self, proyecto: Proyecto, pieza: Pieza) -> Pieza:
+        actual = proyecto.taller.piezas.get(pieza.id)
+        if actual is not None:
+            pieza.horneado = actual.horneado
+        elif pieza.id in self._horneados_retirados:
+            pieza.horneado = self._horneados_retirados[pieza.id]  # type: ignore[assignment]
+        return pieza
 
     def _guardar_bruto(self, proyecto: Proyecto, id_bruto: str) -> None:
         actual = proyecto.taller.brutos.get(id_bruto)
@@ -44,15 +58,18 @@ class _EdicionTaller(Comando):
                 proyecto.taller.brutos[identificador] = copy.deepcopy(bruto)
         for identificador, pieza in self._piezas_antes.items():
             if pieza is None:
-                proyecto.taller.piezas.pop(identificador, None)
+                retirada = proyecto.taller.piezas.pop(identificador, None)
+                if retirada is not None:
+                    self._horneados_retirados[identificador] = retirada.horneado
             else:
-                restaurada = copy.deepcopy(pieza)
+                restaurada = self._con_horneado_vigente(proyecto, copy.deepcopy(pieza))
                 proyecto.taller.piezas[identificador] = restaurada
                 proyecto.referencias.registrar_pieza(identificador, restaurada.ids_brutos())
 
     def _reiniciar(self) -> None:
         self._brutos_antes = {}
         self._piezas_antes = {}
+        # `_horneados_retirados` se conserva: lo necesita el rehacer.
 
     def afectados(self) -> list[Afectados]:
         return [self._afectados]
@@ -125,7 +142,7 @@ class AgregarPieza(_EdicionTaller):
         self._reiniciar()
         self._guardar_pieza(proyecto, self.pieza.id)
         proyecto.ids.registrar(self.pieza.id)
-        nueva = copy.deepcopy(self.pieza)
+        nueva = self._con_horneado_vigente(proyecto, copy.deepcopy(self.pieza))
         proyecto.taller.agregar_pieza(nueva)
         proyecto.referencias.registrar_pieza(nueva.id, nueva.ids_brutos())
         self._afectados = Afectados(piezas={self.pieza.id})
@@ -184,6 +201,7 @@ class CambiarRecetaPieza(_EdicionTaller):
             raise EdicionRechazada(f"Tramos con Brutos inexistentes: {', '.join(sorted(faltantes))}")
         self._guardar_pieza(proyecto, self.id_pieza)
         nueva = replace(pieza, **copy.deepcopy(self.cambios))
+        nueva.horneado = pieza.horneado
         if set(self.cambios) - {"nombre"}:
             nueva.receta_modificada = True
         proyecto.taller.piezas[self.id_pieza] = nueva

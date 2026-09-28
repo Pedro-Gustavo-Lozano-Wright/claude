@@ -33,6 +33,8 @@ from editor.core.proyecto_fs.gemelo import (
 from editor.core.proyecto_fs.manifiestos import (
     aplicar_datos_capitulo,
     aplicar_datos_minuto,
+    aplicar_datos_renders,
+    horneado_desde_datos,
     pieza_desde_datos,
     proyecto_desde_datos,
 )
@@ -60,6 +62,8 @@ class Informe:
     solapes: list[str] = field(default_factory=list)
     ids_reasignados: list[str] = field(default_factory=list)
     brutos_faltantes: list[str] = field(default_factory=list)
+    brutos_sin_registrar: list[str] = field(default_factory=list)
+    taller_sin_receta: list[str] = field(default_factory=list)
     piezas_sin_horneado: list[str] = field(default_factory=list)
     diario_recuperado: int = 0
     bloqueo_huerfano: InfoBloqueo | None = None
@@ -68,7 +72,8 @@ class Informe:
     def avisos(self) -> int:
         return sum(len(lista) for lista in (
             self.fuera_de_linea, self.gemelos_faltantes, self.fuera_de_carpeta, self.no_reconocidos,
-            self.solapes, self.ids_reasignados, self.brutos_faltantes,
+            self.solapes, self.ids_reasignados, self.brutos_faltantes, self.brutos_sin_registrar,
+            self.taller_sin_receta,
         ))
 
     def resumen(self) -> str:
@@ -85,6 +90,8 @@ class Informe:
             ("Solapamientos en una misma capa", self.solapes),
             ("IDs duplicados reasignados", self.ids_reasignados),
             ("Brutos faltantes", self.brutos_faltantes),
+            ("Archivos en brutos/ sin registrar (importados sin guardar)", self.brutos_sin_registrar),
+            ("Carpetas del Taller sin _pieza.json (Piezas sin guardar)", self.taller_sin_receta),
             ("Piezas sin hornear", self.piezas_sin_horneado),
         )
         for titulo, lista in secciones:
@@ -166,6 +173,7 @@ def abrir_proyecto(raiz: Path, solo_lectura: bool = False) -> Apertura:
             proyecto.taller.brutos[bruto.id] = bruto
             _registrar_id(proyecto, estado, informe, bruto.id, f"Bruto {bruto.nombre}")
 
+        _detectar_brutos_sin_registrar(raiz, estado, informe)
         _cargar_piezas(proyecto, estado, informe)
         _descubrir_capitulos(proyecto, informe)
         proyecto.reconstruir_referencias()
@@ -197,7 +205,10 @@ def _cargar_piezas(proyecto: Proyecto, estado: EstadoDisco, informe: Informe) ->
         return
     for carpeta in sorted(carpeta_taller.iterdir()):
         manifiesto = carpeta / nom.ARCHIVO_PIEZA
-        if not carpeta.is_dir() or not manifiesto.exists():
+        if not carpeta.is_dir():
+            continue
+        if not manifiesto.exists():
+            informe.taller_sin_receta.append(estructura.relativa(raiz, carpeta))
             continue
         try:
             datos_crudos = leer_json(manifiesto)
@@ -205,6 +216,13 @@ def _cargar_piezas(proyecto: Proyecto, estado: EstadoDisco, informe: Informe) ->
         except (ValueError, KeyError) as error:
             informe.no_reconocidos.append(f"{estructura.relativa(raiz, manifiesto)} ({error})")
             continue
+        ruta_horneado = carpeta / nom.ARCHIVO_HORNEADO
+        if ruta_horneado.exists():
+            datos_horneado = leer_json(ruta_horneado)
+            pieza.horneado = horneado_desde_datos(datos_horneado)
+            estado.horneados[pieza.id] = RegistroArchivo(
+                estructura.relativa(raiz, ruta_horneado), Firma.de(ruta_horneado), huella(datos_horneado)
+            )
         if pieza.horneado is not None:
             ruta = estructura.ruta_horneado(raiz, pieza)
             pieza.horneado.archivo = ruta if ruta is not None and ruta.exists() else None
@@ -217,6 +235,17 @@ def _cargar_piezas(proyecto: Proyecto, estado: EstadoDisco, informe: Informe) ->
         )
         estado.copias_piezas[pieza.id] = copias
         proyecto.referencias.registrar_pieza(pieza.id, pieza.ids_brutos())
+
+
+def _detectar_brutos_sin_registrar(raiz: Path, estado: EstadoDisco, informe: Informe) -> None:
+    conocidos = set(estado.brutos.values())
+    for sub in nom.SUBCARPETAS_BRUTOS:
+        carpeta = raiz / nom.CARPETA_BRUTOS / sub
+        if not carpeta.exists():
+            continue
+        for ruta in sorted(carpeta.iterdir()):
+            if ruta.is_file() and not ruta.name.startswith(".") and estructura.relativa(raiz, ruta) not in conocidos:
+                informe.brutos_sin_registrar.append(estructura.relativa(raiz, ruta))
 
 
 def _descubrir_capitulos(proyecto: Proyecto, informe: Informe) -> None:
@@ -276,6 +305,14 @@ def cargar_capitulo(proyecto: Proyecto, estado: EstadoDisco, numero: int, inform
 
     _cargar_carpeta_elementos(proyecto, estado, informe, capitulo, nom.carpeta_global(raiz, numero), en_global=True)
     _cargar_shorts(proyecto, estado, informe, capitulo)
+
+    ruta_renders = estructura.ruta_renders(raiz, numero)
+    if ruta_renders.exists():
+        datos = leer_json(ruta_renders)
+        aplicar_datos_renders(capitulo, datos)
+        estado_cap.control[estructura.relativa(raiz, ruta_renders)] = RegistroArchivo(
+            estructura.relativa(raiz, ruta_renders), Firma.de(ruta_renders), huella(datos)
+        )
 
     informe.capitulos_cargados.append(numero)
     return capitulo

@@ -35,6 +35,9 @@ ARCHIVO_CAPITULO = "_capitulo.json"
 ARCHIVO_MINUTO = "_minuto.json"
 ARCHIVO_GUION = "_guion.txt"
 ARCHIVO_PIEZA = "_pieza.json"
+# Estado automático (lo escriben los servicios en el momento, no el guardado del usuario).
+ARCHIVO_RENDERS = "_renders.json"
+ARCHIVO_HORNEADO = "_horneado.json"
 
 CARPETA_BRUTOS = "brutos"
 CARPETA_TALLER = "taller"
@@ -73,7 +76,8 @@ PATRON_ELEMENTO = re.compile(
 )
 PATRON_SHORT = re.compile(
     rf"^(?P<inicio>{_INICIO})_(?P<duracion>{_DURACION})"
-    rf"_(?P<nombre>{_NOMBRE})__(?P<id>{_ID})(?:_v(?P<version>\d{{3}}))?\.(?P<extension>[a-z0-9]+)$"
+    rf"_(?P<nombre>{_NOMBRE})__(?P<id>{_ID})(?:_v(?P<version>\d{{3}})(?:_(?P<idioma>[a-z]{{2,3}}))?)?"
+    rf"\.(?P<extension>[a-z0-9]+)$"
 )
 PATRON_BRUTO = re.compile(rf"^bru(?P<numero>\d{{4}})_(?P<nombre>{_NOMBRE})__(?P<id>{_ID})\.(?P<extension>[a-z0-9]+)$")
 PATRON_PIEZA = re.compile(rf"^pie(?P<numero>\d{{4}})_(?P<nombre>{_NOMBRE})__(?P<id>{_ID})(?:\.(?P<extension>[a-z0-9]+))?$")
@@ -81,7 +85,7 @@ PATRON_CAPITULO = re.compile(r"^cap(?P<numero>\d{4})$")
 PATRON_MINUTO = re.compile(r"^min(?P<numero>\d{2})$")
 PATRON_RENDER = re.compile(
     r"^cap(?P<capitulo>\d{4})_(?:(?P<completo>completo)|min(?P<desde>\d{2})(?:-(?P<hasta>\d{2}))?)"
-    r"_v(?P<version>\d{3})\.(?P<extension>[a-z0-9]+)$"
+    r"_v(?P<version>\d{3})(?:_(?P<idioma>[a-z]{2,3}))?\.(?P<extension>[a-z0-9]+)$"
 )
 PATRON_ID = re.compile(rf"^{_ID}$")
 
@@ -219,8 +223,9 @@ class NombreShort:
     def receta(self) -> str:
         return f"{self.base}.{EXTENSION_GEMELO}"
 
-    def render(self, version: int, extension: str = "mp4") -> str:
-        return f"{self.base}_v{_version(version)}.{extension}"
+    def render(self, version: int, extension: str = "mp4", idioma: str | None = None) -> str:
+        sufijo = f"_{_idioma(idioma)}" if idioma else ""
+        return f"{self.base}_v{_version(version)}{sufijo}.{extension}"
 
     @classmethod
     def desde_archivo(cls, nombre_archivo: str) -> tuple["NombreShort", int | None]:
@@ -330,6 +335,7 @@ class NombreRender:
     desde: int | None = None  # None = capítulo completo
     hasta: int | None = None
     extension: str = "mp4"
+    idioma: str | None = None  # None = todas las pistas en un archivo (o proyecto de un solo idioma)
 
     @property
     def archivo(self) -> str:
@@ -340,7 +346,8 @@ class NombreRender:
             alcance = codigo_minuto(self.desde)
         else:
             alcance = f"{codigo_minuto(self.desde)}-{self.hasta:02d}"
-        return f"{prefijo}_{alcance}_v{_version(self.version)}.{self.extension}"
+        sufijo = f"_{_idioma(self.idioma)}" if self.idioma else ""
+        return f"{prefijo}_{alcance}_v{_version(self.version)}{sufijo}.{self.extension}"
 
     @property
     def minutos(self) -> range:
@@ -361,6 +368,7 @@ class NombreRender:
             desde=int(desde) if desde is not None else None,
             hasta=int(hasta) if hasta is not None else None,
             extension=coincidencia["extension"],
+            idioma=coincidencia["idioma"],
         )
 
 
@@ -431,6 +439,12 @@ def _numero4(numero: int) -> str:
     if not 1 <= numero <= 9999:
         raise NombreInvalido(f"Número fuera de rango: {numero}")
     return f"{numero:04d}"
+
+
+def _idioma(idioma: str) -> str:
+    if not re.fullmatch(r"[a-z]{2,3}", idioma):
+        raise NombreInvalido(f"Código de idioma inválido: {idioma!r} (ISO 639: 'es', 'en'…)")
+    return idioma
 
 
 def _version(version: int) -> str:

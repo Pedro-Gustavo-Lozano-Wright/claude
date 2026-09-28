@@ -6,7 +6,6 @@ Todos llevan `version_esquema` para poder migrar proyectos en el futuro.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from editor.core.estandar import Estandar
 from editor.core.modelo.bruto import Bruto, TipoMedio
@@ -131,7 +130,6 @@ def capitulo_a_datos(capitulo: Capitulo) -> Datos:
         "titulo": capitulo.titulo,
         "capas": {clave: estado_capa_a_datos(e) for clave, e in sorted(capitulo.capas.items())},
         "marcadores": [marcador_a_datos(m) for m in sorted(capitulo.marcadores, key=lambda m: m.f)],
-        "renders": [{"archivo": r.nombre.archivo, "huella": r.huella} for r in capitulo.renders],
     }
 
 
@@ -140,9 +138,6 @@ def aplicar_datos_capitulo(capitulo: Capitulo, datos: Datos) -> None:
     capitulo.titulo = datos.get("titulo", capitulo.titulo)
     capitulo.capas = {clave: estado_capa_desde_datos(e) for clave, e in datos.get("capas", {}).items()}
     capitulo.marcadores = [marcador_desde_datos(m) for m in datos.get("marcadores", [])]
-    capitulo.renders = [
-        RegistroRender(NombreRender.desde_archivo(r["archivo"]), r["huella"]) for r in datos.get("renders", [])
-    ]
 
 
 def minuto_a_datos(minuto: Minuto) -> Datos:
@@ -150,18 +145,84 @@ def minuto_a_datos(minuto: Minuto) -> Datos:
         "numero": minuto.numero,
         "listo": minuto.listo,
         "notas": minuto.notas,
-        "ultimo_render": None if minuto.ultimo_render is None else {
-            "version": minuto.ultimo_render.version,
-            "huella": minuto.ultimo_render.huella,
-        },
     }
 
 
 def aplicar_datos_minuto(minuto: Minuto, datos: Datos) -> None:
     minuto.listo = bool(datos.get("listo", False))
     minuto.notas = datos.get("notas", "")
-    render = datos.get("ultimo_render")
-    minuto.ultimo_render = None if not render else RegistroRenderMinuto(int(render["version"]), str(render["huella"]))
+
+
+# --- Estado automático ------------------------------------------------------------------
+#
+# Lo escriben los servicios en el momento (render, horneado), en archivos propios,
+# para no mezclarlo con lo que el usuario edita y guarda cuando quiere.
+
+def renders_a_datos(capitulo: Capitulo) -> Datos:
+    """`capNNNN/render/_renders.json`: entregables, último render de cada minuto y de cada Short."""
+    return {
+        "version_esquema": VERSION_ESQUEMA,
+        "entregables": [{"archivo": r.nombre.archivo, "huella": r.huella} for r in capitulo.renders],
+        "minutos": {
+            f"{m.numero:02d}": {"version": m.ultimo_render.version, "huella": m.ultimo_render.huella}
+            for m in capitulo.minutos if m.ultimo_render is not None
+        },
+        "shorts": {
+            s.id: {"version": s.ultimo_render.version, "huella": s.ultimo_render.huella}
+            for s in capitulo.shorts.values() if s.ultimo_render is not None
+        },
+    }
+
+
+def aplicar_datos_renders(capitulo: Capitulo, datos: Datos) -> None:
+    from editor.core.modelo.short import RegistroRenderShort
+
+    capitulo.renders = [
+        RegistroRender(NombreRender.desde_archivo(r["archivo"]), r["huella"]) for r in datos.get("entregables", [])
+    ]
+    for numero, render in datos.get("minutos", {}).items():
+        capitulo.minuto(int(numero)).ultimo_render = RegistroRenderMinuto(int(render["version"]), str(render["huella"]))
+    for identificador, render in datos.get("shorts", {}).items():
+        short = capitulo.shorts.get(identificador)
+        if short is not None:
+            short.ultimo_render = RegistroRenderShort(int(render["version"]), str(render["huella"]))
+
+
+def horneado_a_datos(horneado: Horneado | None) -> Datos:
+    """`taller/pieNNNN…/_horneado.json`: resultado del último horneado."""
+    if horneado is None:
+        return {"version_esquema": VERSION_ESQUEMA, "horneado": None}
+    return {
+        "version_esquema": VERSION_ESQUEMA,
+        "horneado": {
+            "version": horneado.version,
+            "extension": horneado.extension,
+            "ancho": horneado.ancho,
+            "alto": horneado.alto,
+            "fotogramas": horneado.fotogramas,
+            "asas_inicio": horneado.asas_inicio,
+            "asas_fin": horneado.asas_fin,
+            "tiene_alfa": horneado.tiene_alfa,
+            "tiene_audio": horneado.tiene_audio,
+        },
+    }
+
+
+def horneado_desde_datos(datos: Datos | None) -> Horneado | None:
+    horneado = (datos or {}).get("horneado")
+    if not horneado:
+        return None
+    return Horneado(
+        version=int(horneado["version"]),
+        extension=horneado["extension"],
+        ancho=int(horneado.get("ancho", 0)),
+        alto=int(horneado.get("alto", 0)),
+        fotogramas=int(horneado.get("fotogramas", 0)),
+        asas_inicio=int(horneado.get("asas_inicio", 0)),
+        asas_fin=int(horneado.get("asas_fin", 0)),
+        tiene_alfa=bool(horneado.get("tiene_alfa", False)),
+        tiene_audio=bool(horneado.get("tiene_audio", False)),
+    )
 
 
 # --- Pieza -------------------------------------------------------------------------
@@ -176,7 +237,7 @@ class Copia:
 
 
 def pieza_a_datos(pieza: Pieza, copias: list[Copia]) -> Datos:
-    horneado = pieza.horneado
+    """Receta de la Pieza (lo que edita el usuario). El horneado va en `_horneado.json`."""
     return {
         "version_esquema": VERSION_ESQUEMA,
         "id": pieza.id,
@@ -188,17 +249,6 @@ def pieza_a_datos(pieza: Pieza, copias: list[Copia]) -> Datos:
         "espacio": transform_a_datos(pieza.espacio),
         "efectos": [efecto_a_datos(e) for e in pieza.efectos],
         "receta_modificada": pieza.receta_modificada,
-        "horneado": None if horneado is None else {
-            "version": horneado.version,
-            "extension": horneado.extension,
-            "ancho": horneado.ancho,
-            "alto": horneado.alto,
-            "fotogramas": horneado.fotogramas,
-            "asas_inicio": horneado.asas_inicio,
-            "asas_fin": horneado.asas_fin,
-            "tiene_alfa": horneado.tiene_alfa,
-            "tiene_audio": horneado.tiene_audio,
-        },
         "copias": [
             {"capitulo": c.capitulo, "minuto": c.minuto, "id": c.id_elemento}
             for c in sorted(copias, key=lambda c: (c.capitulo, -1 if c.minuto is None else c.minuto, c.id_elemento))
@@ -208,7 +258,6 @@ def pieza_a_datos(pieza: Pieza, copias: list[Copia]) -> Datos:
 
 def pieza_desde_datos(datos: Datos) -> tuple[Pieza, list[Copia]]:
     verificar_esquema(datos, "_pieza.json")
-    horneado: Any = datos.get("horneado")
     pieza = Pieza(
         id=datos["id"],
         numero=int(datos["numero"]),
@@ -219,17 +268,6 @@ def pieza_desde_datos(datos: Datos) -> tuple[Pieza, list[Copia]]:
         espacio=transform_desde_datos(datos.get("espacio")),
         efectos=[efecto_desde_datos(e) for e in datos.get("efectos", [])],
         receta_modificada=bool(datos.get("receta_modificada", True)),
-        horneado=None if not horneado else Horneado(
-            version=int(horneado["version"]),
-            extension=horneado["extension"],
-            ancho=int(horneado.get("ancho", 0)),
-            alto=int(horneado.get("alto", 0)),
-            fotogramas=int(horneado.get("fotogramas", 0)),
-            asas_inicio=int(horneado.get("asas_inicio", 0)),
-            asas_fin=int(horneado.get("asas_fin", 0)),
-            tiene_alfa=bool(horneado.get("tiene_alfa", False)),
-            tiene_audio=bool(horneado.get("tiene_audio", False)),
-        ),
     )
     copias = [
         Copia(int(c["capitulo"]), None if c.get("minuto") is None else int(c["minuto"]), c["id"])

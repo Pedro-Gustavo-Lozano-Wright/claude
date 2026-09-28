@@ -67,6 +67,8 @@ class EstadoDisco:
     capitulos: dict[int, EstadoCapitulo] = field(default_factory=dict)
     proyecto: RegistroArchivo | None = None
     piezas: dict[str, RegistroArchivo] = field(default_factory=dict)
+    # `_horneado.json` de cada Pieza (estado automático).
+    horneados: dict[str, RegistroArchivo] = field(default_factory=dict)
     # Copias conocidas de cada Pieza (de `_pieza.json`), también en capítulos no cargados.
     copias_piezas: dict[str, list[Copia]] = field(default_factory=dict)
     # IDs ya vistos al cargar, para detectar duplicados.

@@ -20,7 +20,7 @@ from editor.core.modelo.elemento import (
     TiempoElemento,
     TipoFuente,
 )
-from editor.core.modelo.short import RegistroRenderShort, Short, VentanaVertical
+from editor.core.modelo.short import Short, VentanaVertical
 from editor.core.proyecto_fs.serializacion import (
     Datos,
     animacion_a_datos,
@@ -184,17 +184,12 @@ def short_a_datos(short: Short) -> Datos:
             "zoom": short.ventana.zoom,
             "keyframes": animacion_a_datos(short.ventana.animacion),
         },
-        "ultimo_render": None if short.ultimo_render is None else {
-            "version": short.ultimo_render.version,
-            "huella": short.ultimo_render.huella,
-        },
     }
 
 
 def short_desde_datos(datos: Datos | None, nombre: NombreShort) -> Short:
     datos = datos or {}
     ventana = datos.get("ventana", {})
-    render = datos.get("ultimo_render")
     return Short(
         id=nombre.id,
         nombre=nombre.nombre,
@@ -205,5 +200,4 @@ def short_desde_datos(datos: Datos | None, nombre: NombreShort) -> Short:
             zoom=float(ventana.get("zoom", 1.0)),
             animacion=animacion_desde_datos(ventana.get("keyframes")),
         ),
-        ultimo_render=None if not render else RegistroRenderShort(int(render["version"]), str(render["huella"])),
     )

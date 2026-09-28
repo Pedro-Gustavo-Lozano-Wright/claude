@@ -19,13 +19,17 @@ from editor.core.proyecto_fs.gemelo import elemento_a_datos, elemento_desde_dato
 from editor.core.proyecto_fs.manifiestos import (
     aplicar_datos_capitulo,
     aplicar_datos_minuto,
+    aplicar_datos_renders,
     bruto_desde_datos,
     capitulo_a_datos,
+    horneado_a_datos,
+    horneado_desde_datos,
     minuto_a_datos,
     pieza_a_datos,
     pieza_desde_datos,
     proyecto_a_datos,
     proyecto_desde_datos,
+    renders_a_datos,
 )
 from editor.core.proyecto_fs.serializacion import escribir_json_atomico, leer_json
 from editor.core.tiempo.nomenclatura import CARPETA_AUTOSAVE, VERSION_ESQUEMA, NombreElemento, NombreShort
@@ -43,6 +47,7 @@ def guardar_instantanea(proyecto: Proyecto) -> Path:
     for capitulo in proyecto.capitulos_cargados():
         capitulos[str(capitulo.numero)] = {
             "manifiesto": capitulo_a_datos(capitulo),
+            "renders": renders_a_datos(capitulo),
             "minutos": [minuto_a_datos(m) for m in capitulo.minutos],
             "elementos": [
                 {"archivo": e.nombre_archivo().archivo, "global": e.en_global, "gemelo": elemento_a_datos(e)}
@@ -56,7 +61,10 @@ def guardar_instantanea(proyecto: Proyecto) -> Path:
         "version_esquema": VERSION_ESQUEMA,
         "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "proyecto": proyecto_a_datos(proyecto),
-        "piezas": [pieza_a_datos(p, []) for p in proyecto.taller.piezas.values()],
+        "piezas": [
+            {"receta": pieza_a_datos(p, []), "horneado": horneado_a_datos(p.horneado)}
+            for p in proyecto.taller.piezas.values()
+        ],
         "capitulos": capitulos,
     }
     ruta = ruta_instantanea(proyecto.raiz)
@@ -103,7 +111,8 @@ def restaurar_instantanea(proyecto: Proyecto) -> None:
     }
     proyecto.taller.piezas = {}
     for datos_pieza in datos.get("piezas", []):
-        pieza, _ = pieza_desde_datos(datos_pieza)
+        pieza, _ = pieza_desde_datos(datos_pieza["receta"])
+        pieza.horneado = horneado_desde_datos(datos_pieza.get("horneado"))
         if pieza.horneado is not None:
             pieza.horneado.archivo = archivos_horneados.get(pieza.id)
         proyecto.taller.piezas[pieza.id] = pieza
@@ -125,6 +134,7 @@ def restaurar_instantanea(proyecto: Proyecto) -> None:
             nombre, _ = NombreShort.desde_archivo(item["receta"])
             short = short_desde_datos(item["datos"], nombre)
             capitulo.shorts[short.id] = short
+        aplicar_datos_renders(capitulo, datos_capitulo.get("renders", {}))
         proyecto.capitulos[numero] = capitulo
 
     proyecto.registrar_ids_cargados()
