@@ -12,7 +12,7 @@ La arquitectura completa, las decisiones y las épicas están en
 | Fase | Épicas | Estado |
 |---|---|---|
 | A — Fundamentos | E0 fundación · E1 base transversal · E2 tiempo y nomenclatura · E3 espacio · E4 modelo | ✅ Código escrito y auditado (revisión 4) |
-| B — Persistencia y edición | E5 disco · E6 comandos | Pendiente |
+| B — Persistencia y edición | E5 disco · E6 comandos | ✅ Código escrito |
 | C — Motor y servicios | E7–E11 | Pendiente |
 | D — Interfaz | E12–E16 | Pendiente |
 | E — Capacidades creativas | E17–E20 | Pendiente |
@@ -40,8 +40,8 @@ con el script `main.py` y la raíz del repositorio como directorio de trabajo.
 ```bash
 python main.py                                    # interfaz (E12)
 python main.py RUTA_PROYECTO                      # interfaz con un proyecto (E12)
-python main.py --nuevo RUTA_PROYECTO              # crear proyecto (E5)
-python main.py --escanear RUTA_PROYECTO           # reconstruir desde el disco (E5)
+python main.py --nuevo RUTA_PROYECTO              # crear proyecto ✅
+python main.py --escanear RUTA_PROYECTO           # revisar el proyecto en disco ✅
 python main.py --render RUTA --capitulo 1 --minutos 00-05   # render sin interfaz (E10)
 python main.py --shorts RUTA --capitulo 1         # Shorts verticales (E20)
 ```

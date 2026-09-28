@@ -106,11 +106,44 @@ def pendiente(modo: str, epica: str) -> int:
 
 
 def modo_nuevo(contexto: Contexto, ruta: Path) -> int:
-    return pendiente(f"--nuevo {ruta}", "E5")
+    """Crea el proyecto con su primer capítulo (cap0001, min00–min23)."""
+    from editor.core.proyecto_fs import estructura
+
+    try:
+        proyecto = estructura.crear_proyecto(ruta, estandar=contexto.estandar_por_defecto)
+    except estructura.ProyectoExistente as error:
+        registro.error("%s", error)
+        return SALIDA_ERROR
+    capitulo = estructura.crear_capitulo(proyecto, 1)
+    contexto.ajustes.registrar_reciente(ruta)
+    contexto.ajustes.guardar_usuario()
+    print(f"Proyecto creado en {proyecto.raiz}")
+    print(f"  {capitulo.codigo}/ con min00 … min23, global/, render/ y shorts/")
+    print("  brutos/, taller/, recursos/ y _proyecto.json")
+    registro.info("La interfaz para abrirlo llega en la épica E12.")
+    return SALIDA_OK
 
 
 def modo_escanear(contexto: Contexto, ruta: Path) -> int:
-    return pendiente(f"--escanear {ruta}", "E5")
+    """Lee el proyecto completo en solo lectura y muestra lo encontrado."""
+    from editor.core.proyecto_fs.diario import Diario
+    from editor.core.proyecto_fs.escaner import NoEsProyecto, abrir_proyecto
+
+    try:
+        apertura = abrir_proyecto(ruta, solo_lectura=True)
+    except NoEsProyecto as error:
+        registro.error("%s", error)
+        return SALIDA_ERROR
+    proyecto = apertura.proyecto
+    for numero in proyecto.numeros_capitulos():
+        proyecto.capitulo(numero)
+    print(f"Proyecto: {proyecto.nombre} ({proyecto.raiz})")
+    print(f"Idiomas: {', '.join(proyecto.idiomas)} · Brutos: {len(proyecto.taller.brutos)} · "
+          f"Piezas: {len(proyecto.taller.piezas)}")
+    print(apertura.informe.resumen())
+    if Diario(proyecto.raiz).hay_pendiente():
+        print("Hay un guardado interrumpido: se completará al abrir el proyecto para editar.")
+    return SALIDA_OK
 
 
 def modo_render(contexto: Contexto, ruta: Path, capitulo: int, minutos: range | None) -> int:

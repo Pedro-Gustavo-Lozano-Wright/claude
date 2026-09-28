@@ -52,6 +52,8 @@ class TiempoElemento:
     velocidad: float = 1.0           # negativa = reversa
     # Fotogramas que tiene la fuente, asas incluidas; 0 = ilimitada (imagen fija, texto).
     fuente_duracion: int = 0
+    # Congelar fotograma: muestra siempre `fuente_entrada` durante toda la duración.
+    congelado: bool = False
 
     def __post_init__(self) -> None:
         if self.inicio < 0:
@@ -71,6 +73,8 @@ class TiempoElemento:
     @property
     def fotogramas_fuente_usados(self) -> int:
         """Cuántos fotogramas de la fuente consume el Elemento."""
+        if self.congelado:
+            return 1
         return max(1, math.ceil(self.duracion * abs(self.velocidad)))
 
     @property
@@ -149,6 +153,14 @@ class Elemento:
         return self.tiempo.duracion
 
     @property
+    def excede_fuente(self) -> bool:
+        return self.tiempo.excede_fuente
+
+    @property
+    def margen_fuente(self) -> tuple[int, int]:
+        return self.tiempo.margen_fuente
+
+    @property
     def minuto_inicio(self) -> int:
         return granularidad.minuto_de(self.inicio)
 
@@ -178,6 +190,8 @@ class Elemento:
 
     def fotograma_fuente(self, f: int) -> int:
         """Fotograma de la fuente (Pieza a 24 fps) que se ve en el fotograma f del capítulo."""
+        if self.tiempo.congelado:
+            return self.tiempo.fuente_entrada
         desplazamiento = math.floor((f - self.inicio) * abs(self.tiempo.velocidad))
         if self.tiempo.velocidad > 0:
             return self.tiempo.fuente_entrada + desplazamiento

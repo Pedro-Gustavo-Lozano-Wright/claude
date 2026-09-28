@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 5. Fase A (E0–E4) implementada y auditada. Siguiente bloque: Fase B (E5 disco + E6 comandos).
+- **Estado:** revisión 5. Fases A (E0–E4) y B (E5–E6) implementadas. Siguiente bloque: Fase C (motor y servicios, E7–E11).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -1391,7 +1391,8 @@ con los keyframes de la ventana.
     │   │   ├── short.py                 Short + VentanaVertical
     │   │   └── referencias.py           índice Bruto → Pieza → Elemento → Minuto
     │   ├── comandos/                    N3
-    │   │   ├── comando.py  compuesto.py  historial.py
+    │   │   ├── comando.py  compuesto.py  historial.py  operaciones.py  fabrica.py  estado_capitulo.py
+    │   │   ├── capas.py  colocacion.py  taller.py
     │   │   ├── agregar_elemento.py  quitar_elemento.py  mover_elemento.py
     │   │   ├── recortar_elemento.py  dividir_elemento.py  separar_audio.py
     │   │   ├── cambiar_propiedad.py  transformar_elemento.py
@@ -1404,6 +1405,7 @@ con los keyframes de la ventana.
     │   ├── proyecto_fs/                 N3
     │   │   ├── serializacion.py         conversión canónica (también para huellas)
     │   │   ├── estructura.py  gemelo.py  manifiestos.py  bloqueo.py
+    │   │   ├── estado_disco.py          último estado conocido del disco
     │   │   ├── diario.py  reconciliador.py  escaner.py
     │   │   ├── guion.py  autosave.py
     │   ├── motor/                       N3
@@ -1674,7 +1676,23 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | E3 | ✅ | `geometria` (Rect, imán), `transform` (Afin, Transform, recorte, compensación de ancla, ajuste inicial), `lienzo` (visibilidad, región de interés, márgenes, ventana vertical) |
 | E4 | ✅ | Modelo completo (con idiomas por capa desde la revisión 5). La Pieza es por ahora una secuencia lineal de tramos; las capas dentro de una Pieza quedan para más adelante |
 | Revisión 4 | ✅ | Correcciones A1–A10 aplicadas; marcadores y estado de capas; carga perezosa de capítulos |
-| E5 en adelante | Pendiente | |
+| E5 | ✅ | `serializacion`, `gemelo`, `manifiestos`, `estructura`, `bloqueo`, `estado_disco` (nuevo: último estado conocido), `diario`, `escaner` (carga perezosa e `Informe`), `reconciliador` (fases A/B/C, papelera, conflictos, materialización simple), `guion`, `autosave`; `main.py --nuevo` y `--escanear` |
+| E6 | ✅ | `comando` (contrato, `EdicionCapitulo` con deshacer por instantáneas, IDs reservados, fusión de gestos), `compuesto`, `historial` (marca de guardado, eventos), `operaciones` y `fabrica` (nuevos), y los comandos de T6.4–T6.10, capas y marcadores (`capas.py`), rangos (`colocacion.py`) y Taller (`taller.py`) |
+| E7 en adelante | Pendiente | |
+
+### Decisiones tomadas al implementar la Fase B
+
+| Tema | Decisión |
+|---|---|
+| Deshacer | Cada `EdicionCapitulo` guarda copias de los Elementos que toca y deshacer las restaura. La interfaz debe referirse a los Elementos por ID, no por objeto |
+| Fusión de arrastres | Solo comandos con valores absolutos (mover, recortar, roll, slip, slide, transformar, cambiar propiedad o parámetro, poner keyframe); ventana de 1 s y nunca sobre el estado guardado |
+| Quitar con ripple | Cierra el hueco **en la misma capa** |
+| Ripple de recorte | Corre **todas las capas** de los minutos dentro del alcance (no Global), para conservar la sincronía |
+| Modo insertar | Divide lo que cruza el punto en la capa del Elemento y corre todo lo posterior del alcance |
+| Materialización | El reconciliador copia cuando la fuente tiene la misma extensión; extraer audio y convertir formatos quedan en `pendientes` para el servicio de guardado (E9) |
+| Guardar sin cambios | 0 operaciones: solo se escribe lo que cambió (comparación por huella) |
+| Bloqueo | También impide abrir dos veces el proyecto desde el mismo proceso |
+| Verificación | Sin tests en el repositorio. Se ejecutó un recorrido temporal fuera del repo (crear, editar, guardar, deshacer tras guardar, reabrir, intercambiar minutos, conflicto externo, bloqueo) que encontró y corrigió 3 fallos |
 
 ### Dependencias entre épicas
 
