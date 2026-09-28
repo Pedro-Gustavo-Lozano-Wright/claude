@@ -1346,7 +1346,7 @@ Metas, no garantías.
 ### 21.2 Decisiones abiertas
 
 1. ¿Capítulos siempre de hasta 24 minutos o con duración variable mayor?
-2. ¿30 fps además de 24? Cambiaría el rango `f00`–`f29`.
+2. ~~¿30 fps además de 24?~~ **Cerrada: solo 24 fps.** Todo se normaliza a 24 fps; el campo de fotograma del nombre es siempre `f00`–`f23`.
 3. ¿Formatos verticales (9:16) desde el inicio o en E20?
 4. ¿Versión web de la interfaz dentro del alcance?
 5. ¿Duración de las asas: 1 s fijo o configurable?
