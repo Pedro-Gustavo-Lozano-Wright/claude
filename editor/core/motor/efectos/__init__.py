@@ -2,7 +2,7 @@
 
 Cada efecto recibe la imagen **no premultiplicada** en float32 (alto, ancho, 4)
 con valores 0–1, sus parámetros ya evaluados en el fotograma y un contexto, y
-devuelve la imagen resultante. El registro es ampliable: los plugins (E21)
+devuelve la imagen resultante. El registro es ampliable: los plugins (E23)
 agregan efectos con `registrar_efecto`.
 
 Parámetros (convención):

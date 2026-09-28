@@ -250,7 +250,7 @@ class Ventana:
         elif nombre == "shorts":
             superior = ft.Column([
                 ft.Container(self.monitor.control, expand=True),
-                texto_suave("Espacio Shorts: la ventana 9:16 y su vista previa vertical llegan en la épica E20. "
+                texto_suave("Espacio Shorts: la ventana 9:16 y su vista previa vertical llegan en la épica E22. "
                             "La guía 9:16 del monitor ya muestra qué entra en un Short."),
             ], expand=True)
         else:

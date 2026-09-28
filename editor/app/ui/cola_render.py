@@ -1,4 +1,4 @@
-"""Tareas de fondo y renders (E19 básico; perfiles y exportación completa en E19).
+"""Tareas de fondo y renders (básico; perfiles y exportación completa en E21).
 
 - `BarraTareas`: franja inferior de la ventana con la tarea en curso, su
   progreso y cuántas quedan; siempre visible.

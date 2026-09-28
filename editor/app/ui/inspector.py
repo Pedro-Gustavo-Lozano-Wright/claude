@@ -244,7 +244,7 @@ class Inspector:
         campo = self._campo_numero(etiqueta, valor_pantalla, unidad, aplicar)
         fila = ft.Row([rombo, campo, *navegar], spacing=0)
         if indice_efecto is not None:
-            return fila   # el editor de curvas trabaja con las propiedades del Elemento (efectos: E17)
+            return fila   # el editor de curvas trabaja con las propiedades del Elemento (efectos: E19)
         return ft.GestureDetector(content=fila, on_tap=lambda _: self._activar(propiedad))
 
     def _efectos(self, elemento) -> list[ft.Control]:

@@ -160,7 +160,7 @@ def _audio_tramo(ruta: Path, bruto: Bruto, desde: int, hasta: int, fps: Fraction
     largo = round(muestras.shape[1] * factor)
     if pieza.audio_conformado is AudioConformado.SILENCIAR:
         return np.zeros((2, largo), dtype=np.float32)
-    # Estiramiento simple (cambia el tono); E18 puede sustituirlo por uno que lo conserve.
+    # Estiramiento simple (cambia el tono); E20 puede sustituirlo por uno que lo conserve.
     return _ajustar_largo(muestras, largo)
 
 

@@ -235,7 +235,7 @@ def modo_fotograma(contexto: Contexto, ruta: Path, capitulo: int, tiempo: str, s
 
 
 def modo_shorts(contexto: Contexto, ruta: Path, capitulo: int) -> int:
-    return pendiente(f"--shorts {ruta} (capítulo {capitulo})", "E20")
+    return pendiente(f"--shorts {ruta} (capítulo {capitulo})", "E22")
 
 
 def modo_interfaz(contexto: Contexto, ruta: Path | None) -> int:

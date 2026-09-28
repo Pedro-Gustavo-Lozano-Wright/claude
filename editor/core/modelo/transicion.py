@@ -13,7 +13,7 @@ ZOOM = "zoom"
 BARRIDO = "barrido"
 TIPOS_TRANSICION = (FUNDIDO, DESLIZAMIENTO, ZOOM, BARRIDO)
 
-# Registro ampliable: los plugins (E21) agregan sus tipos aquí.
+# Registro ampliable: los plugins (E23) agregan sus tipos aquí.
 _tipos_registrados: set[str] = set(TIPOS_TRANSICION)
 
 

@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 9. Fases A, B, C y D (E0–E16) implementadas y consolidadas; la interfaz se recorrió en Chromium con medios reales. Siguiente bloque: Fase E (capacidades creativas, E17–E20). Instalación: [INSTALACION.md](INSTALACION.md).
+- **Estado:** revisión 10. Fases A–D (E0–E16) implementadas y consolidadas. Siguiente: **Fase E — Completar la edición, empezando por E17** (sección 19). Instalación y uso: [README.md](README.md).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 9](#0-cambios-de-las-revisiones-2-a-9)
+0. [Cambios de las revisiones 2 a 10](#0-cambios-de-las-revisiones-2-a-10)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,13 +43,22 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 9
+## 0. Cambios de las revisiones 2 a 10
+
+### Revisión 10: orden de las épicas pendientes y guía de instalación en el README
+
+- Las épicas pendientes se reordenan de abajo hacia arriba: **Fase E Completar la
+  edición (E17–E18)**, **F Capacidades creativas (E19–E20)**, **G Entrega
+  (E21–E22)**, **H Extensión y cierre (E23–E24)**. Equivalencias con la numeración
+  anterior en la sección 19. El código se actualizó a la numeración nueva.
+- La guía de instalación pasa al **README** (un solo documento de uso);
+  `PROJECT.md` sigue siendo la referencia de arquitectura.
+- **Siguiente: E17 — Timeline y Taller completos.**
+
 
 ### Revisión 9: consolidación de A–D antes de la Fase E
 
-Aclaración: todo el código es Python con **Flet**; Flet dibuja con el motor de
-Flutter por dentro, por eso algunos comportamientos (gestos, foco, `expand`) se
-describen con sus reglas, pero no hay código Dart.
+Todo el código es Python; la interfaz usa **Flet** (paquetes de `requirements.txt`).
 
 **Cabos sueltos encontrados y cerrados**
 
@@ -81,18 +90,7 @@ inspector de efectos, Shift+clic).
 | Interfaz | Paneles con `.control` y `.refrescar()`, redibujo pedido con `Ventana.refrescar(partes)`; `widgets.actualizar()` para controles que pueden no estar montados |
 | Huellas | Todo parámetro nuevo que cambie la imagen o el sonido debe entrar en `serializacion` (y por tanto en la huella del minuto) para invalidar renders y pre-renders |
 
-**Ajustes al plan de las épicas siguientes**
-
-| Épica | Qué se agrega o precisa |
-|---|---|
-| E14 (seguimiento) | Mover en grupo con selección múltiple (hoy se arrastra un Elemento; copiar, pegar y borrar sí son múltiples); miniaturas y forma de onda dibujadas en las pistas (los servicios ya las generan al hornear) |
-| E15 (seguimiento) | Detección de escenas y silencios; sincronía de audio externo; colocar audio en A2+ desde el navegador |
-| E17 | `DescriptorTransicion` y `DescriptorAnimacionTexto` como el de efectos; transiciones visibles y editables en la timeline; curvas de parámetros de efectos en el editor de curvas; plantillas de títulos; `.srt` |
-| E18 | Edición de `proyecto.idiomas` con un comando (hoy solo al crear); forma de onda y línea de volumen en las pistas A; estiramiento que conserve el tono |
-| E19 | Lista de trabajos de render (hoy: barra de tareas + entregables); perfiles en el estándar |
-| E20 | Espacio Shorts sobre `asas.VistaLienzo` y `Lienzo.ventana_vertical`; los comandos ya existen |
-| E21 | Plugins registran efectos (con descriptor), transiciones y exportadores |
-| E22 | Descargar de memoria los capítulos sin historial al cambiar de capítulo; rendimiento con cientos de Elementos por minuto (mapa y timeline); empaquetado |
+**Ajustes al plan**: incorporados en el nuevo orden de la revisión 10 (sección 19).
 
 ### Revisión 8: Fase D (interfaz) implementada
 
@@ -1854,21 +1852,90 @@ puede ejecutar con `main.py` en modo sin interfaz.
 
 **E16. Inspector, keyframes y curvas** — propiedades por grupo (espacio, audio, efectos, texto), rombo de keyframe por propiedad, navegación entre keyframes, editor de curvas bezier, panel de historial.
 
-### Fase E — Capacidades creativas
+### Orden de lo que falta (revisión 10)
 
-**E17. Efectos, transiciones y texto** — implementación de `TIPOS_EFECTO` y `TIPOS_TRANSICION`; LUT `.cube`; croma; máscaras; estabilización; animaciones de entrada y salida de clips; Ken Burns; plantillas de títulos y rótulos; títulos y subtítulos por idioma con animaciones de `ANIMACIONES_TEXTO`; importar `.srt`; monitores de señal; velocidad y rampas (keyframes de velocidad).
+Criterio, de abajo hacia arriba como en todo el plan: **primero terminar la base
+de edición diaria** (lo que la interfaz ya muestra pero no completa), después lo
+creativo, luego la entrega y al final la extensión y el cierre. Cada fase solo
+usa lo que ya existe debajo.
 
-**E18. Audio avanzado** — keyframes de volumen en la timeline, reducción automática de la música con voz, medidores de nivel, normalización de sonoridad (−14 LUFS para YouTube), reducción de ruido, gestión de idiomas del proyecto.
+```
+A Fundamentos → B Persistencia → C Motor → D Interfaz        (hecho, E0–E16)
+  → E Completar la edición   E17 Timeline y Taller completos · E18 Proyecto, idiomas y mantenimiento
+  → F Capacidades creativas  E19 Efectos, transiciones y texto · E20 Audio avanzado
+  → G Entrega                E21 Render y exportación · E22 Shorts verticales 9:16
+  → H Extensión y cierre     E23 Plugins y plantillas · E24 Rendimiento, empaquetado y documentación
+```
 
-**E19. Cola de render y exportación** — panel de cola, perfiles (YouTube 1080p, 720p, 4K, solo audio), render por idioma (varias pistas o un archivo por idioma), subtítulos `.srt` y en pista, capítulos de YouTube desde marcadores, H.265 / 10 bits, NVENC; VAAPI solo con PyAV compilado contra el FFmpeg del sistema (15.4).
+### Fase E — Completar la edición
 
-**E20. Shorts verticales 9:16** — modelo ya listo (E4); servicio de recomposición a 720×1280; espacio de trabajo Shorts; `main.py --shorts`.
+**E17. Timeline y Taller completos** — mover y recortar **en grupo** con la
+selección múltiple (un solo paso de deshacer); miniaturas y forma de onda
+dibujadas en las pistas (los servicios ya las generan al hornear); línea de
+volumen editable en las pistas A (keyframes de `volumen`); transiciones
+**visibles y editables** en la timeline con `DescriptorTransicion` (mismo patrón
+que los efectos) sobre el comando `CambiarTransicion` ya existente; colocar audio
+en A2+ y elegir la capa de audio destino; búsqueda de Elementos por nombre;
+Taller: detección de escenas y de silencios (marcas sugeridas de entrada y
+salida), sincronía de audio externo por forma de onda, ajuste por tramo cuando
+los tramos de una Pieza tienen distinta relación de aspecto.
 
-### Fase F — Cierre
+**E18. Proyecto, idiomas y mantenimiento** — comando para agregar, quitar y
+ordenar los **idiomas del proyecto** (hoy solo al crearlo) y su pantalla;
+descargar de memoria los capítulos sin historial al cambiar de capítulo; atajos
+editables desde la interfaz; gestor de proyecto: consolidar, limpiar Brutos sin
+uso, vaciar caché y papelera con confirmación; espacio en disco antes de
+importar, hornear y renderizar (22.6).
 
-**E21. Extras** — atajos editables desde la interfaz, plugins (código externo: solo desde `~/.config/editor/plugins/` y con aviso), gestor de proyecto (consolidar, limpiar Brutos sin uso, caché y papelera), plantillas de capítulo, subtítulos automáticos opcionales.
+### Fase F — Capacidades creativas
 
-**E22. Documentación final** — README completo y este documento al día.
+**E19. Efectos, transiciones y texto** — nuevos tipos de efecto con su
+descriptor (máscaras, estabilización, Ken Burns, animaciones de entrada y salida
+de clips); tipos de transición completos; curvas de los parámetros de efectos en
+el editor de curvas; `DescriptorAnimacionTexto`, plantillas de títulos y rótulos;
+títulos y subtítulos por idioma; importar `.srt`; velocidad y rampas (keyframes
+de velocidad); monitores de señal (histograma, forma de onda de luminancia).
+
+**E20. Audio avanzado** — reducción automática de la música con voz, medidores
+de nivel, normalización de sonoridad (−14 LUFS para YouTube), reducción de
+ruido, estiramiento de audio que **conserve el tono** (velocidad y conformar).
+
+### Fase G — Entrega
+
+**E21. Render y exportación** — lista de trabajos de render (hoy: barra de
+tareas y entregables), perfiles en el estándar (YouTube 1080p, 720p, 4K, solo
+audio), subtítulos `.srt` y en pista, capítulos de YouTube desde marcadores,
+H.265 / 10 bits, NVENC; VAAPI con PyAV compilado contra el FFmpeg del sistema
+(15.4).
+
+**E22. Shorts verticales 9:16** — modelo y comandos ya listos (E4, E6); servicio
+de recomposición a 720×1280; espacio de trabajo Shorts sobre `asas.VistaLienzo` y
+`Lienzo.ventana_vertical`; `main.py --shorts`.
+
+### Fase H — Extensión y cierre
+
+**E23. Plugins y plantillas** — plugins desde `~/.config/editor/plugins/` (con
+aviso: es código externo) que registran efectos, transiciones y exportadores con
+sus descriptores; plantillas de capítulo; subtítulos automáticos opcionales.
+
+**E24. Rendimiento, empaquetado y documentación** — capítulos grandes (cientos
+de Elementos por minuto) en mapa y timeline; mediciones de memoria y tiempos;
+empaquetado para Linux; README y este documento al día.
+
+### Numeración anterior
+
+Las revisiones 1–9 usan la numeración vieja de las épicas pendientes:
+
+| Antes | Ahora |
+|---|---|
+| E15 (pendientes: escenas, silencios, sincronía) y seguimientos de E14 | E17 |
+| E18 "gestión de idiomas del proyecto" y parte de E21 "gestor de proyecto, atajos editables" | E18 |
+| E17 Efectos, transiciones y texto | E19 |
+| E18 Audio avanzado | E20 |
+| E19 Cola de render y exportación | E21 |
+| E20 Shorts | E22 |
+| E21 Extras (plugins, plantillas) | E23 |
+| E22 Documentación final | E24 |
 
 ### Estado de implementación
 
@@ -1892,7 +1959,8 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | E14 | ✅ | Timeline (4 zooms, 6 herramientas, imán, fantasmas, Global, cabeceras de capa con idioma, marcadores, I/O, texto) y mapa del capítulo (3 estados, listo, intercambiar) |
 | E15 | ✅ (parcial) | Brutos, visor nativo, fps interpretado, método, tramos, hornear, colocar. Pendiente: detección de escenas y silencios, sincronía de audio externo |
 | E16 | ✅ | Inspector por grupos, keyframes (rombo, saltar), editor de curvas con bezier, historial |
-| E17 en adelante | Pendiente | |
+| E17 | **Siguiente** | Timeline y Taller completos |
+| E18–E24 | Pendiente | Ver el orden de la revisión 10 |
 
 ### Decisiones tomadas al implementar la Fase B
 
@@ -1914,9 +1982,12 @@ puede ejecutar con `main.py` en modo sin interfaz.
 E0 → E1 → E2 → E3 → E4 ─┬→ E5 ─┐
                         ├→ E6 ─┼→ E9 → E10 → E11 → E12 → E13 → E14 → E15 → E16
                         └→ E7 → E8 ─┘                                        │
-                                                          E17 ← ─ ─ ─ ─ ─ ─ ─┘
-                                                           └→ E18 → E19 → E20 → E21 → E22
+          ┌──────────────────────────────────────────────────────────────────┘
+          └→ E17 → E18 → E19 → E20 → E21 → E22 → E23 → E24
 ```
+
+E19 (efectos, transiciones) y E20 (audio) pueden avanzar en paralelo una vez
+hecha E18; E22 (Shorts) usa el render de E21.
 
 E5, E6 y E7 dependen solo de E4 y pueden avanzar en paralelo; E9 necesita las
 tres (y E8).

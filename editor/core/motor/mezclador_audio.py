@@ -157,7 +157,7 @@ class Mezclador:
             original = fuente.leer(inicio_fuente, largo_fuente)[:, ::-1]
         else:
             original = fuente.leer(inicio_fuente, largo_fuente)
-        # Cambio de velocidad simple (también cambia el tono); E18 puede sustituirlo por uno que lo conserve.
+        # Cambio de velocidad simple (también cambia el tono); E20 puede sustituirlo por uno que lo conserve.
         posiciones = np.linspace(0, original.shape[1] - 1, cantidad)
         indices = np.arange(original.shape[1])
         return np.vstack([np.interp(posiciones, indices, original[c]) for c in range(2)]).astype(np.float32)

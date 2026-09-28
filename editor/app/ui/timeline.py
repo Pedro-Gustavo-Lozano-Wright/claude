@@ -359,7 +359,7 @@ class Timeline:
             self._arrastre = {"tipo": "cabezal"}
             self.app.mover_cabezal_a(vista.f(x))
             return
-        # Flutter también inicia un arrastre en un clic simple: con Shift la selección
+        # Flet también inicia un arrastre en un clic simple: con Shift la selección
         # ya la decidió el toque (sumar o quitar) y aquí no se toca.
         if elemento.id not in self.sesion.estado.seleccion and not self.app.shift_presionado:
             self.app.seleccionar({elemento.id}, refrescar=False)

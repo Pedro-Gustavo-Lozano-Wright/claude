@@ -1,4 +1,4 @@
 """Espacio de trabajo de Shorts verticales.
 
-Pendiente: épica E20.
+Pendiente: épica E22.
 """

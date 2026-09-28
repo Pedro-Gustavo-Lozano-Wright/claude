@@ -1,8 +1,8 @@
 """Atajos de teclado con contextos de foco (T12.7).
 
 `config/atajos.json` (o su copia en `~/.config/editor/`) asocia acciones a
-combinaciones como "Ctrl+Shift+Z". Flet entrega la etiqueta de la tecla que
-da Flutter ("Arrow Left", " ", "Page Up"…); aquí se normaliza.
+combinaciones como "Ctrl+Shift+Z". Flet entrega la etiqueta de la tecla
+("Arrow Left", " ", "Page Up"…); aquí se normaliza.
 
 Contextos: con el foco en un campo de texto solo funciona guardar (Ctrl+S);
 deshacer, flechas, espacio y letras quedan para el campo mientras se escribe.

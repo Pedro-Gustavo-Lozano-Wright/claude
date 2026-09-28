@@ -4,7 +4,7 @@ Separado de lo que edita el usuario (PROJECT.md, 22.7):
 
 | Archivo | Contenido | Lo escribe |
 |---|---|---|
-| `capNNNN/render/_renders.json` | Entregables, último render de cada minuto y de cada Short | Servicio de render (E10, E20) |
+| `capNNNN/render/_renders.json` | Entregables, último render de cada minuto y de cada Short | Servicio de render (E10, E22) |
 | `taller/pieNNNN…/_horneado.json` | Resultado del último horneado | Servicio de horneado (E9) |
 
 Así un render o un horneado nunca se pierde por cerrar sin guardar, y
