@@ -458,13 +458,18 @@ class Ventana:
             self.raiz.cerrar_proyecto()
             terminar()
 
+        def descartar() -> None:
+            # Descartar es una decisión: la instantánea de autosave no debe ofrecerse al reabrir.
+            ctl_proyecto.descartar_autosave(self.sesion)
+            cerrar()
+
         if not self.sesion.historial.hay_cambios or self.sesion.solo_lectura:
             cerrar()
             return
         self.raiz.dialogo(
             "Cambios sin guardar",
             "El proyecto tiene cambios sin guardar.",
-            [("Guardar", lambda: self.guardar(despues=cerrar)), ("Descartar", cerrar), ("Cancelar", None)],
+            [("Guardar", lambda: self.guardar(despues=cerrar)), ("Descartar", descartar), ("Cancelar", None)],
         )
 
     # --- Bucles de fondo del hilo de Flet ----------------------------------------------

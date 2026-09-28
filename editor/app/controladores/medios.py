@@ -17,6 +17,9 @@ from editor.core.tareas.cola import BANCO_VISIBLE, Tarea
 def importar(sesion: Sesion, rutas: list[Path]) -> None:
     proyecto = sesion.proyecto
     assert proyecto.raiz is not None
+    if sesion.solo_lectura:
+        sesion.avisar("El proyecto está abierto en solo lectura: no se puede importar.")
+        return
     raiz = proyecto.raiz
     for origen in rutas:
         if not origen.is_file():

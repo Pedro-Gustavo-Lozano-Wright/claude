@@ -11,7 +11,7 @@ from editor.app.estado import Sesion
 from editor.core.comandos.agregar_elemento import AgregarElemento
 from editor.core.comandos.fabrica import elemento_desde_bruto, elemento_desde_pieza
 from editor.core.comandos.operaciones import ModoColocacion
-from editor.core.comandos.taller import AgregarPieza, CambiarRecetaPieza, InterpretarFps
+from editor.core.comandos.taller import AgregarPieza, CambiarRecetaPieza, InterpretarFps, QuitarBruto
 from editor.core.espacio.transform import ENCAJAR
 from editor.core.modelo.bruto import TipoMedio
 from editor.core.modelo.capa import Capa, TipoCapa
@@ -57,6 +57,9 @@ def interpretar_fps(sesion: Sesion, id_bruto: str, fps: Fraction | None) -> bool
 def hornear(sesion: Sesion, id_pieza: str) -> None:
     proyecto = sesion.proyecto
     assert proyecto.raiz is not None
+    if sesion.solo_lectura:
+        sesion.avisar("El proyecto está abierto en solo lectura: no se puede hornear.")
+        return
     raiz = proyecto.raiz
     pieza = copy.deepcopy(proyecto.taller.pieza(id_pieza))
     brutos = copy.deepcopy(proyecto.taller.brutos)
@@ -103,7 +106,8 @@ def colocar_pieza(sesion: Sesion, id_pieza: str, codigo_capa: str | None = None,
     pieza = proyecto.taller.pieza(id_pieza)
     capa = Capa.desde_codigo(codigo_capa or sesion.estado.capa_destino)
     try:
-        elemento = elemento_desde_pieza(proyecto, pieza, capa, sesion.estado.cabezal, ajuste=ENCAJAR)
+        elemento = elemento_desde_pieza(proyecto, pieza, capa, sesion.estado.cabezal, ajuste=ENCAJAR,
+                                        en_global=sesion.estado.destino_global)
     except ErrorModelo as error:
         sesion.avisar(str(error))
         return False
@@ -124,7 +128,8 @@ def colocar_bruto(sesion: Sesion, id_bruto: str, codigo_capa: str | None = None,
     if bruto.tipo is TipoMedio.AUDIO and capa.tipo is not TipoCapa.AUDIO:
         capa = Capa(TipoCapa.AUDIO, 1)
     try:
-        elemento = elemento_desde_bruto(proyecto, bruto, capa, sesion.estado.cabezal, ajuste=ENCAJAR)
+        elemento = elemento_desde_bruto(proyecto, bruto, capa, sesion.estado.cabezal, ajuste=ENCAJAR,
+                                        en_global=sesion.estado.destino_global)
     except ErrorModelo as error:
         sesion.avisar(str(error))
         return False
@@ -132,6 +137,11 @@ def colocar_bruto(sesion: Sesion, id_bruto: str, codigo_capa: str | None = None,
         sesion.estado.seleccion = {elemento.id}
         return True
     return False
+
+
+def quitar_bruto(sesion: Sesion, id_bruto: str) -> bool:
+    """Quita el Bruto del Taller (se deshace). Al guardar, su archivo pasa a `.papelera/`."""
+    return sesion.ejecutar(QuitarBruto(id_bruto))
 
 
 _visor = None   # GestorFuentes del visor del Taller (se crea al primer uso)

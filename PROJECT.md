@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 8. Fases A, B, C y D (E0–E16) implementadas; la interfaz se recorrió en Chromium con medios reales. Siguiente bloque: Fase E (capacidades creativas, E17–E20).
+- **Estado:** revisión 9. Fases A, B, C y D (E0–E16) implementadas y consolidadas; la interfaz se recorrió en Chromium con medios reales. Siguiente bloque: Fase E (capacidades creativas, E17–E20). Instalación: [INSTALACION.md](INSTALACION.md).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 8](#0-cambios-de-las-revisiones-2-a-8)
+0. [Cambios de las revisiones 2 a 9](#0-cambios-de-las-revisiones-2-a-9)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,56 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 8
+## 0. Cambios de las revisiones 2 a 9
+
+### Revisión 9: consolidación de A–D antes de la Fase E
+
+Aclaración: todo el código es Python con **Flet**; Flet dibuja con el motor de
+Flutter por dentro, por eso algunos comportamientos (gestos, foco, `expand`) se
+describen con sus reglas, pero no hay código Dart.
+
+**Cabos sueltos encontrados y cerrados**
+
+| Hallazgo | Corrección |
+|---|---|
+| Tras restaurar un autosave el historial decía "sin cambios": cerrar sin guardar perdía lo recuperado | `Historial.marcar_sin_guardar()` al restaurar |
+| "Descartar" al cerrar dejaba la instantánea y el proyecto volvía a ofrecerla | Descartar borra la instantánea |
+| En solo lectura se podía importar, hornear y renderizar (escriben en el proyecto) | Bloqueados con aviso |
+| No había forma de poner o pasar Elementos a Global (música, logo fijo) | Comando `CambiarAGlobal` (guardar mueve gemelo y archivo); casilla **Global** en la barra de la timeline; botón en el inspector |
+| `QuitarBruto` permitía quitar un Bruto usado por Piezas (el horneado fallaría) | Rechazado; botón **Quitar Bruto** en el Taller |
+| Los efectos no declaraban parámetros: la interfaz no podía agregarlos ni editarlos | `DescriptorEfecto` / `Parametro` en `modelo/efecto.py` (rango, valor inicial, unidad, opciones), `efecto_nuevo`, `registrar_efecto(tipo, aplicador, descriptor)`; `CambiarOpcionEfecto`; inspector con pila de efectos (agregar, activar, subir, quitar, parámetros con keyframes, opciones) |
+| Deshacer un paso de otro capítulo lo cambiaba sin mostrarlo | Deshacer y rehacer llevan al capítulo afectado |
+| Con el botón de reproducir enfocado, Espacio llegaba dos veces | Dos pulsaciones en < 0,25 s cuentan como una |
+| Un clic simple también inicia un arrastre: Shift+clic no sumaba a la selección y un clic podía dejar un paso vacío | El arrastre respeta Shift y no ejecuta nada sin desplazamiento |
+
+Verificado fuera del repositorio: recorrido del núcleo (Global ida y vuelta con
+guardado y reapertura, efecto animado compuesto al fotograma, `QuitarBruto`
+protegido, deshacer entre capítulos, autosave restaurado) y Chromium (Global,
+inspector de efectos, Shift+clic).
+
+**Contratos que la Fase E debe respetar** (cómo se conecta con A–D)
+
+| Tema | Regla |
+|---|---|
+| Ediciones | Siempre un comando por el historial (`Sesion.ejecutar`), nunca tocar el modelo desde la interfaz; valores absolutos para que los arrastres se fusionen |
+| Trabajo pesado | Tarea en la cola con instantánea (`Capitulo.instantanea`) y `al_terminar` por `Sesion.tarea` (llega al hilo de Flet) |
+| Estado automático | Lo que produce un servicio (render de Shorts, análisis, sonoridad medida) se escribe con `proyecto_fs/automatico.py` y no se deshace |
+| Tipos ampliables | Efectos por descriptor; transiciones, animaciones de texto y exportadores deben seguir el mismo patrón (descriptor + registro) para que la interfaz y los plugins (E21) los traten igual |
+| Interfaz | Paneles con `.control` y `.refrescar()`, redibujo pedido con `Ventana.refrescar(partes)`; `widgets.actualizar()` para controles que pueden no estar montados |
+| Huellas | Todo parámetro nuevo que cambie la imagen o el sonido debe entrar en `serializacion` (y por tanto en la huella del minuto) para invalidar renders y pre-renders |
+
+**Ajustes al plan de las épicas siguientes**
+
+| Épica | Qué se agrega o precisa |
+|---|---|
+| E14 (seguimiento) | Mover en grupo con selección múltiple (hoy se arrastra un Elemento; copiar, pegar y borrar sí son múltiples); miniaturas y forma de onda dibujadas en las pistas (los servicios ya las generan al hornear) |
+| E15 (seguimiento) | Detección de escenas y silencios; sincronía de audio externo; colocar audio en A2+ desde el navegador |
+| E17 | `DescriptorTransicion` y `DescriptorAnimacionTexto` como el de efectos; transiciones visibles y editables en la timeline; curvas de parámetros de efectos en el editor de curvas; plantillas de títulos; `.srt` |
+| E18 | Edición de `proyecto.idiomas` con un comando (hoy solo al crear); forma de onda y línea de volumen en las pistas A; estiramiento que conserve el tono |
+| E19 | Lista de trabajos de render (hoy: barra de tareas + entregables); perfiles en el estándar |
+| E20 | Espacio Shorts sobre `asas.VistaLienzo` y `Lienzo.ventana_vertical`; los comandos ya existen |
+| E21 | Plugins registran efectos (con descriptor), transiciones y exportadores |
+| E22 | Descargar de memoria los capítulos sin historial al cambiar de capítulo; rendimiento con cientos de Elementos por minuto (mapa y timeline); empaquetado |
 
 ### Revisión 8: Fase D (interfaz) implementada
 

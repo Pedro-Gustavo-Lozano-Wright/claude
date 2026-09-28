@@ -24,7 +24,7 @@ from typing import Callable
 import cv2
 import numpy as np
 
-from editor.core.modelo.efecto import Efecto, registrar_tipo_efecto
+from editor.core.modelo.efecto import DescriptorEfecto, Efecto, registrar_tipo_efecto
 
 registro = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ Aplicador = Callable[[np.ndarray, dict[str, float], dict[str, str], ContextoEfec
 _APLICADORES: dict[str, Aplicador] = {}
 
 
-def registrar_efecto(tipo: str, aplicador: Aplicador) -> None:
-    registrar_tipo_efecto(tipo)
+def registrar_efecto(tipo: str, aplicador: Aplicador, descriptor: DescriptorEfecto | None = None) -> None:
+    registrar_tipo_efecto(tipo, descriptor)
     _APLICADORES[tipo] = aplicador
 
 

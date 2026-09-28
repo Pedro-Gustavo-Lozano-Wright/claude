@@ -8,7 +8,13 @@ La interfaz nunca modifica el modelo: crea un comando y lo pasa al historial.
 """
 
 from editor.core.comandos.actualizar_fuente import ActualizarFuenteEnCapitulo, actualizar_fuente
-from editor.core.comandos.agregar_efecto import ActivarEfecto, AgregarEfecto, CambiarParametroEfecto, ReordenarEfecto
+from editor.core.comandos.agregar_efecto import (
+    ActivarEfecto,
+    AgregarEfecto,
+    CambiarOpcionEfecto,
+    CambiarParametroEfecto,
+    ReordenarEfecto,
+)
 from editor.core.comandos.agregar_elemento import AgregarElemento, DuplicarElemento, PegarElementos
 from editor.core.comandos.agregar_keyframe import MoverKeyframe, PonerKeyframe
 from editor.core.comandos.cambiar_propiedad import CambiarPropiedad, CambiarVelocidad
@@ -33,7 +39,7 @@ from editor.core.comandos.editar_short import (
     QuitarShort,
 )
 from editor.core.comandos.historial import Historial
-from editor.core.comandos.mover_elemento import MoverElemento, mover_entre_capitulos
+from editor.core.comandos.mover_elemento import CambiarAGlobal, MoverElemento, mover_entre_capitulos
 from editor.core.comandos.mover_minuto import IntercambiarMinutos
 from editor.core.comandos.operaciones import Alcance, ModoColocacion
 from editor.core.comandos.quitar_efecto import QuitarEfecto

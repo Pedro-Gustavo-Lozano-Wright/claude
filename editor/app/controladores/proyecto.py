@@ -73,6 +73,8 @@ def crear(
 def restaurar_autosave(sesion: Sesion) -> None:
     autosave.restaurar_instantanea(sesion.proyecto)
     sesion.vista_previa.actualizar_taller(sesion.proyecto)
+    # Lo restaurado no está en disco: hasta guardar, cerrar debe preguntar.
+    sesion.historial.marcar_sin_guardar()
 
 
 def descartar_autosave(sesion: Sesion) -> None:

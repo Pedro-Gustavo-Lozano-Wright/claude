@@ -9,6 +9,9 @@ from editor.core.modelo.minuto import EstadoRender
 
 
 def renderizar(sesion: Sesion, desde: int | None, hasta: int | None, por_idioma: bool = False) -> None:
+    if sesion.solo_lectura:
+        sesion.avisar("El proyecto está abierto en solo lectura: no se puede renderizar.")
+        return
     pedido = render.PedidoRender.crear(
         sesion.proyecto, sesion.estado.capitulo, desde, hasta,
         modo=render.ARCHIVOS if por_idioma else render.PISTAS,

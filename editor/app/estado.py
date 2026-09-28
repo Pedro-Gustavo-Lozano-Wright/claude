@@ -56,6 +56,7 @@ class EstadoApp:
     iman: bool = True
     seguir_cabezal: bool = True
     capa_destino: str = "V1"              # capa donde se colocan Piezas nuevas
+    destino_global: bool = False          # colocar en Global (abarca minutos: música, logo fijo)
     entrada: int | None = None            # marcas I / O de la timeline (fotogramas del capítulo)
     salida: int | None = None
 
@@ -134,14 +135,22 @@ class Sesion:
     def deshacer(self) -> None:
         comando = self.historial.deshacer()
         if comando is not None:
+            self._ir_al_capitulo_de(comando)
             self.avisar(f"Deshecho: {comando.descripcion}")
         self._limpiar_seleccion()
 
     def rehacer(self) -> None:
         comando = self.historial.rehacer()
         if comando is not None:
+            self._ir_al_capitulo_de(comando)
             self.avisar(f"Rehecho: {comando.descripcion}")
         self._limpiar_seleccion()
+
+    def _ir_al_capitulo_de(self, comando: Comando) -> None:
+        """El historial es del proyecto: si el paso tocó otro capítulo, se muestra ese."""
+        capitulos = {a.capitulo for a in comando.afectados() if a.capitulo is not None}
+        if capitulos and self.estado.capitulo not in capitulos:
+            self.cambiar_capitulo(min(capitulos))
 
     def _limpiar_seleccion(self) -> None:
         capitulo = self.capitulo

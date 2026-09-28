@@ -69,6 +69,7 @@ class Monitor:
         self._video: flet_video.Video | None = None
         self._video_listo = asyncio.Event()
         self._nivel3 = True        # se desactiva si el reproductor de video falla una vez
+        self._ultimo_alternar = 0.0
         self._audios_listos: dict[tuple[int, int, str | None], str] = {}
 
         self.imagen = ft.Image(src=imagen_vacia(), gapless_playback=True, fit=ft.BoxFit.FILL)
@@ -384,6 +385,12 @@ class Monitor:
     # --- Reproducción ------------------------------------------------------------------
 
     def alternar_reproduccion(self) -> None:
+        # Con el botón de reproducir enfocado, Espacio llega dos veces (el botón y el atajo):
+        # dos pulsaciones en menos de 0,25 s cuentan como una.
+        ahora = time.monotonic()
+        if ahora - self._ultimo_alternar < 0.25:
+            return
+        self._ultimo_alternar = ahora
         if self.sesion.estado.reproduciendo:
             self.detener()
         else:

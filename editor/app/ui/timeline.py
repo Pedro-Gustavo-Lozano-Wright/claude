@@ -95,6 +95,9 @@ class Timeline:
                 ft.IconButton(ft.Icons.CROP, tooltip="Quitar el rango I–O (Shift: extraer)", icon_size=18,
                               on_click=lambda _: self._quitar_rango()),
                 self.capa_destino,
+                ft.Checkbox(label="Global", value=app.sesion.estado.destino_global,
+                            tooltip="Colocar en la pista Global del capítulo (música, logo fijo)",
+                            on_change=self._cambiar_destino_global),
                 ft.Container(expand=True),
                 self.titulo,
                 ft.IconButton(ft.Icons.ZOOM_OUT, tooltip="Pistas más bajas", icon_size=18,
@@ -356,11 +359,15 @@ class Timeline:
             self._arrastre = {"tipo": "cabezal"}
             self.app.mover_cabezal_a(vista.f(x))
             return
-        if elemento.id not in self.sesion.estado.seleccion:
+        # Flutter también inicia un arrastre en un clic simple: con Shift la selección
+        # ya la decidió el toque (sumar o quitar) y aquí no se toca.
+        if elemento.id not in self.sesion.estado.seleccion and not self.app.shift_presionado:
             self.app.seleccionar({elemento.id}, refrescar=False)
         self._arrastre = {
             "tipo": "elemento", "id": elemento.id, "original": copy.deepcopy(elemento),
-            "zona": ctl.zona_de(elemento, vista, x), "x0": x, "vista": vista, "ultimo_delta": None,
+            "zona": ctl.zona_de(elemento, vista, x), "x0": x, "vista": vista,
+            # Sin desplazamiento no se ejecuta nada (un clic no deja pasos vacíos en el historial).
+            "ultimo_delta": (0, self._pista_en(y)),
         }
 
     def _arrastrar(self, evento: ft.DragUpdateEvent) -> None:
@@ -420,6 +427,9 @@ class Timeline:
 
     def _cambiar_destino(self, evento) -> None:
         self.sesion.estado.capa_destino = evento.control.value
+
+    def _cambiar_destino_global(self, evento) -> None:
+        self.sesion.estado.destino_global = bool(evento.control.value)
 
     def _alto(self, delta: int) -> None:
         self.alto_pista = max(22, min(80, self.alto_pista + delta))

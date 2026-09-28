@@ -64,6 +64,31 @@ class MoverElemento(EdicionCapitulo):
         return colocar_con_modo(self, proyecto, capitulo, [elemento], self.modo, self.alcance)
 
 
+class CambiarAGlobal(EdicionCapitulo):
+    """Pasa un Elemento de los minutos a Global o al revés, en el mismo instante y capa.
+
+    Global es para lo que abarca varios minutos (música, un logo fijo); al guardar,
+    el gemelo y el archivo cambian de carpeta como en cualquier otro movimiento.
+    """
+
+    def __init__(self, capitulo: int, id_elemento: str, a_global: bool) -> None:
+        super().__init__(capitulo)
+        self.id_elemento = id_elemento
+        self.a_global = a_global
+        self.descripcion = "Pasar a Global" if a_global else "Pasar a los minutos"
+
+    def involucrados(self, capitulo: Capitulo) -> set[str]:
+        return {self.id_elemento}
+
+    def aplicar(self, proyecto: Proyecto, capitulo: Capitulo) -> set[str]:
+        elemento = self.obtener(capitulo, self.id_elemento)
+        if elemento.en_global == self.a_global:
+            return set()
+        self.retirar(capitulo, [elemento])
+        elemento.en_global = self.a_global
+        return colocar_con_modo(self, proyecto, capitulo, [elemento], ModoColocacion.RECHAZAR, Alcance.MINUTO)
+
+
 def mover_entre_capitulos(
     proyecto: Proyecto,
     origen: int,

@@ -59,6 +59,30 @@ class CambiarParametroEfecto(EdicionCapitulo):
         return set()
 
 
+class CambiarOpcionEfecto(EdicionCapitulo):
+    """Opción de texto de un efecto (color del croma, archivo del LUT)."""
+
+    descripcion = "Ajustar efecto"
+
+    def __init__(self, capitulo: int, id_elemento: str, indice: int, opcion: str, valor: str) -> None:
+        super().__init__(capitulo)
+        self.id_elemento = id_elemento
+        self.indice = indice
+        self.opcion = opcion
+        self.valor = valor
+
+    def involucrados(self, capitulo: Capitulo) -> set[str]:
+        return {self.id_elemento}
+
+    def aplicar(self, proyecto: Proyecto, capitulo: Capitulo) -> set[str]:
+        elemento = self.obtener(capitulo, self.id_elemento)
+        try:
+            elemento.efectos[self.indice].opciones[self.opcion] = str(self.valor)
+        except IndexError:
+            raise EdicionRechazada(f"No hay un efecto en la posición {self.indice}.") from None
+        return set()
+
+
 class ActivarEfecto(EdicionCapitulo):
     descripcion = "Activar o desactivar efecto"
 

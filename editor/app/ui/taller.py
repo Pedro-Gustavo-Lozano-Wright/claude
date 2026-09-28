@@ -163,6 +163,7 @@ class Taller:
                 ft.OutlinedButton("Entrada (I)", on_click=lambda _: self.marcar_entrada()),
                 ft.OutlinedButton("Salida (O)", on_click=lambda _: self.marcar_salida()),
                 ft.FilledButton("Crear Pieza", icon=ft.Icons.ADD, on_click=lambda _: self._crear_pieza()),
+                ft.TextButton("Quitar Bruto", icon=ft.Icons.DELETE, on_click=lambda _: self._quitar_bruto()),
             ]
             if pieza is not None:
                 acciones.append(ft.OutlinedButton(f"Añadir tramo a P{pieza.numero:03d}",
@@ -297,6 +298,19 @@ class Taller:
         if self.id_pieza and ctl.colocar_pieza(self.sesion, self.id_pieza):
             self.app.refrescar("timeline", "monitor", "inspector", "mapa", "navegador")
             self.app.aviso_breve("Pieza colocada en el cabezal.")
+
+    def _quitar_bruto(self) -> None:
+        id_bruto = self.id_bruto
+        if id_bruto is None:
+            return
+
+        def quitar() -> None:
+            if ctl.quitar_bruto(self.sesion, id_bruto):
+                self.id_bruto = None
+                self.app.refrescar("taller", "navegador")
+
+        self.app.confirmar("Quitar Bruto", "El Bruto se quitará del Taller (se puede deshacer); al guardar, "
+                           "su archivo pasa a .papelera/.", quitar)
 
     def _quitar_pieza(self) -> None:
         id_pieza = self.id_pieza

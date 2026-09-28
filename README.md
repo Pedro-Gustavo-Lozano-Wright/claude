@@ -31,6 +31,8 @@ sudo apt install libmpv2 libgtk-3-0 libgstreamer1.0-0 zenity fonts-dejavu
 
 ## Instalación
 
+Guía completa (dependencias del sistema, PyCharm, problemas frecuentes): **[INSTALACION.md](INSTALACION.md)**.
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate

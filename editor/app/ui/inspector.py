@@ -15,7 +15,20 @@ import flet as ft
 from editor.app.ui.editor_curvas import EditorCurvas
 from editor.app.ui.tema import TEMA, texto, texto_suave, titulo_panel
 from editor.app.ui.widgets import actualizar, timecode
-from editor.core.comandos import ActivarEfecto, CambiarPropiedad, CambiarVelocidad, PonerKeyframe, QuitarKeyframe
+from editor.core.comandos import (
+    ActivarEfecto,
+    AgregarEfecto,
+    CambiarAGlobal,
+    CambiarOpcionEfecto,
+    CambiarParametroEfecto,
+    CambiarPropiedad,
+    CambiarVelocidad,
+    PonerKeyframe,
+    QuitarEfecto,
+    QuitarKeyframe,
+    ReordenarEfecto,
+)
+from editor.core.modelo.efecto import descriptor_efecto, efecto_nuevo, tipos_efecto
 from editor.core.espacio.transform import MODOS_MEZCLA
 from editor.core.modelo.keyframe import Keyframe
 from editor.core.modelo.texto import ALINEACIONES, ANIMACIONES_TEXTO
@@ -90,6 +103,11 @@ class Inspector:
                             on_change=lambda e: self._propiedad(elemento, "estado.activo", bool(e.control.value))),
                 ft.Checkbox(label="Bloqueado", value=elemento.estado.bloqueado,
                             on_change=lambda e: self._propiedad(elemento, "estado.bloqueado", bool(e.control.value))),
+                ft.TextButton("Pasar a los minutos" if elemento.en_global else "Pasar a Global",
+                              icon=ft.Icons.LAYERS,
+                              tooltip="Global abarca varios minutos (música, logo fijo); los minutos, un tramo",
+                              on_click=lambda _: self._ejecutar(lambda: CambiarAGlobal(
+                                  self.sesion.estado.capitulo, elemento.id, not elemento.en_global))),
             ], wrap=True),
         ]
         if not elemento.es_texto:
@@ -120,14 +138,8 @@ class Inspector:
                                             lambda v: self._propiedad(elemento, "audio.fundido_entrada", max(0, int(v)))))
             filas.append(self._campo_numero("fundido salida", elemento.audio.fundido_salida, "f",
                                             lambda v: self._propiedad(elemento, "audio.fundido_salida", max(0, int(v)))))
-        if elemento.efectos:
-            filas.append(ft.Text("EFECTOS", size=TEMA.tamano_pequeno, color=TEMA.texto_suave))
-            for indice, efecto in enumerate(elemento.efectos):
-                filas.append(ft.Checkbox(
-                    label=efecto.tipo, value=efecto.activo,
-                    on_change=lambda e, i=indice: self._ejecutar(
-                        lambda: ActivarEfecto(self.sesion.estado.capitulo, elemento.id, i, bool(e.control.value))),
-                ))
+        if elemento.es_visual:
+            filas += self._efectos(elemento)
         self.cuerpo.controls = filas
         self.curvas.mostrar(self.propiedad_activa if elemento.animacion.tiene(self.propiedad_activa) else None)
 
@@ -195,16 +207,22 @@ class Inspector:
         )
 
     def _fila_animable(self, elemento, propiedad: str, etiqueta: str, valor_pantalla: float, unidad: str,
-                       desde_pantalla: Callable[[float], float], base_ruta: str) -> ft.Control:
+                       desde_pantalla: Callable[[float], float], base_ruta: str | None,
+                       indice_efecto: int | None = None) -> ft.Control:
+        """Campo con rombo de keyframe. `indice_efecto`: parámetro del efecto en esa posición."""
         f_local = self.sesion.estado.cabezal - elemento.inicio
-        animada = elemento.animacion.tiene(propiedad)
-        en_cabezal = animada and elemento.animacion.pista(propiedad).obtener(f_local) is not None
+        animacion = _animacion(elemento, indice_efecto)
+        animada = animacion.tiene(propiedad)
+        en_cabezal = animada and animacion.pista(propiedad).obtener(f_local) is not None
 
         def aplicar(nuevo: float) -> None:
             self.propiedad_activa = propiedad
             valor = desde_pantalla(nuevo)
             if animada:
-                self._poner_keyframe(elemento, propiedad, valor)
+                self._poner_keyframe(elemento, propiedad, valor, indice_efecto)
+            elif indice_efecto is not None:
+                self._ejecutar(lambda: CambiarParametroEfecto(self.sesion.estado.capitulo, elemento.id,
+                                                              indice_efecto, propiedad, valor))
             else:
                 self._propiedad(elemento, base_ruta, valor)
 
@@ -212,19 +230,61 @@ class Inspector:
             ft.Icons.DIAMOND if en_cabezal else ft.Icons.DIAMOND_OUTLINED,
             icon_color=TEMA.marcador if animada else TEMA.texto_suave, icon_size=16, width=30, height=30,
             tooltip="Quitar keyframe" if en_cabezal else "Poner keyframe en el cabezal",
-            on_click=lambda _: self._alternar_keyframe(elemento, propiedad, desde_pantalla(valor_pantalla), en_cabezal),
+            on_click=lambda _: self._alternar_keyframe(elemento, propiedad, desde_pantalla(valor_pantalla),
+                                                       en_cabezal, indice_efecto),
         )
         navegar = [
             ft.IconButton(ft.Icons.CHEVRON_LEFT, icon_size=14, width=24, height=24, disabled=not animada,
-                          tooltip="Keyframe anterior", on_click=lambda _: self._saltar(elemento, propiedad, -1)),
+                          tooltip="Keyframe anterior",
+                          on_click=lambda _: self._saltar(elemento, propiedad, -1, indice_efecto)),
             ft.IconButton(ft.Icons.CHEVRON_RIGHT, icon_size=14, width=24, height=24, disabled=not animada,
-                          tooltip="Keyframe siguiente", on_click=lambda _: self._saltar(elemento, propiedad, 1)),
+                          tooltip="Keyframe siguiente",
+                          on_click=lambda _: self._saltar(elemento, propiedad, 1, indice_efecto)),
         ]
         campo = self._campo_numero(etiqueta, valor_pantalla, unidad, aplicar)
-        return ft.GestureDetector(
-            content=ft.Row([rombo, campo, *navegar], spacing=0),
-            on_tap=lambda _: self._activar(propiedad),
-        )
+        fila = ft.Row([rombo, campo, *navegar], spacing=0)
+        if indice_efecto is not None:
+            return fila   # el editor de curvas trabaja con las propiedades del Elemento (efectos: E17)
+        return ft.GestureDetector(content=fila, on_tap=lambda _: self._activar(propiedad))
+
+    def _efectos(self, elemento) -> list[ft.Control]:
+        """Pila de efectos: agregar, activar, parámetros con keyframes, opciones, subir y quitar."""
+        capitulo = self.sesion.estado.capitulo
+        filas: list[ft.Control] = [ft.Row([
+            ft.Text("EFECTOS", size=TEMA.tamano_pequeno, color=TEMA.texto_suave),
+            ft.Dropdown(dense=True, width=190, label="Agregar efecto", value=None,
+                        options=[ft.DropdownOption(key=t, text=descriptor_efecto(t).etiqueta) for t in tipos_efecto()],
+                        on_select=lambda e: e.control.value and self._ejecutar(
+                            lambda: AgregarEfecto(capitulo, elemento.id, efecto_nuevo(e.control.value)))),
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)]
+        f_local = elemento.local(self.sesion.estado.cabezal)
+        for indice, efecto in enumerate(elemento.efectos):
+            descriptor = descriptor_efecto(efecto.tipo)
+            filas.append(ft.Row([
+                ft.Checkbox(label=descriptor.etiqueta, value=efecto.activo,
+                            on_change=lambda e, i=indice: self._ejecutar(
+                                lambda: ActivarEfecto(capitulo, elemento.id, i, bool(e.control.value)))),
+                ft.Row([
+                    ft.IconButton(ft.Icons.ARROW_UPWARD, icon_size=14, width=26, height=26, tooltip="Subir",
+                                  disabled=indice == 0,
+                                  on_click=lambda _, i=indice: self._ejecutar(
+                                      lambda: ReordenarEfecto(capitulo, elemento.id, i, i - 1))),
+                    ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=14, width=26, height=26, tooltip="Quitar",
+                                  on_click=lambda _, i=indice: self._ejecutar(
+                                      lambda: QuitarEfecto(capitulo, elemento.id, i))),
+                ], spacing=0),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
+            for parametro in descriptor.parametros:
+                valor = efecto.valor(parametro.nombre, f_local)
+                filas.append(self._fila_animable(
+                    elemento, parametro.nombre, parametro.nombre, valor, parametro.unidad,
+                    lambda v, p=parametro: max(p.minimo, min(p.maximo, v)), None, indice_efecto=indice))
+            for opcion, _defecto in descriptor.opciones:
+                filas.append(self._campo_texto(
+                    opcion, efecto.opciones.get(opcion, ""),
+                    lambda v, i=indice, o=opcion: self._ejecutar(
+                        lambda: CambiarOpcionEfecto(capitulo, elemento.id, i, o, v.strip()))))
+        return filas
 
     # --- Acciones ----------------------------------------------------------------------
 
@@ -238,22 +298,26 @@ class Inspector:
     def _velocidad(self, elemento, valor: float) -> None:
         self._ejecutar(lambda: CambiarVelocidad(self.sesion.estado.capitulo, elemento.id, valor))
 
-    def _poner_keyframe(self, elemento, propiedad: str, valor: float) -> None:
+    def _poner_keyframe(self, elemento, propiedad: str, valor: float, indice_efecto: int | None = None) -> None:
         f_local = self.sesion.estado.cabezal - elemento.inicio
         if not 0 <= f_local < elemento.duracion:
             self.app.avisar("El cabezal no está sobre el Elemento.")
             return
-        previo = elemento.animacion.pista(propiedad).obtener(f_local) if elemento.animacion.tiene(propiedad) else None
+        animacion = _animacion(elemento, indice_efecto)
+        previo = animacion.pista(propiedad).obtener(f_local) if animacion.tiene(propiedad) else None
         keyframe = Keyframe(f_local, float(valor), previo.curva if previo else "lineal", previo.controles if previo else None)
-        self._ejecutar(lambda: PonerKeyframe(self.sesion.estado.capitulo, elemento.id, propiedad, keyframe))
+        self._ejecutar(lambda: PonerKeyframe(self.sesion.estado.capitulo, elemento.id, propiedad, keyframe, indice_efecto))
 
-    def _alternar_keyframe(self, elemento, propiedad: str, valor: float, hay: bool) -> None:
-        self.propiedad_activa = propiedad
+    def _alternar_keyframe(self, elemento, propiedad: str, valor: float, hay: bool,
+                           indice_efecto: int | None = None) -> None:
+        if indice_efecto is None:
+            self.propiedad_activa = propiedad
         if hay:
             f_local = self.sesion.estado.cabezal - elemento.inicio
-            self._ejecutar(lambda: QuitarKeyframe(self.sesion.estado.capitulo, elemento.id, propiedad, f_local))
+            self._ejecutar(lambda: QuitarKeyframe(self.sesion.estado.capitulo, elemento.id, propiedad, f_local,
+                                                  indice_efecto))
         else:
-            self._poner_keyframe(elemento, propiedad, valor)
+            self._poner_keyframe(elemento, propiedad, valor, indice_efecto)
 
     def agregar_keyframe(self) -> None:
         """Atajo K: keyframe de la propiedad activa (por defecto, la posición x e y)."""
@@ -269,15 +333,17 @@ class Inspector:
                 valor = elemento.animacion.valor(propiedad, elemento.local(f), getattr(elemento.audio, propiedad))
                 self._poner_keyframe(elemento, propiedad, valor)
 
-    def _saltar(self, elemento, propiedad: str, direccion: int) -> None:
-        if not elemento.animacion.tiene(propiedad):
+    def _saltar(self, elemento, propiedad: str, direccion: int, indice_efecto: int | None = None) -> None:
+        animacion = _animacion(elemento, indice_efecto)
+        if not animacion.tiene(propiedad):
             return
         f_local = self.sesion.estado.cabezal - elemento.inicio
-        posiciones = [k.f for k in elemento.animacion.pista(propiedad)]
+        posiciones = [k.f for k in animacion.pista(propiedad)]
         destino = ([f for f in posiciones if f > f_local][:1] if direccion > 0
                    else [f for f in posiciones if f < f_local][-1:])
         if destino:
-            self.propiedad_activa = propiedad
+            if indice_efecto is None:
+                self.propiedad_activa = propiedad
             self.app.mover_cabezal_a(elemento.inicio + destino[0])
 
     def _activar(self, propiedad: str) -> None:
@@ -285,6 +351,10 @@ class Inspector:
         elemento = self.sesion.seleccionado()
         self.curvas.mostrar(propiedad if elemento is not None and elemento.animacion.tiene(propiedad) else None)
         actualizar(self.curvas.control)
+
+
+def _animacion(elemento, indice_efecto: int | None):
+    return elemento.animacion if indice_efecto is None else elemento.efectos[indice_efecto].animacion
 
 
 def _numero(valor: float) -> str:

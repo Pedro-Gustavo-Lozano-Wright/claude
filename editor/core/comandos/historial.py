@@ -53,6 +53,11 @@ class Historial:
         self._marca_guardado = len(self._deshacer)
         self._publicar_estado()
 
+    def marcar_sin_guardar(self) -> None:
+        """El modelo cambió fuera del historial (p. ej. al restaurar un autosave): hay que guardar."""
+        self._marca_guardado = None
+        self._publicar_estado()
+
     def descripciones(self) -> tuple[list[str], list[str]]:
         """Para el panel de historial: (pasos hechos, pasos por rehacer)."""
         return [c.descripcion for c in self._deshacer], [c.descripcion for c in reversed(self._rehacer)]

@@ -99,9 +99,11 @@ class QuitarBruto(_EdicionTaller):
 
     def ejecutar(self, proyecto: Proyecto) -> None:
         self._reiniciar()
-        _, dependientes = proyecto.referencias.dependientes_de_bruto(self.id_bruto)
+        piezas, dependientes = proyecto.referencias.dependientes_de_bruto(self.id_bruto)
         if dependientes:
             raise EdicionRechazada(f"El Bruto se usa en {len(dependientes)} Elementos; quítelos primero.")
+        if piezas:
+            raise EdicionRechazada(f"El Bruto es fuente de {len(piezas)} Pieza(s); quítelas primero.")
         self._guardar_bruto(proyecto, self.id_bruto)
         proyecto.taller.quitar_bruto(self.id_bruto)
         self._afectados = Afectados(brutos={self.id_bruto})
