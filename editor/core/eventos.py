@@ -52,20 +52,35 @@ class ProyectoModificado(Evento):
     """El modelo tiene cambios que todavía no se reconciliaron con el disco."""
 
 
+@dataclass(frozen=True)
+class CapituloCreado(Evento):
+    capitulo: int
+
+
 # --- Edición ------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class ElementoCambiado(Evento):
+    """Un Elemento se agregó, cambió o se quitó.
+
+    `minutos_afectados` reúne los minutos que tocaba antes y después del cambio,
+    desbordes incluidos: son los que hay que redibujar e invalidar.
+    """
+
     id_elemento: str
     capitulo: int
-    minuto: int | None  # None si el Elemento está en Global
+    minuto: int | None  # carpeta donde vive ahora; None si está en Global o se quitó
+    minutos_afectados: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
-class ElementoQuitado(Evento):
-    id_elemento: str
-    capitulo: int
-    minuto: int | None
+class ElementoAgregado(ElementoCambiado):
+    pass
+
+
+@dataclass(frozen=True)
+class ElementoQuitado(ElementoCambiado):
+    pass
 
 
 @dataclass(frozen=True)
@@ -87,6 +102,13 @@ class ShortCambiado(Evento):
 @dataclass(frozen=True)
 class BrutoImportado(Evento):
     id_bruto: str
+
+
+@dataclass(frozen=True)
+class PiezaModificada(Evento):
+    """La receta de una Pieza cambió y su horneado quedó desactualizado."""
+
+    id_pieza: str
 
 
 @dataclass(frozen=True)
@@ -112,6 +134,24 @@ class MedioFueraDeLinea(Evento):
 class MinutoInvalidado(Evento):
     capitulo: int
     minuto: int
+
+
+@dataclass(frozen=True)
+class TareaProgreso(Evento):
+    """Progreso de cualquier tarea de fondo (banco, horneado, pre-render, render)."""
+
+    id_tarea: str
+    tipo: str
+    fraccion: float
+    descripcion: str = ""
+
+
+@dataclass(frozen=True)
+class TareaTerminada(Evento):
+    id_tarea: str
+    tipo: str
+    exito: bool
+    mensaje: str = ""
 
 
 @dataclass(frozen=True)

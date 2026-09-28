@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 3. Fase A (E0–E4) implementada: base transversal, tiempo, espacio y modelo.
+- **Estado:** revisión 4. Fase A (E0–E4) implementada y auditada: base transversal, tiempo, espacio y modelo.
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 y 3](#0-cambios-de-las-revisiones-2-y-3)
+0. [Cambios de las revisiones 2, 3 y 4](#0-cambios-de-las-revisiones-2-3-y-4)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -37,10 +37,55 @@ documento, se corrige uno de los dos de forma explícita.
 19. [Épicas en orden sistemático](#19-épicas-en-orden-sistemático)
 20. [Especificaciones aspirables](#20-especificaciones-aspirables)
 21. [Riesgos y decisiones abiertas](#21-riesgos-y-decisiones-abiertas)
+22. [Contratos de integración núcleo ↔ pantallas](#22-contratos-de-integración-núcleo--pantallas)
+23. [Casos de uso futuros contemplados](#23-casos-de-uso-futuros-contemplados)
 
 ---
 
-## 0. Cambios de las revisiones 2 y 3
+## 0. Cambios de las revisiones 2, 3 y 4
+
+### Revisión 4: auditoría de integración
+
+Revisión completa del código de la Fase A y de las dependencias reales.
+
+**Corregido en el código**
+
+| # | Hallazgo | Corrección |
+|---|---|---|
+| A1 | Una animación de escala que cruza el cero (volteo de 1 a −1) hacía fallar la evaluación del Elemento | `Transform.con_valores` limita la escala a ±0,0001 |
+| A2 | Orden de apilado ambiguo entre Global y los minutos (ambos V1) | Orden fijo: V del minuto → V de Global → T del minuto → T de Global (`Capa.orden_apilado`) |
+| A3 | Con IDs de 4 hexadecimales caben 65 536 objetos; 1000 capítulos llenos los superan | **IDs de 6 hexadecimales** (16,7 millones) |
+| A4 | Los eventos de edición no decían qué minutos redibujar e invalidar (un Elemento movido o que se desborda toca varios) | `ElementoCambiado` lleva `minutos_afectados`; nuevos `ElementoAgregado`, `CapituloCreado`, `PiezaModificada`, `TareaProgreso`, `TareaTerminada` |
+| A5 | El Elemento no sabía cuánto material tiene su fuente: trim y slip podían pedir fotogramas inexistentes | `TiempoElemento.fuente_duracion`, `excede_fuente`, `margen_fuente` |
+| A6 | Abrir un proyecto obligaba a cargar los 1000 capítulos | **Carga perezosa**: `Proyecto.indice_capitulos` + `cargador_capitulo` inyectado por `proyecto_fs` (sin romper la dirección de dependencias) |
+| A7 | Faltaban marcadores y estado por capa (ocultar, silenciar, bloquear, solo) | `modelo/marcador.py`; `Capitulo.marcadores`, `Capitulo.capas`, `se_ve`, `se_oye`, `editable` |
+| A8 | `flet==1.0.1` sin el extra `desktop` no abre ventana | `flet[desktop]==1.0.1` |
+| A9 | Nada reproducía audio: el reloj maestro del nivel 2 no tenía base | `flet-audio==1.0.1` (misma versión que `flet` y `flet-video`) |
+| A10 | Faltaban constantes para papelera, bloqueo y versión de esquema | `CARPETA_PAPELERA`, `ARCHIVO_BLOQUEO`, `VERSION_ESQUEMA` |
+
+**Verificado en las dependencias**
+
+| Qué | Resultado |
+|---|---|
+| Códecs de PyAV 18.1.0 | ✅ `libx264`, `libx265`, `prores_ks`, `libvpx-vp9` (alfa), `png`, `libwebp`, `aac`, `qtrle`, NVENC. ❌ VAAPI (15.4) |
+| Flet 1.0.1 | ✅ `ft.run`, `Image(src=bytes)`, `page.run_task` / `run_thread`, `on_keyboard_event`, `canvas`, `GestureDetector`, `Video` con lista de reproducción, `Audio`. Los métodos de medios son **asíncronos** (22.4) |
+
+**Agregado al plan**
+
+| # | Cabo suelto | Resolución | Dónde |
+|---|---|---|---|
+| P1 | Un intercambio de nombres A↔B podía pisar archivos | Renombres en dos fases | T5.8 |
+| P2 | Deshacer un borrado después de guardar | `.papelera/` | T5.9 |
+| P3 | Dos instancias abriendo el mismo proyecto | `.bloqueo` | T5.5 |
+| P4 | Archivos cambiados fuera del programa | Firma + conflicto, nunca sobrescribir | T5.8 |
+| P5 | Volver a hornear una Pieza con copias en capítulos no cargados | Lista de copias en `_pieza.json` | T5.2 |
+| P6 | Materializar requiere el motor (extraer audio, normalizar imágenes) y el reconciliador no puede usarlo | La materialización la ejecuta el servicio de guardado (N4) | T9.5 |
+| P7 | Qué archivo lee el motor si la copia aún no se guardó | Resolución de fuente: copia → horneado → Bruto → fuera de línea | T9.2 |
+| P8 | Trim de entrada y división con keyframes relativos | Los comandos desplazan y reparten keyframes | T6.4 |
+| P9 | Estado de la interfaz mezclado con el modelo | `EstadoApp` separado, no se deshace | 22.1 |
+| P10 | Atajos que chocan con campos de texto | Contextos de foco | T12.7 |
+| P11 | Formatos de proyecto futuros | `version_esquema` en `_proyecto.json` | T5.2 |
+| P12 | Exportar un fotograma (miniaturas) | Función y modo de `main.py` | T7.8 |
 
 ### Revisión 3: decisiones del usuario
 
@@ -184,7 +229,7 @@ y archivos; con tildes solo en la interfaz.
 3. **Ceros a la izquierda en todo**: orden alfabético = orden cronológico.
 4. **Minutos del 00 al 23, como un reloj**: `min02_seg12` es `02:12` en el
    reproductor.
-5. **IDs**: 4 caracteres hexadecimales, **únicos en todo el proyecto**
+5. **IDs**: 6 caracteres hexadecimales, **únicos en todo el proyecto**
    (Brutos, Piezas y Elementos comparten el mismo espacio de IDs). Nunca
    cambian.
 6. **Nombre descriptivo**: minúsculas, números y guiones; máximo 32 caracteres.
@@ -194,10 +239,10 @@ y archivos; con tildes solo en la interfaz.
 ### 3.3 Gramática del nombre de un Elemento
 
 ```
-min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov
- │     │    │    │        │   │            │    │
- │     │    │    │        │   │            │    └ extensión (.mov si tiene alfa)
- │     │    │    │        │   │            └ ID del Elemento
+min02_seg12f08_dur05s00_V2_puerta-abre__a3f90e.mov
+ │     │    │    │        │   │            │      │
+ │     │    │    │        │   │            │      └ extensión (.mov si tiene alfa)
+ │     │    │    │        │   │            └ ID del Elemento (6 hexadecimales)
  │     │    │    │        │   └ nombre descriptivo
  │     │    │    │        └ capa: V video/imagen · A audio · T texto (1–9)
  │     │    │    └ duración: segundos + fotogramas (dur01m05s00 si ≥ 1 min)
@@ -209,20 +254,20 @@ min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov
 Expresión regular de referencia:
 
 ```
-^min(\d{2})_seg(\d{2})f(\d{2})_dur(?:(\d{2})m)?(\d{2})s(\d{2})_([VAT][1-9])_([a-z0-9-]{1,32})__([0-9a-f]{4})\.(\w+)$
+^min(\d{2})_seg(\d{2})f(\d{2})_dur(?:(\d{2})m)?(\d{2})s(\d{2})_([VAT][1-9])_([a-z0-9-]{1,32})__([0-9a-f]{6})\.(\w+)$
 ```
 
 Otros nombres:
 
 | Objeto | Formato | Ejemplo |
 |---|---|---|
-| Bruto | `bruNNNN_nombre__id.ext` | `bru0001_toma-calle__7c21.mp4` |
-| Pieza (carpeta y archivo) | `pieNNNN_nombre__id` | `pie0001_puerta-abre__5e1c.mov` |
+| Bruto | `bruNNNN_nombre__id.ext` | `bru0001_toma-calle__7c2185.mp4` |
+| Pieza (carpeta y archivo) | `pieNNNN_nombre__id` | `pie0001_puerta-abre__5e1c3a.mov` |
 | Render de un minuto | `capCCCC_minMM_vNNN.mp4` | `cap0001_min00_v003.mp4` |
 | Render de un rango | `capCCCC_minMM-MM_vNNN.mp4` | `cap0001_min05-08_v001.mp4` |
 | Render del capítulo | `capCCCC_completo_vNNN.mp4` | `cap0001_completo_v002.mp4` |
-| Short (receta) | `minMM_segSSfFF_dur…_nombre__id.json` | `min02_seg10f00_dur45s00_momento-clave__b71c.json` |
-| Short (render) | igual que la receta + `_vNNN.mp4` | `min02_seg10f00_dur45s00_momento-clave__b71c_v001.mp4` |
+| Short (receta) | `minMM_segSSfFF_dur…_nombre__id.json` | `min02_seg10f00_dur45s00_momento-clave__b71c4d.json` |
+| Short (render) | igual que la receta + `_vNNN.mp4` | `min02_seg10f00_dur45s00_momento-clave__b71c4d_v001.mp4` |
 
 Un Short usa la misma gramática que un Elemento **sin el campo de capa**: el
 nombre dice en qué instante del capítulo empieza y cuánto dura.
@@ -563,14 +608,14 @@ Monitor, miniaturas, vista previa y render usan este mismo proceso.
 ### 8.3 Archivo gemelo
 
 ```
-min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov    ← contenido
-min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.json   ← gemelo
+min02_seg12f08_dur05s00_V2_puerta-abre__a3f90e.mov    ← contenido
+min02_seg12f08_dur05s00_V2_puerta-abre__a3f90e.json   ← gemelo
 ```
 
 ```json
 {
-  "id": "a3f9",
-  "fuente": { "tipo": "pieza", "ref": "5e1c", "version": 3 },
+  "id": "a3f90e",
+  "fuente": { "tipo": "pieza", "ref": "5e1c3a", "version": 3 },
   "tiempo": {
     "inicio": "min02_seg12f08",
     "duracion": "dur05s00",
@@ -616,7 +661,7 @@ Un Elemento T **no tiene archivo de medios**: su `.json` es a la vez contenido y
 gemelo:
 
 ```
-min02_seg14f00_dur03s00_T1_titulo-capitulo__d4e2.json
+min02_seg14f00_dur03s00_T1_titulo-capitulo__d4e25c.json
 ```
 
 Añade al gemelo la sección `texto`: contenido, fuente (de `recursos/fuentes/`),
@@ -662,38 +707,40 @@ MINUTO 02 · cap0001 · lienzo 1280×720 · 24 fps
 MiSerie/                                    ← PROYECTO
 ├── _proyecto.json                          estándar propio, capítulos, contador de IDs
 ├── brutos/                                 T0 · originales, nunca se modifican
-│   ├── video/   bru0001_toma-calle__7c21.mp4
-│   ├── audio/   bru0002_entrevista__91be.wav
-│   └── imagen/  bru0003_logo__0f3a.png
+│   ├── video/   bru0001_toma-calle__7c2185.mp4
+│   ├── audio/   bru0002_entrevista__91be07.wav
+│   └── imagen/  bru0003_logo__0f3a6b.png
 ├── taller/                                 T1 · sandbox
-│   └── pie0001_puerta-abre__5e1c/
+│   └── pie0001_puerta-abre__5e1c3a/
 │       ├── _pieza.json                     receta + versión + referencias
-│       └── pie0001_puerta-abre__5e1c.mov   horneado normalizado (.mp4 si es opaco)
+│       └── pie0001_puerta-abre__5e1c3a.mov   horneado normalizado (.mp4 si es opaco)
 ├── recursos/
 │   ├── fuentes/                            .ttf / .otf usados por los textos
 │   └── luts/                               .cube
 ├── cap0001/                                  ← CAPÍTULO
 │   ├── _capitulo.json                      título, duración, registro de renders
 │   ├── global/
-│   │   ├── min00_seg00f00_dur24m00s00_A1_musica-tema__c810.wav
-│   │   └── min00_seg00f00_dur24m00s00_A1_musica-tema__c810.json
+│   │   ├── min00_seg00f00_dur24m00s00_A1_musica-tema__c810f2.wav
+│   │   └── min00_seg00f00_dur24m00s00_A1_musica-tema__c810f2.json
 │   ├── min00/                              ← MINUTO 00:00–00:59
 │   │   ├── _minuto.json
 │   │   ├── _guion.txt
-│   │   ├── min00_seg00f00_dur12s08_V1_ciudad-amanece__4b7e.mp4
-│   │   ├── min00_seg00f00_dur12s08_V1_ciudad-amanece__4b7e.json
-│   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov
-│   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f9.json
-│   │   └── min00_seg14f00_dur03s00_T1_titulo-capitulo__d4e2.json
+│   │   ├── min00_seg00f00_dur12s08_V1_ciudad-amanece__4b7e19.mp4
+│   │   ├── min00_seg00f00_dur12s08_V1_ciudad-amanece__4b7e19.json
+│   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f90e.mov
+│   │   ├── min00_seg12f08_dur05s00_V2_puerta-abre__a3f90e.json
+│   │   └── min00_seg14f00_dur03s00_T1_titulo-capitulo__d4e25c.json
 │   ├── min01/ … min23/
 │   ├── render/
 │   │   ├── cap0001_min00_v003.mp4
 │   │   └── cap0001_completo_v002.mp4
 │   └── shorts/                             ← recortes verticales 9:16
-│       ├── min02_seg10f00_dur45s00_momento-clave__b71c.json       receta
-│       └── min02_seg10f00_dur45s00_momento-clave__b71c_v001.mp4   720×1280
+│       ├── min02_seg10f00_dur45s00_momento-clave__b71c4d.json       receta
+│       └── min02_seg10f00_dur45s00_momento-clave__b71c4d_v001.mp4   720×1280
 ├── cap0002/ … cap1000/
+├── .bloqueo                                PID, equipo y fecha de la instancia que lo tiene abierto
 ├── .diario/                                operaciones de disco pendientes
+├── .papelera/                              lo borrado, con su ruta original
 ├── .autosave/                              instantáneas del modelo
 └── .cache/                                 BORRABLE: bancos, pre-renders, ondas, audio de vista previa
 ```
@@ -721,6 +768,10 @@ cuenta la historia completa.
 | Se pierde un gemelo | El **escáner** rescata tiempo y capa del nombre; espacio por defecto |
 | Renombre manual | El ID permite reconocer el archivo |
 | Mayúsculas y minúsculas | Linux las distingue: todos los nombres generados van en minúsculas |
+| Intercambio de nombres (A↔B) | Renombres en dos fases con nombres temporales |
+| Deshacer un borrado ya guardado | Lo borrado va a `.papelera/` y el siguiente guardado lo recupera |
+| Dos instancias sobre el mismo proyecto | `.bloqueo`; la segunda abre en solo lectura |
+| Cambios hechos fuera del programa | Firma distinta = conflicto; se avisa y no se sobrescribe |
 
 ### 10.2 Componentes
 
@@ -925,8 +976,9 @@ Se guardan en `_minuto.json`, así que sobreviven al cierre del programa.
 2. Escalado Lanczos.
 3. CRF 16–18.
 4. Opción H.265 y 10 bits.
-5. Codificación por hardware en Linux si existe: **VAAPI** (Intel/AMD) o
-   **NVENC** (NVIDIA); si no, `libx264` por software.
+5. Codificación por hardware: **NVENC** (NVIDIA) viene incluido en PyAV. **VAAPI**
+   (Intel/AMD) no viene en el paquete binario de PyAV: requiere compilar PyAV contra
+   el FFmpeg del sistema (15.4). Sin aceleración, `libx264` por software.
 6. Sin marca de agua ni nube.
 
 ### 13.5 Shorts verticales 9:16
@@ -977,7 +1029,7 @@ ampliación.
 
 ```json
 {
-  "id": "b71c",
+  "id": "b71c4d",
   "capitulo": "cap0001",
   "tiempo": { "inicio": "min02_seg10f00", "duracion": "dur45s00" },
   "ventana": {
@@ -1060,7 +1112,11 @@ Eventos principales:
 
 | Evento | Lo publica | Reaccionan |
 |---|---|---|
-| `ElementoCambiado` | historial (tras un comando) | timeline, inspector, monitor, huella |
+| `ElementoAgregado` / `ElementoCambiado` / `ElementoQuitado` | historial (tras un comando), con `minutos_afectados` | timeline, inspector, monitor, selección, huellas |
+| `HistorialCambiado` | historial | menú Editar, barra de estado |
+| `CapituloCreado` | servicio de proyecto | navegador |
+| `PiezaModificada` | comandos del Taller | Taller (marca "sin hornear") |
+| `TareaProgreso` / `TareaTerminada` | cola de tareas | barra de estado, cola de render |
 | `MinutoInvalidado` | servicio de huellas | mapa del capítulo, planificador de pre-render |
 | `PiezaHorneada` | servicio de horneado | índice de referencias, banco |
 | `BancoListo` | servicio de banco | timeline (miniaturas), monitor |
@@ -1165,9 +1221,15 @@ conecta su parte.
 | Controlador NVIDIA con NVENC (opcional) | Codificación por hardware NVIDIA |
 | `fonts-dejavu` o similares | Fuentes por defecto para los textos |
 
-PyAV trae FFmpeg dentro de su paquete. En E0 se verifica que incluya los
-codificadores necesarios (`libx264`, `prores_ks`); si falta alguno, se
-documenta cómo usar el FFmpeg del sistema.
+PyAV 18.1.0 trae FFmpeg dentro de su paquete. **Verificado** (revisión 4): incluye
+`libx264`, `libx265`, `prores_ks` (codificar ProRes 4444), `prores`, `libvpx-vp9`
+(decodificar VP9 con alfa), `png`, `mjpeg`, `libwebp`, `aac`, `pcm_s16le`, `qtrle`
+y `h264_nvenc` / `hevc_nvenc`. **No** incluye VAAPI; para usarlo:
+`sudo apt install libavcodec-dev libavformat-dev libavdevice-dev libavfilter-dev libswscale-dev libswresample-dev`
+y `pip install av==18.1.0 --no-binary av` (usa el FFmpeg del sistema).
+
+Flet 1.0 necesita el extra `desktop` (`flet[desktop]`) para abrir la ventana de
+escritorio; ya está en `requirements.txt`.
 
 **Rutas**
 
@@ -1291,6 +1353,7 @@ con los keyframes de la ventana.
     │   │   ├── bruto.py  pieza.py  taller.py
     │   │   ├── elemento.py  capa.py  keyframe.py
     │   │   ├── efecto.py  transicion.py  texto.py
+    │   │   ├── marcador.py              Marcador, EstadoCapa
     │   │   ├── short.py                 Short + VentanaVertical
     │   │   └── referencias.py           índice Bruto → Pieza → Elemento → Minuto
     │   ├── comandos/                    N3
@@ -1305,7 +1368,8 @@ con los keyframes de la ventana.
     │   │   ├── mover_minuto.py
     │   │   └── editar_short.py          crear, cambiar rango, mover ventana
     │   ├── proyecto_fs/                 N3
-    │   │   ├── estructura.py  gemelo.py  manifiestos.py
+    │   │   ├── serializacion.py         conversión canónica (también para huellas)
+    │   │   ├── estructura.py  gemelo.py  manifiestos.py  bloqueo.py
     │   │   ├── diario.py  reconciliador.py  escaner.py
     │   │   ├── guion.py  autosave.py
     │   ├── motor/                       N3
@@ -1317,6 +1381,7 @@ con los keyframes de la ventana.
     │   │   ├── mezclador_audio.py
     │   │   └── efectos/                 biblioteca de efectos
     │   ├── servicios/                   N4
+    │   │   ├── fuentes.py               qué archivo lee el motor para cada Elemento
     │   │   ├── importacion.py           copiar a brutos + análisis (fps detectado, medido, vfr)
     │   │   ├── horneado.py              Pieza → conversión a 24 fps → archivo normalizado → comando
     │   │   ├── banco.py  miniaturas.py  forma_onda.py
@@ -1349,8 +1414,9 @@ con los keyframes de la ventana.
 `requirements.txt`:
 
 ```
-flet==1.0.1
+flet[desktop]==1.0.1
 flet-video==1.0.1
+flet-audio==1.0.1
 av==18.1.0
 numpy==2.5.3
 opencv-python-headless==5.0.0.93
@@ -1439,92 +1505,129 @@ puede ejecutar con `main.py` en modo sin interfaz.
 
 ### Fase B — Persistencia y edición
 
-**E5. Disco (N3)**
-- Estructura, gemelos, manifiestos, diario, reconciliador (mover y renombrar),
-  escáner, guion, autosave.
-- `main.py --nuevo` y `--escanear` operativos.
+**E5. Disco (N3)** — el proyecto existe en carpetas reales, se guarda, se reabre y se rescata.
 
-**E6. Comandos (N3)**
-- Comando, compuesto, historial (100 pasos, fusión de arrastres).
-- Edición básica, avanzada (ripple con alcance, roll, slip, slide), separar
-  audio, actualizar fuente, mover minuto.
+| Tarea | Detalle |
+|---|---|
+| T5.1 Serialización base (`proyecto_fs/serializacion.py`, nuevo) | Conversión canónica (claves ordenadas, sin espacios variables) de: `Fraction` ↔ `"30000/1001"`, Instante ↔ `"min02_seg12f08"`, Duración ↔ `"dur05s00"`, Transform y Recorte, Animación y Keyframe (controles como lista), Efecto, Transición, Texto, enums por su valor. Es la misma serialización que usan las huellas (E10) |
+| T5.2 Manifiestos | `_proyecto.json`: `version_esquema`, nombre, estándar, índice de capítulos (número → título), IDs usados, Brutos (datos de análisis y `fps_interpretado`). `_capitulo.json`: título, estado de capas, marcadores, registro de renders. `_minuto.json`: listo, notas, último render. `_pieza.json`: receta, horneado, versión y **lista de copias** (capítulo, minuto, ID) para no cargar capítulos al volver a hornear |
+| T5.3 Gemelos | Elemento ↔ JSON según 8.3; Elementos T sin archivo de medios; `fuente_duracion` incluida. Receta de Short ↔ JSON |
+| T5.4 Estructura | Crear proyecto (carpetas, `brutos/video|audio|imagen`, `recursos/fuentes|luts`, `_proyecto.json`). Crear capítulo (`min00`–`min23`, `global/`, `render/`, `shorts/`, manifiestos) |
+| T5.5 Bloqueo | `.bloqueo` con PID, equipo y fecha. Si otro proceso vivo lo tiene: abrir en solo lectura o cancelar. Bloqueo huérfano (PID muerto): se recupera con aviso |
+| T5.6 Escáner y carga perezosa | Abrir = leer `_proyecto.json` y el Taller, e inyectar `Proyecto.cargador_capitulo`. Cargar un capítulo = leer minutos, Global y Shorts. Tolerancias: gemelo faltante → espacio por defecto; gemelo sin archivo → fuera de línea; archivos con nombre no reconocido → lista aparte, nunca se tocan; ID duplicado → se reasigna al guardar, con aviso |
+| T5.7 Diario | Operaciones: copiar, mover, renombrar, escribir, enviar a papelera. Plan en `.diario/` con estado por paso y `fsync`. Al abrir, un plan a medias se completa o se revierte |
+| T5.8 Reconciliador | Compara el modelo con el **último estado conocido del disco** (lo leído al abrir o escrito al guardar). Genera: copias nuevas a materializar, movimientos, renombres, gemelos y manifiestos a escribir, envíos a `.papelera/`. **Renombres en dos fases** (nombre temporal y después definitivo) para que un intercambio A↔B no pise archivos. Si un archivo cambió fuera del programa (firma distinta): conflicto, no se sobrescribe, se avisa |
+| T5.9 Papelera | Lo borrado va a `.papelera/` con su ruta original. Deshacer después de guardar lo recupera en el siguiente guardado. Vaciado manual o por antigüedad |
+| T5.10 Guion | `_guion.txt` por minuto, generado al guardar |
+| T5.11 Autosave | Instantánea del modelo cargado en `.autosave/` (sin tocar archivos de medios). Al abrir: si es más reciente que el disco, ofrecer restaurarla |
+| T5.12 main | `--nuevo` crea y (hasta E12) informa; `--escanear` imprime capítulos, Elementos, fuera de línea, no reconocidos y conflictos |
+
+**E6. Comandos (N3)** — toda la edición con deshacer.
+
+| Tarea | Detalle |
+|---|---|
+| T6.1 Contrato `Comando` | `ejecutar(proyecto)`, `deshacer(proyecto)`, `descripcion`, `afectados()` → capítulo, IDs y minutos antes y después (desbordes incluidos), `fusionar(otro)` para arrastres continuos. **Valida todo antes de mutar**: nunca deja el modelo a medias |
+| T6.2 Historial | Único por proyecto (no por minuto). Límite 100. Marca de "guardado" para saber si hay cambios. Publica `HistorialCambiado`, `ElementoAgregado/Cambiado/Quitado` con `minutos_afectados`, `ProyectoModificado` |
+| T6.3 Compuesto | Agrupa comandos; deshace en orden inverso |
+| T6.4 Elementos | Agregar desde Pieza (`fuente_entrada` = asas reales, `fuente_duracion`, tamaño, alfa, audio, transform según ajuste inicial, ID nuevo); agregar imagen o audio directo desde Bruto (`fuente_entrada` = 0); quitar; mover (tiempo, capa, minuto, **entre capítulos**); duplicar; pegar (el portapapeles es estado de la app); recortar (trim de entrada **desplaza keyframes** y `fuente_entrada`); dividir (reparte keyframes); separar audio; cambiar velocidad |
+| T6.5 Propiedades | Cambiar propiedad genérica, transformar, mover ancla con compensación, keyframes (poner, quitar, mover), efectos (agregar, quitar, reordenar, parámetro), transición, texto |
+| T6.6 Edición avanzada | Ripple con alcance minuto o capítulo, roll, slip (limitado por `margen_fuente`), slide. Todos compuestos |
+| T6.7 Capas y marcadores | Visible, silenciada, bloqueada, solo; marcadores (poner, mover, quitar) |
+| T6.8 Nivel superior | Mover o intercambiar minutos; `actualizar_fuente` tras volver a hornear (versión, `fuente_duracion`, reajuste de `fuente_entrada` si cambiaron las asas); comandos del Taller (agregar Bruto y Pieza, cambiar receta, interpretar fps); Shorts (crear, rango, ventana, keyframes) |
+| T6.9 Reglas | Rechazar cambios sobre Elementos o capas bloqueados; rechazar lo que exceda la fuente (`excede_fuente`); el aviso de ripple de capítulo lo pide la app **antes** de ejecutar |
 
 ### Fase C — Motor y servicios
 
 **E7. Decodificación y compositor (N3)**
-- Decodificador, codificador, caché, compositor con alfa premultiplicado y
-  modos de mezcla, texto.
-- `conversion_fps.py`: los cinco métodos de conversión a 24 fps.
-- Exportar un fotograma de prueba con capas apiladas y medir capas soportadas.
+
+| Tarea | Detalle |
+|---|---|
+| T7.1 `motor_base` | Interfaz: abrir una ruta → fuente; `fotograma(n, tamaño)` → RGBA premultiplicado (numpy); información de la fuente |
+| T7.2 Decodificador | PyAV; búsqueda exacta por PTS (saltar al fotograma clave anterior y decodificar hasta el pedido); reutilizar contenedores abiertos (LRU); formatos con alfa (`yuva420p`, ProRes 4444, RGBA); imágenes con Pillow; decodificar al tamaño necesario |
+| T7.3 Caché | LRU por (ruta, firma, fotograma, tamaño) con límite en MB (`Ajustes.cache_fotogramas_mb`) |
+| T7.4 Compositor | Recibe los Elementos evaluados de `Capitulo.visuales_activos_en(f)`; fondo negro; descarte, región de interés, `warpAffine`, efectos, modos de mezcla (fórmulas sobre premultiplicado), transiciones (fundido = rampa de opacidad del entrante; deslizamiento, zoom y barrido = transform adicional); salida RGB/RGBA a cualquier escala |
+| T7.5 Texto | Pillow dibuja al tamaño del destino (nítido en Shorts y 4K); caché por (contenido, estilo, escala) |
+| T7.6 Conversión de fps | Los 5 métodos sobre el flujo de fotogramas nativos; interpolación con flujo óptico de OpenCV |
+| T7.7 Codificador | PyAV: video + audio, parámetros del Estandar, fotograma clave en el primer fotograma, NVENC opcional |
+| T7.8 Exportar fotograma | Un fotograma del capítulo a PNG (miniaturas de YouTube, revisión). También como modo de `main.py` |
 
 **E8. Mezclador de audio (N3)**
-- Mezcla, volumen, paneo, fundidos, limitador.
+
+| Tarea | Detalle |
+|---|---|
+| T8.1 Rejilla exacta | 48 000 / 24 = **2000 muestras por fotograma**: audio y video se alinean sin redondeos |
+| T8.2 Mezcla | float32 estéreo; remuestreo de cada fuente a 48 kHz con `av.AudioResampler`; volumen y paneo con rampas por muestra (sin clics); fundidos; transiciones cruzadas cuando dos Elementos se solapan por una transición |
+| T8.3 Estados | Respeta `Capitulo.se_oye` (silenciar y solo) y `Elemento.suena` |
+| T8.4 Salida | Limitador suave; WAV para vista previa, AAC para el render |
 
 **E9. Cola de tareas y servicios de medios (N4)**
-- `tareas/cola.py` con prioridades e instantáneas.
-- Importación con análisis de fps (detectado, medido, variable).
-- Horneado normalizado a 24 fps con el método elegido y asas de 1 s; banco,
-  miniaturas, forma de onda.
+
+| Tarea | Detalle |
+|---|---|
+| T9.1 Cola | Hilos de trabajo (`Ajustes.trabajadores_fondo`) con prioridades (14.4), cancelación, reprioridad; cada tarea recibe una **instantánea** (`copy.deepcopy` del subconjunto que necesita) y su huella; publica `TareaProgreso` y `TareaTerminada` |
+| T9.2 Resolución de fuente (`servicios/fuentes.py`, nuevo) | Qué archivo se lee para un Elemento: la copia materializada si existe; si todavía no se guardó, el horneado de su Pieza; si es directo, el Bruto; si no hay ninguno, fuera de línea (`MedioFueraDeLinea`) |
+| T9.3 Importación | Copiar a `brutos/` con progreso; analizar: flujos, fps declarado, fps medido por marcas de tiempo, fps variable, alfa por formato de píxel, audio; comprobar espacio en disco |
+| T9.4 Horneado | Tramos → conversión de fps → transform y efectos de la Pieza → asas → codificar `.mp4` o `.mov`; versión + 1; `PiezaHorneada`; después el comando `actualizar_fuente` para todas sus copias (lista en `_pieza.json`) |
+| T9.5 Materialización | La ejecuta el **servicio de guardado** (N4), no el reconciliador, porque puede necesitar el motor: copiar la Pieza, extraer WAV para "separar audio", normalizar imágenes a PNG y audio directo a WAV 48 kHz |
+| T9.6 Banco, miniaturas, forma de onda | Según 12.1, con firma para invalidar |
 
 **E10. Render y ensamblado (N4)**
-- Huellas y estados, render por minuto, ensamblado sin recodificar, audio en una
-  pasada, versionado.
-- `main.py --render` operativo.
+
+| Tarea | Detalle |
+|---|---|
+| T10.1 Huellas | Hash de la serialización canónica (T5.1) de todo lo que afecta al minuto (`Capitulo.que_afecta_al_minuto`), firmas de archivos, estado de capas y estándar. Publica `MinutoInvalidado` al cambiar |
+| T10.2 Render de minuto | 1440 fotogramas exactos, solo video, fotograma clave inicial, parámetros idénticos entre minutos |
+| T10.3 Audio del capítulo | Una pasada del mezclador para el rango pedido |
+| T10.4 Ensamblado | Unir minutos **copiando paquetes** con PyAV (sin recodificar) y multiplexar el audio |
+| T10.5 Entregables | Minuto, rango, capítulo; versionado; registro en `_capitulo.json`; `RenderTerminado`; `main.py --render` |
 
 **E11. Vista previa (N4)**
-- Niveles 1–4, pre-render por minuto, reloj de audio.
-- Servicio de guardado conectado a eventos.
+
+| Tarea | Detalle |
+|---|---|
+| T11.1 Niveles 1, 2 y 4 | Imagen JPEG en bytes para `ft.Image(src=bytes)` |
+| T11.2 Nivel 3 | Pre-render por minuto en segundo plano; lista de reproducción de minutos para `flet_video.Video` |
+| T11.3 Reloj de audio | `flet_audio.Audio` reproduce la mezcla de vista previa. Como `get_current_position()` es asíncrono y tiene latencia, el reloj se **extrapola** con `time.monotonic()` entre consultas y se corrige en cada respuesta |
+| T11.4 Guardado | Servicio de guardado (reconciliador + materialización + guion) y autosave conectados a eventos |
 
 ### Fase D — Interfaz
 
 **E12. Aplicación base (N5–N6)**
-- `app/estado.py` (eventos → Flet), controladores.
-- `ventana`, `divisor`, `distribucion`, espacios de trabajo, `inicio`, `navegador`.
-- `main.py` abre la interfaz.
 
-**E13. Monitor y control espacial**
-- Monitor con los 4 niveles, transporte, mesa de trabajo, reglas, asas, ancla,
-  imán, márgenes seguros, teclado.
+| Tarea | Detalle |
+|---|---|
+| T12.1 Arranque Flet 1.0 | `ft.run(principal)`; APIs confirmadas en 1.0.1: `Image(src=bytes)`, `page.run_task`, `page.run_thread`, `page.on_keyboard_event`, `canvas`, `GestureDetector`, `Video` con lista de reproducción, `Audio` asíncrono |
+| T12.2 `EstadoApp` | Estado de la interfaz que **no** es del modelo ni se deshace (sección 22.1) |
+| T12.3 Puente de eventos | `app/estado.py` se suscribe al bus; los eventos que llegan desde hilos de trabajo se pasan al bucle de Flet con `page.run_task`; se agrupan para redibujar como máximo una vez por cuadro |
+| T12.4 Ventana | Secciones, `Divisor`, distribución y espacios de trabajo (Taller, Minuto, Capítulo, Shorts, Render) |
+| T12.5 Inicio y navegador | Recientes, crear/abrir; árbol de capítulos con carga perezosa; estados de minuto (22.3) |
+| T12.6 Diálogos y avisos | Cambios sin guardar, proyecto bloqueado, restaurar autosave, cascadas de renombres, conflictos de disco, errores (22.5) |
+| T12.7 Teclado | `atajos.json` con **contextos de foco** (monitor, timeline, taller, campo de texto): en un campo de texto no se disparan atajos |
+| T12.8 Tema | Tokens de color y tipografía en `app/ui/recursos/temas/oscuro.json` (22.3) |
 
-**E14. Timeline y mapa del capítulo**
-- Capas, zoom por granularidad, arrastre, herramientas, desbordes fantasma,
-  pistas Global, mapa de 24 minutos con estados.
+**E13. Monitor y control espacial** — monitor con los 4 niveles, transporte, mesa de trabajo, reglas, asas (dibujadas en `canvas` al instante), ancla, imán (bordes, centro, otros Elementos, guías), márgenes seguros, guía 9:16, zoom del lienzo.
 
-**E15. Taller**
-- Brutos con fps detectado, medido y avisos de fps variable.
-- Mini-timeline de la Pieza en **fotogramas nativos** de la fuente, selector de
-  `fps_interpretado` y de método de conversión.
-- Horneado, ida y vuelta con el minuto.
+**E14. Timeline y mapa del capítulo** — capas con alto ajustable, zoom por granularidad, dibujo solo de lo visible, arrastre con fusión de comandos, herramientas (selección, cuchilla, ripple, roll, slip, slide), imán a cortes, marcadores y cabezal, desbordes fantasma, pistas Global, cabecera de capa (ver, silenciar, bloquear, solo), selección múltiple, seguir al cabezal al cruzar de minuto, mapa de 24 celdas con los dos estados.
 
-**E16. Inspector, keyframes y curvas**
-- Inspector, keyframes en precisión de fotograma, editor de curvas bezier.
+**E15. Taller** — Brutos con fps y avisos; mini-timeline en fotogramas nativos; selector de `fps_interpretado` y método; tramos; horneado con progreso; ida y vuelta con el minuto.
+
+**E16. Inspector, keyframes y curvas** — propiedades por grupo (espacio, audio, efectos, texto), rombo de keyframe por propiedad, navegación entre keyframes, editor de curvas bezier.
 
 ### Fase E — Capacidades creativas
 
-**E17. Efectos, transiciones y texto**
-- Color (brillo, contraste, saturación, temperatura, LUT), desenfoque, nitidez,
-  croma; transiciones (fundido, deslizamiento, zoom, barrido); títulos y
-  subtítulos; velocidad y rampas.
+**E17. Efectos, transiciones y texto** — implementación de `TIPOS_EFECTO` y `TIPOS_TRANSICION`; LUT `.cube`; croma; títulos y subtítulos con animaciones de `ANIMACIONES_TEXTO`; velocidad y rampas (keyframes de velocidad).
 
-**E18. Audio avanzado**
-- Keyframes de volumen, reducción automática de la música con voz, medidores.
+**E18. Audio avanzado** — keyframes de volumen en la timeline, reducción automática de la música con voz, medidores de nivel.
 
-**E19. Cola de render y exportación**
-- Panel de cola de render, perfiles, H.265 / 10 bits, codificación por hardware.
+**E19. Cola de render y exportación** — panel de cola, perfiles, H.265 / 10 bits, NVENC; VAAPI solo con PyAV compilado contra el FFmpeg del sistema (15.4).
 
-**E20. Shorts verticales 9:16**
-- Modelo `Short` y `VentanaVertical`, comando `editar_short`.
-- Servicio de recomposición vertical a 720×1280 con huellas.
-- Espacio de trabajo **Shorts** y guía 9:16 en el monitor.
-- `main.py --shorts` operativo.
+**E20. Shorts verticales 9:16** — modelo ya listo (E4); servicio de recomposición a 720×1280; espacio de trabajo Shorts; `main.py --shorts`.
 
 ### Fase F — Cierre
 
-**E21. Extras**
-- Atajos configurables, plugins, subtítulos automáticos.
+**E21. Extras** — atajos editables desde la interfaz, plugins (código externo: solo desde `~/.config/editor/plugins/` y con aviso), subtítulos automáticos.
 
-**E22. Documentación final**
-- README completo y actualización de este documento con lo implementado.
+**E22. Documentación final** — README completo y este documento al día.
 
 ### Estado de implementación
 
@@ -1535,6 +1638,7 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | E2 | ✅ | `granularidad` (Instante, Duración, minutos, fps de fuentes) y `nomenclatura` (Elementos, Shorts, Brutos, Piezas, capítulos, minutos, renders, IDs) |
 | E3 | ✅ | `geometria` (Rect, imán), `transform` (Afin, Transform, recorte, compensación de ancla, ajuste inicial), `lienzo` (visibilidad, región de interés, márgenes, ventana vertical) |
 | E4 | ✅ | Modelo completo. La Pieza es por ahora una secuencia lineal de tramos; las capas dentro de una Pieza quedan para más adelante |
+| Revisión 4 | ✅ | Correcciones A1–A10 aplicadas; marcadores y estado de capas; carga perezosa de capítulos |
 | E5 en adelante | Pendiente | |
 
 ### Dependencias entre épicas
@@ -1582,7 +1686,9 @@ Metas, no garantías.
 | Micro-cortes al cruzar minutos en el nivel 3 | Unir el rango sin recodificar antes de reproducir |
 | Disco por materialización | Piezas cortas; aviso de espacio; posible modo de enlaces en el futuro |
 | Cascadas de renombres (ripple de capítulo, mover minuto) | Alcance por minuto por defecto; aviso previo; diario |
-| API de Flet cambiante | Versión fijada; Flet aislado en `app/ui` |
+| API de Flet cambiante | Versión fijada (`flet`, `flet-video` y `flet-audio` en 1.0.1); Flet aislado en `app/ui` |
+| Latencia del reloj de audio (`get_current_position` asíncrono) | Extrapolar con `time.monotonic()` entre consultas (T11.3) |
+| VAAPI ausente en PyAV binario | NVENC o software; compilar PyAV contra el FFmpeg del sistema si hace falta |
 | Dependencias de sistema de Linux (libmpv, VAAPI) | Documentadas en 15.4; verificación en E0 |
 | Fuentes con fps variable | Medición por marcas de tiempo, aviso en el Taller y método `tiempo` por defecto |
 | Sin tests | Los modos `--escanear` y `--render` de `main.py` sirven como verificación manual; la arquitectura por niveles permite agregar tests más adelante sin reestructurar |
@@ -1599,3 +1705,142 @@ Todas cerradas en la revisión 3:
 | 4 | Plataforma y versión web | **Solo Linux de escritorio**; sin versión web |
 | 5 | Asas | **1 segundo fijo** |
 | 6 | fps de las fuentes al recortar | Interpretación por Bruto + método de conversión por Pieza (6.7) |
+
+---
+
+## 22. Contratos de integración núcleo ↔ pantallas
+
+Lo que las pantallas (E12–E20) pueden esperar del núcleo, y lo que el núcleo
+espera de ellas.
+
+### 22.1 Estado de la aplicación (`EstadoApp`)
+
+El modelo es el proyecto; `EstadoApp` es **cómo lo está mirando el usuario**.
+No se deshace, no dispara huellas ni renders y no se guarda en el proyecto.
+
+| Campo | Qué es | Persistencia |
+|---|---|---|
+| `proyecto` | Proyecto abierto (o ninguno) | Ruta en recientes (`~/.config/editor/`) |
+| `solo_lectura` | Abierto con el bloqueo de otra instancia | — |
+| `capitulo`, `minuto` | Dónde está el usuario | Último por proyecto, en `~/.config/editor/` |
+| `cabezal` | Fotograma del capítulo | Igual |
+| `seleccion` | IDs de Elementos (del capítulo actual) o de un Short | — |
+| `herramienta` | Selección, cuchilla, ripple, roll, slip, slide | — |
+| `zoom_timeline`, `desplazamiento_timeline` | Nivel de granularidad y posición | — |
+| `zoom_lienzo` | 25 %, 50 %, 100 %, encajar | — |
+| `espacio_trabajo` | Taller, Minuto, Capítulo, Shorts, Render | `distribucion.json` |
+| `reproduciendo`, `nivel_vista_previa` | Estado del transporte | — |
+| `foco` | Monitor, timeline, taller, campo de texto | — |
+| `portapapeles` | Copia serializada de Elementos | — |
+| `tareas` | Tareas de fondo con su progreso | — |
+| `avisos` | Mensajes pendientes | — |
+
+Reglas:
+- Si un Elemento seleccionado se quita (`ElementoQuitado`), sale de la selección.
+- La selección se limita al capítulo actual; cambiar de capítulo la vacía.
+- Al reproducir, si el cabezal cruza de minuto y "seguir cabezal" está activo, la timeline cambia de minuto sola.
+
+### 22.2 Contrato de los comandos
+
+```
+Controlador (N5)                   Historial (N3)                 Bus (N0)
+   │ crea MoverElemento(...)          │                              │
+   │─── historial.ejecutar(cmd) ─────►│ cmd.validar() → error: nada cambia
+   │                                  │ cmd.ejecutar(proyecto)       │
+   │                                  │ apila / fusiona              │
+   │                                  │─── ElementoCambiado(minutos_afectados) ──►
+   │                                  │─── HistorialCambiado ───────────────────►
+   │                                  │─── ProyectoModificado ──────────────────►
+   │◄── resultado / ErrorModelo ──────│                              │
+```
+
+- La interfaz **nunca** modifica el modelo directamente.
+- Un `ErrorModelo` (por ejemplo `Solapamiento`) vuelve al controlador y se muestra como aviso; el modelo queda intacto.
+- Arrastres: un comando por gesto, fusionado mientras dura; al soltar queda un solo paso de deshacer.
+
+### 22.3 Lenguaje visual
+
+Tokens en `app/ui/recursos/temas/oscuro.json` (tema oscuro por defecto):
+
+| Uso | Token | Criterio |
+|---|---|---|
+| Capas V / A / T | `capa_video`, `capa_audio`, `capa_texto` | Azul, verde y ámbar; Global con el mismo color y borde violeta |
+| Selección | `seleccion` | Borde claro de 2 px |
+| Desborde fantasma | `fantasma` | Contorno punteado, relleno al 30 % |
+| Más allá de 24:00 | `fuera_marco` | Rayado atenuado |
+| Fuera de línea | `error` | Rojo con rayado |
+| Bloqueado | — | Candado y 60 % de opacidad |
+| Capa oculta | — | 40 % de opacidad |
+
+**Estados del minuto** en el mapa y el navegador (dos ejes a la vez):
+
+| Eje | Cómo se ve | Valores |
+|---|---|---|
+| Trabajo | **Relleno** de la celda | vacío: gris oscuro · en progreso: ámbar · listo: azul |
+| Render | **Punto** en la esquina | sin render: sin punto · desactualizado: rojo · al día: verde |
+| Avisos | Icono | fuera de línea, conflicto de disco |
+
+Cursores por herramienta; el cabezal y los marcadores con su color en todas las vistas.
+
+### 22.4 Hilos y asincronía con Flet 1.0
+
+- Los manejadores de la interfaz pueden ser `async`; los métodos de `Video` y `Audio` (`play`, `pause`, `seek`, `get_current_position`) **son asíncronos**.
+- El núcleo es síncrono. Las operaciones largas van siempre a la cola de tareas (E9), nunca al manejador de un clic.
+- Los eventos del bus pueden llegar desde hilos de trabajo; `app/estado.py` los pasa al bucle de Flet con `page.run_task` y **agrupa** los redibujados (como máximo uno por cuadro).
+- El tic de la vista previa en vivo (nivel 2) es una tarea asíncrona de Flet que consulta el reloj de audio (T11.3).
+
+### 22.5 Secuencias principales
+
+**Abrir un proyecto**
+1. `main.py` → servicio de proyecto → `proyecto_fs`: bloqueo → diario pendiente → `_proyecto.json` → Taller → cargador de capítulos.
+2. ¿Autosave más reciente? → diálogo restaurar.
+3. `ProyectoAbierto` → navegador; se carga el último capítulo visitado.
+
+**Importar → preparar → colocar**
+1. Importar (tarea): copia a `brutos/`, análisis, `BrutoImportado`; aviso si el fps necesita revisión.
+2. Taller: tramos, fps interpretado, método → comandos del Taller (`PiezaModificada`).
+3. Hornear (tarea): archivo normalizado → `PiezaHorneada` → `actualizar_fuente` → banco (tarea) → `BancoListo`.
+4. Arrastrar la Pieza a un minuto → `AgregarElemento`. La vista previa lee el horneado (T9.2) hasta que se guarde.
+
+**Editar**: gesto → comando → eventos → timeline, inspector y monitor se redibujan → huella → `MinutoInvalidado` → pre-render en cola.
+
+**Guardar**: servicio de guardado → reconciliador (plan) → diario → materialización → renombres en dos fases → gemelos y manifiestos → guion → `ProyectoGuardado` → marca de guardado en el historial.
+
+**Deshacer después de guardar**: el historial vuelve atrás → modelo modificado → el siguiente guardado reconcilia (recuperando desde `.papelera/` si hace falta).
+
+**Renderizar**: huellas → minutos desactualizados a la cola → render de minuto → audio en una pasada → ensamblado → `RenderTerminado` → registro y mapa en verde.
+
+**Cerrar**: ¿cambios? → diálogo → detener tareas → completar diario → liberar bloqueo.
+
+### 22.6 Errores y diálogos
+
+| Situación | Comportamiento |
+|---|---|
+| Regla del modelo violada (solapamiento, bloqueo, fuente insuficiente) | Aviso breve; no cambia nada |
+| Cambios sin guardar al cerrar o cambiar de proyecto | Guardar / descartar / cancelar |
+| Proyecto bloqueado por otra instancia | Abrir en solo lectura / cancelar |
+| Autosave más reciente que el disco | Restaurar / descartar |
+| Ripple de capítulo o mover minuto | Confirmación con cuántos archivos se renombrarán |
+| Conflicto de disco al guardar | Lista de archivos en conflicto; recargar o conservar la versión del programa |
+| Medio fuera de línea | Marco rojo en vista previa; acción "rematerializar" si existe la Pieza |
+| Espacio en disco insuficiente | Antes de importar, hornear o renderizar |
+| Error en una tarea de fondo | `TareaTerminada(exito=False)`; aviso con el mensaje; la tarea se puede reintentar |
+
+---
+
+## 23. Casos de uso futuros contemplados
+
+No están en las épicas actuales, pero la arquitectura ya deja el hueco:
+
+| Caso | Hueco previsto |
+|---|---|
+| Capas dentro de una Pieza | `Pieza` puede pasar a contener una `Composicion` sin cambiar el Elemento |
+| Interfaz PySide6 | `core/` no depende de Flet |
+| Motor MLT u otro | `motor_base` |
+| VAAPI | Parámetro `aceleracion` del estándar + PyAV compilado |
+| Importar y exportar subtítulos `.srt` | Elementos T con tiempo y texto |
+| Exportar EDL / XML para otros editores | Nombres y gemelos ya contienen el tiempo exacto |
+| Plantillas de proyecto o de capítulo | Estructura y manifiestos reutilizables |
+| Varias pistas de idioma de audio | Capas A de Global |
+| Migrar proyectos a un formato nuevo | `version_esquema` |
+| Trabajo entre varios equipos | Bloqueo, diario y papelera |

@@ -20,6 +20,7 @@ from editor.core.modelo.elemento import (
 from editor.core.modelo.errores import ErrorModelo, NoEncontrado, Solapamiento
 from editor.core.modelo.global_ import Global
 from editor.core.modelo.keyframe import Animacion, Keyframe, PistaKeyframes
+from editor.core.modelo.marcador import EstadoCapa, Marcador
 from editor.core.modelo.minuto import EstadoRender, EstadoTrabajo, Minuto, RegistroRenderMinuto
 from editor.core.modelo.pieza import AudioConformado, Horneado, MetodoConversionFps, Pieza, TramoFuente
 from editor.core.modelo.proyecto import Proyecto
@@ -31,9 +32,9 @@ from editor.core.modelo.transicion import Transicion
 
 __all__ = [
     "Animacion", "AudioConformado", "AudioElemento", "Bruto", "Capa", "Capitulo", "Composicion",
-    "ContenidoTexto", "Efecto", "Elemento", "ErrorModelo", "EstadoElemento", "EstadoRender",
+    "ContenidoTexto", "Efecto", "Elemento", "ErrorModelo", "EstadoCapa", "EstadoElemento", "EstadoRender",
     "EstadoTrabajo", "EstiloTexto", "Global", "Horneado", "IndiceReferencias", "Keyframe",
-    "MetodoConversionFps", "Minuto", "NoEncontrado", "Pieza", "PistaKeyframes", "Proyecto",
+    "Marcador", "MetodoConversionFps", "Minuto", "NoEncontrado", "Pieza", "PistaKeyframes", "Proyecto",
     "ReferenciaFuente", "RegistroRender", "RegistroRenderMinuto", "RegistroRenderShort", "Short",
     "Solapamiento", "Sombra", "Taller", "TiempoElemento", "TipoCapa", "TipoFuente", "TipoMedio",
     "TramoFuente", "Transicion", "Ubicacion", "VentanaVertical",

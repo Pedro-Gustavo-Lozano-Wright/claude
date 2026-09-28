@@ -3,10 +3,10 @@
 Convierte en ambos sentidos entre los nombres del disco y los datos que
 expresan, y genera los IDs estables del proyecto.
 
-    Elemento  min02_seg12f08_dur05s00_V2_puerta-abre__a3f9.mov
-    Short     min02_seg10f00_dur45s00_momento-clave__b71c.json
-    Bruto     bru0001_toma-calle__7c21.mp4
-    Pieza     pie0001_puerta-abre__5e1c
+    Elemento  min02_seg12f08_dur05s00_V2_puerta-abre__a3f90e.mov
+    Short     min02_seg10f00_dur45s00_momento-clave__b71c4d.json
+    Bruto     bru0001_toma-calle__7c2185.mp4
+    Pieza     pie0001_puerta-abre__5e1c3a
     Capítulo  cap0001        Minuto  min02
     Render    cap0001_min00_v003.mp4 · cap0001_min05-08_v001.mp4 · cap0001_completo_v002.mp4
 """
@@ -45,6 +45,11 @@ CARPETA_SHORTS = "shorts"
 CARPETA_DIARIO = ".diario"
 CARPETA_AUTOSAVE = ".autosave"
 CARPETA_CACHE = ".cache"
+CARPETA_PAPELERA = ".papelera"
+ARCHIVO_BLOQUEO = ".bloqueo"
+
+# Versión del formato de los archivos de control; permite migrar proyectos viejos.
+VERSION_ESQUEMA = 1
 
 SUBCARPETAS_BRUTOS = ("video", "audio", "imagen")
 SUBCARPETAS_RECURSOS = ("fuentes", "luts")
@@ -52,12 +57,13 @@ SUBCARPETAS_RECURSOS = ("fuentes", "luts")
 EXTENSION_GEMELO = "json"
 
 LONGITUD_NOMBRE_MAXIMA = 32
-LONGITUD_ID = 4
+# 6 hexadecimales = 16,7 millones de IDs: alcanza para 1000 capítulos llenos.
+LONGITUD_ID = 6
 
 # --- Expresiones regulares ----------------------------------------------------
 
 _NOMBRE = r"[a-z0-9]+(?:-[a-z0-9]+)*"
-_ID = r"[0-9a-f]{4}"
+_ID = r"[0-9a-f]{6}"
 _INICIO = r"min\d{2}_seg\d{2}f\d{2}"
 _DURACION = r"dur(?:\d{2}m)?\d{2}s\d{2}"
 
@@ -365,7 +371,7 @@ def es_id_valido(identificador: str) -> bool:
 
 
 class GeneradorIds:
-    """IDs de 4 caracteres hexadecimales, únicos en todo el proyecto."""
+    """IDs de 6 caracteres hexadecimales, únicos en todo el proyecto."""
 
     CAPACIDAD = 16 ** LONGITUD_ID
 

@@ -19,6 +19,7 @@ from editor.core.modelo.composicion import clave_apilado
 from editor.core.modelo.elemento import Elemento
 from editor.core.modelo.errores import ErrorModelo, NoEncontrado
 from editor.core.modelo.global_ import Global
+from editor.core.modelo.marcador import EstadoCapa, Marcador, clave_capa
 from editor.core.modelo.minuto import Minuto
 from editor.core.modelo.short import Short
 from editor.core.tiempo import granularidad
@@ -41,6 +42,9 @@ class Capitulo:
     global_: Global = field(default_factory=Global.nuevo)
     shorts: dict[str, Short] = field(default_factory=dict)
     renders: list[RegistroRender] = field(default_factory=list)
+    marcadores: list[Marcador] = field(default_factory=list)
+    # Estado por capa: "V1" … para los minutos, "GV1" … para Global.
+    capas: dict[str, EstadoCapa] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         validar_numero_capitulo(self.numero)
@@ -116,6 +120,29 @@ class Capitulo:
             origen.elementos[elemento.id] = elemento
             raise
 
+    # --- Capas y marcadores ----------------------------------------------------
+
+    def estado_capa(self, elemento: Elemento) -> EstadoCapa:
+        return self.capas.get(clave_capa(elemento.capa.codigo, elemento.en_global), EstadoCapa())
+
+    def _hay_solo(self) -> bool:
+        return any(estado.solo for estado in self.capas.values())
+
+    def se_ve(self, elemento: Elemento) -> bool:
+        return self.estado_capa(elemento).visible
+
+    def se_oye(self, elemento: Elemento) -> bool:
+        estado = self.estado_capa(elemento)
+        if estado.silenciada:
+            return False
+        return estado.solo or not self._hay_solo()
+
+    def editable(self, elemento: Elemento) -> bool:
+        return not elemento.estado.bloqueado and not self.estado_capa(elemento).bloqueada
+
+    def marcadores_en_rango(self, inicio: int, fin: int) -> list[Marcador]:
+        return sorted((m for m in self.marcadores if inicio <= m.f < fin), key=lambda m: m.f)
+
     # --- Consultas de tiempo ---------------------------------------------------
 
     def minutos_elementos_en_rango(self, inicio: int, fin: int) -> list[Elemento]:
@@ -131,7 +158,7 @@ class Capitulo:
             if e.es_visual and e.activo_en(f)
         ]
         candidatos.extend(self.global_.visuales_activos_en(f))
-        return sorted(candidatos, key=clave_apilado)
+        return sorted((e for e in candidatos if self.se_ve(e)), key=clave_apilado)
 
     def sonoros_activos_en(self, f: int) -> list[Elemento]:
         if not granularidad.dentro_del_capitulo(f):
@@ -141,7 +168,7 @@ class Capitulo:
             if e.suena and e.activo_en(f)
         ]
         candidatos.extend(self.global_.sonoros_activos_en(f))
-        return candidatos
+        return [e for e in candidatos if self.se_oye(e)]
 
     def que_afecta_al_minuto(self, numero: int) -> list[Elemento]:
         """Todo lo que influye en el render de un minuto (base de su huella, PROJECT.md 13.2)."""

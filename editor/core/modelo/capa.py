@@ -37,14 +37,18 @@ class Capa:
     def es_visual(self) -> bool:
         return self.tipo is not TipoCapa.AUDIO
 
-    @property
-    def orden_apilado(self) -> int | None:
-        """Orden de dibujo, de abajo hacia arriba: V1…V9 y después T1…T9. None para audio."""
-        if self.tipo is TipoCapa.VIDEO:
-            return self.numero
-        if self.tipo is TipoCapa.TEXTO:
-            return CAPAS_POR_TIPO + self.numero
-        return None
+    def orden_apilado(self, en_global: bool = False) -> int | None:
+        """Orden de dibujo, de abajo hacia arriba. None para audio.
+
+        V1…V9 del minuto → V1…V9 de Global → T1…T9 del minuto → T1…T9 de Global.
+        Así un logo o un título de Global queda por encima del material de los minutos.
+        """
+        if self.tipo is TipoCapa.AUDIO:
+            return None
+        bloque = 0 if self.tipo is TipoCapa.VIDEO else 2
+        if en_global:
+            bloque += 1
+        return bloque * CAPAS_POR_TIPO + self.numero
 
     def __str__(self) -> str:
         return self.codigo

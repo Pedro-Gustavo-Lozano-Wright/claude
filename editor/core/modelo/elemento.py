@@ -46,8 +46,12 @@ class ReferenciaFuente:
 class TiempoElemento:
     inicio: int                      # fotograma del capítulo
     duracion: int                    # fotogramas
-    fuente_entrada: int = ASAS_FOTOGRAMAS  # fotograma de la fuente (24 fps) donde empieza; incluye asas
+    # Fotograma de la fuente (24 fps) donde empieza. Para una Pieza vale sus asas de
+    # inicio (normalmente 24); para imágenes, textos y audio colocado directo, 0.
+    fuente_entrada: int = ASAS_FOTOGRAMAS
     velocidad: float = 1.0           # negativa = reversa
+    # Fotogramas que tiene la fuente, asas incluidas; 0 = ilimitada (imagen fija, texto).
+    fuente_duracion: int = 0
 
     def __post_init__(self) -> None:
         if self.inicio < 0:
@@ -68,6 +72,21 @@ class TiempoElemento:
     def fotogramas_fuente_usados(self) -> int:
         """Cuántos fotogramas de la fuente consume el Elemento."""
         return max(1, math.ceil(self.duracion * abs(self.velocidad)))
+
+    @property
+    def excede_fuente(self) -> bool:
+        """True si trim, slip o velocidad piden más material del que tiene la fuente."""
+        if self.fuente_duracion <= 0:
+            return False
+        return self.fuente_entrada + self.fotogramas_fuente_usados > self.fuente_duracion
+
+    @property
+    def margen_fuente(self) -> tuple[int, int]:
+        """Fotogramas de fuente libres antes y después del tramo usado (para trim y slip)."""
+        if self.fuente_duracion <= 0:
+            return (self.fuente_entrada, 10**9)
+        despues = self.fuente_duracion - self.fuente_entrada - self.fotogramas_fuente_usados
+        return (self.fuente_entrada, max(0, despues))
 
 
 @dataclass
@@ -209,7 +228,7 @@ class Elemento:
 
     @property
     def orden_apilado(self) -> int | None:
-        return self.capa.orden_apilado
+        return self.capa.orden_apilado(self.en_global)
 
     # --- Nombre en disco -------------------------------------------------------
 

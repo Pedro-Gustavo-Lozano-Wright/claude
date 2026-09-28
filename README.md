@@ -11,7 +11,7 @@ La arquitectura completa, las decisiones y las épicas están en
 
 | Fase | Épicas | Estado |
 |---|---|---|
-| A — Fundamentos | E0 fundación · E1 base transversal · E2 tiempo y nomenclatura · E3 espacio · E4 modelo | ✅ Código escrito |
+| A — Fundamentos | E0 fundación · E1 base transversal · E2 tiempo y nomenclatura · E3 espacio · E4 modelo | ✅ Código escrito y auditado (revisión 4) |
 | B — Persistencia y edición | E5 disco · E6 comandos | Pendiente |
 | C — Motor y servicios | E7–E11 | Pendiente |
 | D — Interfaz | E12–E16 | Pendiente |

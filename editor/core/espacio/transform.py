@@ -159,8 +159,15 @@ class Transform:
         return replace(self, **cambios)
 
     def con_valores(self, valores: dict[str, float]) -> "Transform":
-        """Copia con propiedades animables sustituidas (resultado de evaluar keyframes)."""
+        """Copia con propiedades animables sustituidas (resultado de evaluar keyframes).
+
+        Una animación de escala que cruza el cero (un volteo de 1 a -1) pasa por
+        valores casi nulos: se limitan a ±ESCALA_MINIMA en vez de fallar.
+        """
         validos = {clave: valor for clave, valor in valores.items() if clave in PROPIEDADES_ANIMABLES}
+        for clave in ("escala_x", "escala_y"):
+            if clave in validos and abs(validos[clave]) < ESCALA_MINIMA:
+                validos[clave] = ESCALA_MINIMA if validos[clave] >= 0 else -ESCALA_MINIMA
         return replace(self, **validos) if validos else self
 
     def mover_ancla(self, ancla_x: float, ancla_y: float) -> "Transform":
