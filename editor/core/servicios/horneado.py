@@ -22,7 +22,6 @@ import cv2
 import numpy as np
 
 from editor.core.comandos.actualizar_fuente import actualizar_fuente
-from editor.core.espacio.transform import Afin
 from editor.core.estandar import ASAS_SEGUNDOS, Estandar
 from editor.core.eventos import BusEventos, PiezaHorneada, ProyectoModificado
 from editor.core.modelo.bruto import Bruto

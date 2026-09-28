@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 7. Fases A, B y C (E0–E11) implementadas y verificadas con medios reales. Siguiente bloque: Fase D (interfaz, E12–E16).
+- **Estado:** revisión 8. Fases A, B, C y D (E0–E16) implementadas; la interfaz se recorrió en Chromium con medios reales. Siguiente bloque: Fase E (capacidades creativas, E17–E20).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 7](#0-cambios-de-las-revisiones-2-a-7)
+0. [Cambios de las revisiones 2 a 8](#0-cambios-de-las-revisiones-2-a-8)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,81 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 7
+## 0. Cambios de las revisiones 2 a 8
+
+### Revisión 8: Fase D (interfaz) implementada
+
+**Auditoría previa (Fases A–C frente a la interfaz)**
+
+| Hallazgo | Corrección |
+|---|---|
+| Copiar el capítulo entero para cada imagen del monitor cuesta ~92 ms con 864 Elementos | `Capitulo.instantanea(inicio, fin)`: copia solo lo que toca ese rango (22.8) |
+| Los constructores de comandos validan con `ValueError` antes de llegar al historial | `Sesion.ejecutar` acepta también una función que construye el comando y avisa del error |
+| `pegar` tenía una línea sin efecto | Quitada |
+| Los archivos escritos de forma atómica quedaban con permisos 0600 (`mkstemp`) | Ahora respetan la `umask` (0644 habitual) |
+| `ft.app` en 15.2 | `ft.run` (Flet 1.0) |
+
+**Qué se implementó** (`editor/app/`)
+
+| Módulo | Contenido |
+|---|---|
+| `aplicacion.py` | `lanzar()` para `main.py`; inicio ↔ proyecto; abrir con bloqueo (solo lectura), restaurar autosave, crear; diálogos; cierre de la ventana con `prevent_close`; si la conexión se corta, instantánea de autosave y liberar la sesión |
+| `estado.py` | `EstadoApp` (con marcas I/O), `Sesion`, `hacer_en_principal` |
+| `controladores/` | `proyecto`, `medios`, `taller` (+ visor de fotogramas nativos), `timeline` (+ quitar rango I–O, añadir texto), `reproduccion`, `render` |
+| `ui/ventana.py` | Secciones con `Divisor`, 5 espacios de trabajo, redibujado agrupado (uno por cuadro), bus → paneles, atajos, guardar con conflictos, cerrar con cambios, autosave cada 10 s, pre-render del minuto tras 3 s sin editar |
+| `ui/monitor.py` + `asas.py` | Niveles 2 y 4 con imagen y nivel 3 con `Video`; reloj de audio; asas (mover, escalar, girar, ancla), imán a bordes, centro, márgenes y otros Elementos; márgenes seguros; guía 9:16; zoom; Alt + flechas |
+| `ui/timeline.py` | Canvas solo de lo visible, 4 zooms, 6 herramientas, imán, desbordes fantasma, Global con borde violeta, cabeceras (ver, silenciar, solo, bloquear, idioma), marcador, texto, rango I–O, alto de pista |
+| `ui/mapa_capitulo.py` | 24 celdas: trabajo, render y vista previa lista; doble clic = listo; clic derecho en dos celdas = intercambiar (con confirmación) |
+| `ui/taller.py` | Brutos con fps declarado/medido, visor nativo, entrada/salida, fps interpretado, método, crear Pieza, añadir tramo, hornear, colocar, quitar |
+| `ui/inspector.py` + `editor_curvas.py` | Espacio, audio, texto, efectos; rombo de keyframe por propiedad, saltar entre keyframes, curvas (incluida bezier) y mover keyframes; historial |
+| `ui/cola_render.py` | Barra de tareas con progreso y cancelar; render de minuto, rango o capítulo (pistas o un archivo por idioma) y entregables |
+| `ui/navegador.py`, `inicio.py`, `teclado.py`, `tema.py`, `distribucion.py`, `divisor.py`, `widgets/` | Árbol del proyecto e importar; recientes; atajos por foco; tokens del tema oscuro; espacios guardados en `~/.config/editor/` |
+
+**Verificación** (temporal, fuera del repositorio): la interfaz real se sirvió en
+modo web de Flet 1.0.2 y se recorrió con Chromium sin pantalla, sobre un
+proyecto creado con los controladores (video de 30 fps, PNG con alfa, WAV).
+
+| Recorrido | Resultado |
+|---|---|
+| Abrir, distribución, espacios Taller / Minuto / Capítulo / Render | ✅ |
+| Cabezal por la regla y con flechas; imagen compuesta en el monitor | ✅ |
+| Seleccionar en timeline y monitor; mover con asas (un solo paso de deshacer); Ctrl+Z | ✅ |
+| Keyframes con K, mover en otro instante → keyframe; curva visible | ✅ |
+| Mover en la timeline, cortar con la cuchilla | ✅ |
+| Taller: visor nativo, entrada/salida, crear Pieza | ✅ |
+| Guardar (Ctrl+S), render del minuto desde la interfaz (archivo + registro + mapa en verde) | ✅ |
+| Nuevo capítulo, marcador, cerrar con cambios → descartar → inicio y bloqueo liberado | ✅ |
+| Proyecto abierto por otra sesión → diálogo "solo lectura" | ✅ |
+
+**Corregido al verificar**: el `KeyboardListener` raíz ignora `expand` (la columna
+central quedaba sin altura); `update()` de un panel oculto lanzaba error; el clic
+en la regla borraba la selección; arrastrar en el monitor sin selección no hacía
+nada; el visor del Taller quedaba sin altura; si el video del pre-render no se
+reproduce (sin libmpv) el cabezal saltaba un minuto: ahora se sigue en vivo y se
+avisa; sin salida de sonido, la posición del audio (que no avanza) frenaba la
+imagen: ahora manda el reloj monotónico y las llamadas a `Audio`/`Video` tienen
+tiempo máximo.
+
+**Hechos de Flet 1.0.2 comprobados** (fuente y ejecución)
+
+| Hecho | Consecuencia |
+|---|---|
+| Los manejadores síncronos corren en el bucle de Flet | El modelo se toca desde un solo hilo; `hacer_en_principal` ejecuta directo si ya está en el bucle |
+| `page.run_task` es seguro entre hilos; sin conexión falla | Las llamadas tardías de tareas se descartan al cerrar |
+| `expand` se ignora dentro de `Stack` y de `KeyboardListener`, y en columnas con scroll | Posicionar (`left/top/right/bottom`) o dar alto fijo |
+| `control.page` y `update()` lanzan error si el control no está montado | `widgets.actualizar()` |
+| `FilePicker`, `Audio` son servicios: se registran al construirse en el contexto de la página | Se crean una vez al montar |
+| `FilePicker` en Linux usa `zenity` | Nueva dependencia de sistema (15.4) |
+| `KeyboardEvent` solo informa teclas pulsadas | Shift/Ctrl sostenidos se siguen con `KeyboardListener` (arrastres con Shift) |
+
+**Límites conocidos**
+
+| Límite | Dónde se mejora |
+|---|---|
+| Espacio Shorts: por ahora monitor con guía 9:16 | E20 |
+| Detección de escenas y silencios, sincronía de audio externo en el Taller | E15 (siguiente iteración) |
+| El nivel 3 necesita libmpv; sin él se reproduce en vivo (nivel 2) | 15.4 |
+| Importar abre el selector del sistema (zenity); arrastrar archivos desde el gestor de archivos no está disponible en Flet de escritorio | — |
 
 ### Revisión 7: Fase C (motor y servicios) implementada
 
@@ -1276,7 +1350,7 @@ main.py
      └─ ¿Autosave más reciente? → ofrecer restaurar
   5. Crear Historial, índice de referencias y servicios
   6. Arrancar la cola de tareas de fondo
-  7a. Modo interfaz: ft.app(...) con app/estado y controladores
+  7a. Modo interfaz: ft.run(...) → app/aplicacion.py (sin ruta: último proyecto o inicio)
   7b. Modo render: servicio de render → salir
 ```
 
@@ -1307,7 +1381,8 @@ conecta su parte.
 | `libgtk-3-0`, `libgstreamer1.0-0` | Ventana de escritorio de Flet |
 | `vainfo` + controladores VAAPI (opcional) | Codificación por hardware Intel/AMD |
 | Controlador NVIDIA con NVENC (opcional) | Codificación por hardware NVIDIA |
-| `fonts-dejavu` o similares | Fuentes por defecto para los textos |
+| `fonts-dejavu` o similares | Fuentes por defecto para los textos y la interfaz |
+| `zenity` | Selector de archivos y carpetas de Flet (importar, abrir, nuevo proyecto) |
 
 PyAV 18.1.0 trae FFmpeg dentro de su paquete. **Verificado** (revisión 4): incluye
 `libx264`, `libx265`, `prores_ks` (codificar ProRes 4444), `prores`, `libvpx-vp9`
@@ -1408,6 +1483,26 @@ con los keyframes de la ventana.
 8. Renderizar un minuto, un rango o el capítulo.
 9. Opcional: crear Shorts sobre rangos del capítulo y renderizarlos.
 
+### 16.6 Gestos y atajos (revisión 8)
+
+| Dónde | Gesto | Acción |
+|---|---|---|
+| Regla de la timeline | Clic / arrastrar | Mover el cabezal (no cambia la selección) |
+| Elemento en la timeline | Clic (Shift: sumar) · arrastrar el cuerpo o un borde | Seleccionar · mover, recortar, ripple, roll, slip o slide según la herramienta |
+| Elemento en la timeline | Doble clic | Abrir su Pieza en el Taller |
+| Timeline | Rueda (Ctrl: zoom) | Desplazar en los zooms de segundos y fotograma |
+| Monitor | Clic · arrastrar | Seleccionar lo de arriba · mover (o la asa: escalar, girar, ancla; Shift = libre) |
+| Mapa | Clic · doble clic · clic derecho en dos celdas | Ir al minuto · marcar listo · intercambiar minutos |
+| Divisores | Arrastrar · doble clic | Cambiar tamaño · plegar |
+
+Atajos (`config/atajos.json`; el usuario los redefine en `~/.config/editor/atajos.json`):
+Espacio y L reproducir/pausar · ← → fotograma (en el Taller, fotograma nativo) ·
+Shift + ← → y J segundo · Inicio: comienzo del minuto · RePág/AvPág minuto ·
+I / O entrada y salida · S dividir · M marcador · V C B N Y U herramientas ·
+K keyframe · Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y · Ctrl+S · Ctrl+C / Ctrl+V / Ctrl+D ·
+Supr / Shift+Supr (ripple) · = / − zoom · Alt (+ Shift) + flechas: 1 (10) px · Esc
+deseleccionar. Con el foco en un campo de texto solo funciona Ctrl+S.
+
 ---
 
 ## 17. Arquitectura del código
@@ -1489,6 +1584,7 @@ con los keyframes de la ventana.
     │   └── plugins/                     N4
     │       └── gestor_plugins.py        efectos y exportadores externos
     └── app/                             N5–N6
+        ├── aplicacion.py                arranque Flet, inicio ↔ proyecto, diálogos, cierre
         ├── estado.py                    puente eventos → Flet
         ├── controladores/
         │   ├── proyecto.py  medios.py  taller.py
@@ -1500,7 +1596,9 @@ con los keyframes de la ventana.
             ├── navegador.py  monitor.py  asas.py  inspector.py
             ├── mapa_capitulo.py  timeline.py  taller.py
             ├── editor_curvas.py  cola_render.py  shorts.py
-            ├── widgets/                 timecode, transporte, deslizador, rueda de color
+            ├── teclado.py               atajos con contextos de foco
+            ├── tema.py                  tokens del tema (recursos/temas/oscuro.json)
+            ├── widgets/                 timecode, imagen de relleno, actualizar()
             └── recursos/                iconos, temas
 ```
 
@@ -1740,7 +1838,12 @@ puede ejecutar con `main.py` en modo sin interfaz.
 | E9 | ✅ | `tareas/cola` y servicios `fuentes`, `importacion` (fps medido y fps variable), `horneado` (+ `aplicar_horneado`), `banco` (+ `GestorFuentesBanco`), `miniaturas`, `forma_onda` |
 | E10 | ✅ | `huellas` (video por minuto, audio por idioma), `render` (caché de minutos, modos `pistas` y `archivos`, `registrar`), `ensamblado` (sin recodificar, faststart); `main.py --render` y `--fotograma` |
 | E11 | ✅ | `vista_previa` (niveles 1–4, audio por rango, pre-render por minuto, `RelojAudio`) y `guardado` (materialización pendiente, autosave) |
-| E12 en adelante | Pendiente | |
+| E12 | ✅ | `aplicacion`, `estado` (Sesion), ventana con divisores y 5 espacios de trabajo, inicio, navegador, diálogos, teclado por foco, tema, autosave periódico, cierre seguro |
+| E13 | ✅ | Monitor (niveles 2, 3 y 4 con reloj de audio y respaldo en vivo), asas, ancla, imán, márgenes seguros, guía 9:16, zoom, Alt + flechas |
+| E14 | ✅ | Timeline (4 zooms, 6 herramientas, imán, fantasmas, Global, cabeceras de capa con idioma, marcadores, I/O, texto) y mapa del capítulo (3 estados, listo, intercambiar) |
+| E15 | ✅ (parcial) | Brutos, visor nativo, fps interpretado, método, tramos, hornear, colocar. Pendiente: detección de escenas y silencios, sincronía de audio externo |
+| E16 | ✅ | Inspector por grupos, keyframes (rombo, saltar), editor de curvas con bezier, historial |
+| E17 en adelante | Pendiente | |
 
 ### Decisiones tomadas al implementar la Fase B
 
@@ -1903,7 +2006,9 @@ Cursores por herramienta; el cabezal y los marcadores con su color en todas las 
 - Los manejadores de la interfaz pueden ser `async`; los métodos de `Video` y `Audio` (`play`, `pause`, `seek`, `get_current_position`) **son asíncronos**.
 - El núcleo es síncrono. Las operaciones largas van siempre a la cola de tareas (E9), nunca al manejador de un clic.
 - Los eventos del bus pueden llegar desde hilos de trabajo; `app/estado.py` los pasa al bucle de Flet con `page.run_task` y **agrupa** los redibujados (como máximo uno por cuadro).
-- El tic de la vista previa en vivo (nivel 2) es una tarea asíncrona de Flet que consulta el reloj de audio (T11.3).
+- El tic de la vista previa en vivo (nivel 2) es una tarea asíncrona de Flet que consulta el reloj de audio (T11.3). La composición del fotograma corre en `asyncio.to_thread` sobre una instantánea tomada en el bucle.
+- Los manejadores **síncronos** de Flet 1.0 corren en el propio bucle: el modelo solo se toca desde ese hilo. `hacer_en_principal` ejecuta directamente si ya está en el bucle y, si no, usa `page.run_task`; sin conexión (ventana cerrada) descarta la llamada.
+- Las llamadas a `Audio` y `Video` llevan tiempo máximo: si el sistema no tiene salida de sonido o libmpv, la reproducción sigue con el reloj monotónico y en vivo.
 
 ### 22.5 Secuencias principales
 
@@ -1958,7 +2063,7 @@ archivos del usuario.
 
 | Regla | Motivo |
 |---|---|
-| Las tareas de fondo **nunca** llaman a `proyecto.capitulo()` ni modifican el modelo | La carga perezosa y los comandos solo corren en el hilo principal; los trabajadores reciben instantáneas (`copy.deepcopy`) |
+| Las tareas de fondo **nunca** llaman a `proyecto.capitulo()` ni modifican el modelo | La carga perezosa y los comandos solo corren en el hilo principal; los trabajadores reciben instantáneas: `Capitulo.instantanea(inicio, fin)` copia solo los Elementos del rango (el capítulo entero puede costar ~100 ms) |
 | Un capítulo con pasos en el historial o sin guardar **no se descarga** | Los comandos lo necesitan para deshacer |
 | La interfaz y los servicios se refieren a los Elementos **por ID** | Deshacer restaura copias, no los mismos objetos |
 | `Elemento.archivo` puede estar vacío o desactualizado | Es estado automático; el motor resuelve siempre con `servicios/fuentes.py` (T9.2) y comprueba que exista |
@@ -1992,7 +2097,7 @@ API del núcleo que usa la Fase C:
 | Audio del transporte | `audio(capitulo, inicio, fin, idioma)` → `.wav` para `flet_audio.Audio` + `RelojAudio` | Tarea prioridad 3 |
 | Tras importar | `importacion.preparar_bruto` (principal) → `copiar_y_analizar` (tarea) → `AgregarBruto` + `BrutoImportado` (principal) | — |
 | Tras hornear | `horneado.hornear` (tarea) → `aplicar_horneado` (principal) → `banco.generar`, `miniaturas`, `forma_onda` (tareas) → `ServicioVistaPrevia.actualizar_taller` | — |
-| Guardar | `ServicioGuardado.guardar()`; `en_hilo_principal` = función que usa `page.run_thread` | Principal |
+| Guardar | `ServicioGuardado.guardar()`; `en_hilo_principal` = `hacer_en_principal(page)` (usa `page.run_task`) | Principal |
 | Renderizar | `render.PedidoRender.crear` (principal) → `renderizar` (tarea prioridad 6) → `render.registrar` (principal) | — |
 | Minutos listos para reproducir | `minutos_listos(capitulo, idioma)` → barra verde/roja del mapa | Principal (solo comprueba archivos) |
 

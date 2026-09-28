@@ -220,6 +220,28 @@ class Capitulo:
         inicio, _ = granularidad.rango_minuto(numero)
         return [e for minuto in self.minutos[:numero] for e in minuto if e.fin > inicio]
 
+    # --- Instantáneas para tareas de fondo ----------------------------------------
+
+    def instantanea(self, inicio: int, fin: int) -> "Capitulo":
+        """Copia independiente con solo lo que toca [inicio, fin): para tareas de fondo.
+
+        Copiar el capítulo entero cuesta ~90 ms con 900 Elementos; esto copia unos
+        pocos. Sirve para componer, mezclar o calcular huellas de ese rango; no
+        para guardar ni editar.
+        """
+        import copy
+
+        copia = Capitulo(
+            numero=self.numero,
+            titulo=self.titulo,
+            capas=copy.deepcopy(self.capas),
+        )
+        for elemento in self.todos_los_elementos():
+            if elemento.inicio < fin and inicio < elemento.fin:
+                duplicado = copy.deepcopy(elemento)
+                copia.contenedor_de(duplicado).elementos[duplicado.id] = duplicado
+        return copia
+
     # --- Shorts ----------------------------------------------------------------
 
     def agregar_short(self, short: Short) -> None:

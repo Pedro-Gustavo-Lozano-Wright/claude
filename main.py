@@ -112,7 +112,7 @@ def pendiente(modo: str, epica: str) -> int:
 
 
 def modo_nuevo(contexto: Contexto, ruta: Path) -> int:
-    """Crea el proyecto con su primer capítulo (cap0001, min00–min23)."""
+    """Crea el proyecto con su primer capítulo (cap0001, min00–min23) y lo abre en la interfaz."""
     from editor.core.proyecto_fs import estructura
 
     try:
@@ -126,8 +126,7 @@ def modo_nuevo(contexto: Contexto, ruta: Path) -> int:
     print(f"Proyecto creado en {proyecto.raiz}")
     print(f"  {capitulo.codigo}/ con min00 … min23, global/, render/ y shorts/")
     print("  brutos/, taller/, recursos/ y _proyecto.json")
-    registro.info("La interfaz para abrirlo llega en la épica E12.")
-    return SALIDA_OK
+    return modo_interfaz(contexto, ruta)
 
 
 def modo_escanear(contexto: Contexto, ruta: Path) -> int:
@@ -240,7 +239,17 @@ def modo_shorts(contexto: Contexto, ruta: Path, capitulo: int) -> int:
 
 
 def modo_interfaz(contexto: Contexto, ruta: Path | None) -> int:
-    return pendiente("interfaz" + (f" con {ruta}" if ruta else ""), "E12")
+    """Ventana de escritorio de Flet (E12–E16). Sin ruta: el último proyecto o la pantalla de inicio."""
+    try:
+        from editor.app.aplicacion import lanzar
+    except ImportError as error:
+        registro.error("No se pudo cargar la interfaz (%s). Instale las dependencias: pip install -r requirements.txt", error)
+        return SALIDA_ERROR
+    if ruta is not None and not ruta.exists():
+        registro.error("No existe la carpeta del proyecto: %s", ruta)
+        return SALIDA_ERROR
+    lanzar(contexto.ajustes, contexto.bus, contexto.estandar_por_defecto, ruta)
+    return SALIDA_OK
 
 
 def main(argv: list[str] | None = None) -> int:

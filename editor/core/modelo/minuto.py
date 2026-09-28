@@ -5,7 +5,7 @@ Un Elemento vive en el minuto donde empieza, aunque se desborde al siguiente.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from editor.core.estandar import FOTOGRAMAS_POR_MINUTO

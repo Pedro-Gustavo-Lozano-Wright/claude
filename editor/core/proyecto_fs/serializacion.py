@@ -53,11 +53,22 @@ def leer_json(ruta: Path) -> Any:
         return json.load(archivo)
 
 
+def _umask_actual() -> int:
+    actual = os.umask(0)
+    os.umask(actual)
+    return actual
+
+
+_UMASK = _umask_actual()
+
+
 def escribir_texto_atomico(ruta: Path, texto: str) -> None:
     """Escribe en un temporal del mismo directorio y lo reemplaza de una vez."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporal = tempfile.mkstemp(prefix=".tmp_", dir=ruta.parent)
     try:
+        # mkstemp crea con 0600; los archivos del proyecto llevan los permisos normales (umask).
+        os.fchmod(descriptor, 0o666 & ~_UMASK)
         with os.fdopen(descriptor, "w", encoding="utf-8") as archivo:
             archivo.write(texto)
             archivo.flush()
