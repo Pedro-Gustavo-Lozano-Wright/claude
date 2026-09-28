@@ -80,6 +80,11 @@ class ServicioVistaPrevia:
     def fotograma_exacto(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], idioma: str | None = None) -> bytes:
         return a_jpeg(self._exacto.componer(capitulo, f, tamano, idioma=idioma), self.calidad_pausa)
 
+    def fotograma_ventana(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], ventana,
+                          idioma: str | None = None) -> bytes:
+        """Vista previa de un Short: el fotograma visto a través de su ventana vertical (E22)."""
+        return a_jpeg(self._rapido.componer(capitulo, f, tamano, ventana=ventana, idioma=idioma), self.calidad_jpeg)
+
     def imagen_exacta(self, capitulo: Capitulo, f: int, tamano: tuple[int, int], idioma: str | None = None):
         """RGB uint8 sin comprimir (para los monitores de señal)."""
         return self._exacto.componer(capitulo, f, tamano, idioma=idioma)

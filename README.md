@@ -18,8 +18,8 @@ decisiones y el plan de épicas están en **[PROJECT.md](PROJECT.md)**.
 | D — Interfaz | E12–E16 | ✅ Recorrida en Chromium |
 | E — Completar la edición | E17 Timeline y Taller completos · E18 Proyecto, idiomas y mantenimiento | ✅ |
 | F — Capacidades creativas | E19 Efectos, transiciones y texto · E20 Audio avanzado | ✅ |
-| G — Entrega | E21 Render y exportación · E22 Shorts 9:16 | **Siguiente: E21** |
-| H — Extensión y cierre | E23 Plugins y plantillas · E24 Rendimiento, empaquetado y documentación | Pendiente |
+| G — Entrega | E21 Render y exportación · E22 Shorts 9:16 | ✅ |
+| H — Extensión y cierre | E23 Plugins y plantillas · E24 Rendimiento, empaquetado y documentación | **Siguiente: E23** |
 
 ## Modos de `main.py`
 
@@ -28,9 +28,9 @@ python main.py                                    # interfaz: último proyecto o
 python main.py RUTA_PROYECTO                      # interfaz con un proyecto
 python main.py --nuevo RUTA_PROYECTO              # crear proyecto y abrirlo
 python main.py --escanear RUTA_PROYECTO           # revisar el proyecto en disco
-python main.py --render RUTA --capitulo 1 --minutos 00-05   # render sin interfaz (--por-idioma: un archivo por idioma)
+python main.py --render RUTA --capitulo 1 --minutos 00-05   # render sin interfaz (--solo-audio: .m4a)
 python main.py --fotograma RUTA --capitulo 1 --tiempo 02:12.08 --salida f.png  # exportar un fotograma
-python main.py --shorts RUTA --capitulo 1         # Shorts verticales (E22, pendiente)
+python main.py --shorts RUTA --capitulo 1         # renderiza los Shorts que no están al día
 ```
 
 Mientras un modo no esté implementado, `main.py` indica qué épica lo completa.
@@ -151,7 +151,8 @@ Configuraciones útiles adicionales (mismo script, otros parámetros):
 | Nuevo proyecto | `--nuevo ~/Videos/mi-serie` |
 | Revisar disco | `--escanear ~/Videos/mi-serie` |
 | Render capítulo 1 | `--render ~/Videos/mi-serie --capitulo 1` |
-| Render minutos 0–5 por idioma | `--render ~/Videos/mi-serie --capitulo 1 --minutos 00-05 --por-idioma` |
+| Solo el audio de los minutos 0–5 | `--render ~/Videos/mi-serie --capitulo 1 --minutos 00-05 --solo-audio` |
+| Shorts desactualizados | `--shorts ~/Videos/mi-serie --capitulo 1` |
 | Registro detallado | agregar `--nivel-registro DEBUG` a cualquiera |
 
 ---
@@ -193,7 +194,13 @@ Más herramientas:
 - Taller: **Reducir ruido** en un Bruto de audio (crea un Bruto nuevo); al
   conformar se **conserva el tono** por defecto.
 - Monitor: botón ♥ muestra **medidores de nivel**, histograma RGB y forma de onda.
-- Render: **normalizar a −14 LUFS** (YouTube) y medir la sonoridad antes.
+- Render: **video 720p** o **solo audio**, **normalizar a −14 LUFS** (YouTube) y medir
+  la sonoridad antes. Entrega **un video** con una pista de audio por idioma y, al
+  lado, un **`.srt` por idioma** (textos de las capas T de ese idioma) y un `.txt` con
+  los **capítulos de YouTube** sacados de los marcadores (botón para verlos y copiarlos).
+- Espacio **Shorts**: marcar I–O y pulsar **+**; mover y ampliar la ventana 9:16,
+  **Keyframe aquí** para que siga la acción, **Renderizar** (720×1280, audio y
+  subtítulos del primer idioma, en `capNNNN/shorts/`).
 
 Gestos y atajos: [PROJECT.md, sección 16.6](PROJECT.md#166-gestos-y-atajos-revisión-8).
 

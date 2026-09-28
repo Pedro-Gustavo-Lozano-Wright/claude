@@ -61,13 +61,31 @@ def _formato(f: int) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _bloques(textos, desplazamiento: int = 0, limite: int | None = None) -> list[str]:
+    bloques = []
+    for e in sorted(textos, key=lambda e: e.inicio):
+        inicio = max(0, e.inicio - desplazamiento)
+        fin = e.fin - desplazamiento if limite is None else min(e.fin - desplazamiento, limite)
+        if fin > inicio:
+            bloques.append(f"{len(bloques) + 1}\n{_formato(inicio)} --> {_formato(fin)}\n{e.texto.texto}\n")
+    return bloques
+
+
 def escribir_srt(capitulo: Capitulo, codigo_capa: str, ruta: Path, en_global: bool = False) -> int:
     """Escribe los textos de una capa T como `.srt`. Devuelve cuántos subtítulos escribió."""
     fuente = capitulo.global_ if en_global else capitulo.elementos_de_minutos()
-    textos = sorted((e for e in fuente if e.es_texto and e.capa.codigo == codigo_capa and e.texto is not None),
-                    key=lambda e: e.inicio)
-    bloques = [f"{i}\n{_formato(e.inicio)} --> {_formato(e.fin)}\n{e.texto.texto}\n"  # type: ignore[union-attr]
-               for i, e in enumerate(textos, 1)]
+    bloques = _bloques(e for e in fuente if e.es_texto and e.capa.codigo == codigo_capa and e.texto is not None)
     ruta.write_text("\n".join(bloques), encoding="utf-8")
     return len(bloques)
 
+
+def srt_de_idioma(capitulo: Capitulo, idioma: str, inicio: int, fin: int) -> str | None:
+    """Subtítulos de un idioma (textos de las capas T con ese idioma) en el rango, con tiempos
+    desde `inicio`. None si no hay ninguno. Es lo que acompaña al render (E21)."""
+    textos = [
+        e for e in list(capitulo.elementos_de_minutos()) + list(capitulo.global_)
+        if e.es_texto and e.texto is not None and capitulo.estado_capa(e).idioma == idioma
+        and e.inicio < fin and inicio < e.fin
+    ]
+    bloques = _bloques(textos, inicio, fin - inicio)
+    return "\n".join(bloques) if bloques else None

@@ -3,7 +3,7 @@
     python main.py                                  interfaz
     python main.py RUTA_PROYECTO                    interfaz con ese proyecto
     python main.py --nuevo RUTA_PROYECTO            crear un proyecto y abrirlo
-    python main.py --render RUTA --capitulo 1 [--minutos 00-05]
+    python main.py --render RUTA --capitulo 1 [--minutos 00-05] [--solo-audio]
     python main.py --escanear RUTA_PROYECTO
     python main.py --shorts RUTA --capitulo 1
 
@@ -80,7 +80,7 @@ def crear_analizador() -> argparse.ArgumentParser:
     modos.add_argument("--fotograma", type=Path, metavar="RUTA", help="exportar un fotograma a PNG")
     analizador.add_argument("--tiempo", help="instante para --fotograma: MM:SS.FF (p. ej. 02:12.08)")
     analizador.add_argument("--salida", type=Path, help="archivo PNG para --fotograma")
-    analizador.add_argument("--por-idioma", action="store_true", help="con --render: un archivo por idioma")
+    analizador.add_argument("--solo-audio", action="store_true", help="con --render: solo el audio (.m4a)")
     analizador.add_argument("--capitulo", type=numero_capitulo, help="capítulo para --render y --shorts")
     analizador.add_argument("--minutos", type=rango_minutos, help="rango de minutos para --render, p. ej. 00-05")
     analizador.add_argument("--nivel-registro", default=None, help="DEBUG, INFO, WARNING o ERROR")
@@ -176,7 +176,7 @@ def _progreso_en_consola(contexto: Contexto) -> None:
     contexto.bus.suscribir(TareaProgreso, mostrar)
 
 
-def modo_render(contexto: Contexto, ruta: Path, capitulo: int, minutos: range | None, por_idioma: bool = False) -> int:
+def modo_render(contexto: Contexto, ruta: Path, capitulo: int, minutos: range | None, solo_audio: bool = False) -> int:
     from editor.core.servicios import render
     from editor.core.tareas.cola import ejecutar_ahora
 
@@ -191,7 +191,8 @@ def modo_render(contexto: Contexto, ruta: Path, capitulo: int, minutos: range | 
         desde = None if minutos is None else minutos.start
         hasta = None if minutos is None else minutos.stop - 1
         pedido = render.PedidoRender.crear(
-            proyecto, capitulo, desde, hasta, modo=render.ARCHIVOS if por_idioma else render.PISTAS
+            proyecto, capitulo, desde, hasta, perfil=render.SOLO_AUDIO if solo_audio else render.VIDEO,
+            normalizar_lufs=render.LUFS_YOUTUBE,
         )
         _progreso_en_consola(contexto)
         resultado = ejecutar_ahora(lambda c: render.renderizar(pedido, c), "render", contexto.bus)
@@ -235,7 +236,31 @@ def modo_fotograma(contexto: Contexto, ruta: Path, capitulo: int, tiempo: str, s
 
 
 def modo_shorts(contexto: Contexto, ruta: Path, capitulo: int) -> int:
-    return pendiente(f"--shorts {ruta} (capítulo {capitulo})", "E22")
+    """Renderiza los Shorts del capítulo que no estén al día (E22)."""
+    from editor.core.servicios import shorts
+    from editor.core.tareas.cola import ejecutar_ahora
+
+    apertura = _abrir_para_servicio(ruta)
+    if apertura is None:
+        return SALIDA_ERROR
+    try:
+        proyecto = apertura.proyecto
+        if not proyecto.existe_capitulo(capitulo):
+            registro.error("No existe el capítulo %d.", capitulo)
+            return SALIDA_ERROR
+        pendientes = shorts.desactualizados(proyecto, capitulo)
+        if not pendientes:
+            print("Todos los Shorts están al día.")
+            return SALIDA_OK
+        _progreso_en_consola(contexto)
+        for id_short in pendientes:
+            pedido = shorts.PedidoShort.crear(proyecto, capitulo, id_short)
+            resultado = ejecutar_ahora(lambda c: shorts.renderizar(pedido, c), "short", contexto.bus)
+            shorts.registrar(proyecto, apertura.estado, resultado)
+            print(f"\nShort: {resultado.archivo}")
+        return SALIDA_OK
+    finally:
+        apertura.cerrar()
 
 
 def modo_interfaz(contexto: Contexto, ruta: Path | None) -> int:
@@ -264,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     if argumentos.escanear:
         return modo_escanear(contexto, argumentos.escanear)
     if argumentos.render:
-        return modo_render(contexto, argumentos.render, argumentos.capitulo, argumentos.minutos, argumentos.por_idioma)
+        return modo_render(contexto, argumentos.render, argumentos.capitulo, argumentos.minutos, argumentos.solo_audio)
     if argumentos.fotograma:
         return modo_fotograma(contexto, argumentos.fotograma, argumentos.capitulo, argumentos.tiempo, argumentos.salida)
     if argumentos.shorts:

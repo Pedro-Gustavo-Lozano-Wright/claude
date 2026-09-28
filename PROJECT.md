@@ -4,7 +4,7 @@ Documento maestro de arquitectura. Recoge el enfoque, las decisiones y las
 épicas acordadas. Es la referencia única: si el código contradice este
 documento, se corrige uno de los dos de forma explícita.
 
-- **Estado:** revisión 12. Fases A–F (E0–E20) implementadas. Siguiente: **Fase G — Entrega (E21 Render y exportación)**. Instalación y uso: [README.md](README.md).
+- **Estado:** revisión 13. Fases A–G (E0–E22) implementadas. Siguiente: **Fase H — Extensión y cierre (E23 Plugins y plantillas)**. Instalación y uso: [README.md](README.md).
 - **Plataforma:** solo Linux. Desarrollo y ejecución desde PyCharm.
 - **Punto de partida:** los andamiajes vacíos `qwen_video_editor/` y
   `deep_video_editor/`, que se unifican en una sola arquitectura: `editor/`.
@@ -15,7 +15,7 @@ documento, se corrige uno de los dos de forma explícita.
 
 ## Índice
 
-0. [Cambios de las revisiones 2 a 12](#0-cambios-de-las-revisiones-2-a-12)
+0. [Cambios de las revisiones 2 a 13](#0-cambios-de-las-revisiones-2-a-13)
 1. [Visión](#1-visión)
 2. [Decisiones de base](#2-decisiones-de-base)
 3. [Nomenclatura única](#3-nomenclatura-única)
@@ -43,7 +43,34 @@ documento, se corrige uno de los dos de forma explícita.
 
 ---
 
-## 0. Cambios de las revisiones 2 a 12
+## 0. Cambios de las revisiones 2 a 13
+
+### Revisión 13: Fase G (entrega) implementada, simplificada
+
+Enfoque: **720p 16:9** para el video principal y Shorts **720×1280** (la misma
+calidad; más no aporta porque todo se hornea a 720p). Idiomas, lo más simple:
+
+| Qué | Cómo queda |
+|---|---|
+| Video | **Uno solo** para todos los idiomas: la imagen común (sin subtítulos) |
+| Audio | Una pista por idioma dentro del mismo archivo (común + diálogo de ese idioma) |
+| Subtítulos | Un `.srt` por idioma al lado del video (textos de las capas T de ese idioma); YouTube los acepta tal cual |
+| Shorts | Solo el **primer idioma**: su audio y sus subtítulos **quemados** (los Shorts se miran sin sonido) |
+
+Se quitaron: el modo "un archivo por idioma" (`--por-idioma`), los perfiles
+1080p/4K y H.265/10 bits (sin sentido con material a 720p) y la "lista de
+trabajos de render" (la barra de tareas ya pone en fila los renders pedidos).
+
+| Área | Qué hay | Dónde |
+|---|---|---|
+| Perfiles | Video 720p (YouTube) o solo audio (`.m4a`, una pista por idioma); −14 LUFS por defecto; `--solo-audio` | `servicios/render.py`, `ui/cola_render.py`, `main.py` |
+| Entregables extra | `…_vNNN_es.srt` por idioma y `…_vNNN.txt` con los capítulos de YouTube; se listan con los entregables | `servicios/subtitulos.py`, `servicios/capitulos_youtube.py` |
+| Capítulos de YouTube | Desde los marcadores (sin nombre: "Parte N"; "Inicio" si falta el 0:00), avisos si hay menos de 3 o duran < 10 s; botón que los muestra para copiar | `servicios/capitulos_youtube.py` |
+| Huella de video | Ya no incluye los textos de idioma (no se dibujan en el video común) | `servicios/huellas.py` |
+| Shorts | Composición directa a 720×1280 por la ventana vertical (`componer(ventana=…)`); estados sin render / al día / desactualizado por huella; versión en `_renders.json` | `servicios/shorts.py` |
+| Espacio Shorts | Lista con estado, vista vertical, posición y zoom de la ventana, keyframes para seguir la acción, ventana fija, rango I–O, renderizar uno o los pendientes; el monitor 16:9 con la guía al lado | `ui/shorts.py`, `controladores/shorts.py` |
+| Deshacer | Arrastrar el encuadre del Short es un solo paso (fusión en `EdicionEstadoCapitulo`) | `comandos/estado_capitulo.py` |
+| `main.py --shorts` | Renderiza los Shorts que no están al día | `main.py` |
 
 ### Revisión 12: Fase F (capacidades creativas) implementada
 
@@ -60,9 +87,9 @@ documento, se corrige uno de los dos de forma explícita.
 | Monitores de señal | Medidores de nivel por canal, histograma RGB, forma de onda de luminancia | `ui/monitor.py` |
 | Audio | Bajar la música con la voz (keyframes de volumen, un paso de deshacer), sonoridad BS.1770 (ponderación K por bloque, puertas), normalizar a −14 LUFS con techo −1 dBFS, reducción de ruido espectral | `servicios/analisis.py`, `audio_procesado.py`, `render.py`, `controladores/audio.py` |
 
-**Limitaciones conocidas** (se resuelven en E21):
+**Limitaciones conocidas** (las dos primeras se resolvieron en la revisión 13):
 
-- Los subtítulos de capas T con idioma no se queman en el video común; E21 los exporta como `.srt` o los quema por idioma.
+- Los subtítulos de capas T con idioma no se queman en el video común; van en un `.srt` por idioma (y quemados en los Shorts).
 - La huella del video incluye los textos de idioma: cambiarlos provoca un re-render extra, que es inofensivo.
 - Las rampas de velocidad cambian el tono del audio (el WSOLA se aplica solo a velocidad constante).
 - La normalización se hace por rango renderizado y por pista de idioma.
@@ -188,7 +215,7 @@ inspector de efectos, Shift+clic).
 | `ui/mapa_capitulo.py` | 24 celdas: trabajo, render y vista previa lista; doble clic = listo; clic derecho en dos celdas = intercambiar (con confirmación) |
 | `ui/taller.py` | Brutos con fps declarado/medido, visor nativo, entrada/salida, fps interpretado, método, crear Pieza, añadir tramo, hornear, colocar, quitar |
 | `ui/inspector.py` + `editor_curvas.py` | Espacio, audio, texto, efectos; rombo de keyframe por propiedad, saltar entre keyframes, curvas (incluida bezier) y mover keyframes; historial |
-| `ui/cola_render.py` | Barra de tareas con progreso y cancelar; render de minuto, rango o capítulo (pistas o un archivo por idioma) y entregables |
+| `ui/cola_render.py` | Barra de tareas con progreso y cancelar; render de minuto, rango o capítulo (video 720p o solo audio) y entregables |
 | `ui/navegador.py`, `inicio.py`, `teclado.py`, `tema.py`, `distribucion.py`, `divisor.py`, `widgets/` | Árbol del proyecto e importar; recientes; atajos por foco; tokens del tema oscuro; espacios guardados en `~/.config/editor/` |
 
 **Verificación** (temporal, fuera del repositorio): la interfaz real se sirvió en
@@ -252,7 +279,7 @@ tiempo máximo.
 | Vista previa nivel 2 (banco, 256×144) | ~**218 fps** en el contenedor de desarrollo (el objetivo era 10–15) |
 | Fotograma exacto 1280×720 (nivel 4) | ~130 ms |
 | Cola de tareas | Prioridades, reemplazo por clave, errores informados sin detener la cola |
-| `main.py` | `--render` (con `--por-idioma`), `--fotograma`, `--escanear` |
+| `main.py` | `--render` (con `--solo-audio`), `--fotograma`, `--escanear`, `--shorts` |
 
 **Corregido durante la implementación**: versiones de render que confundían
 "minuto 5" con "rango 5-5"; un render nuevo podía pisar un archivo existente no
@@ -1328,12 +1355,9 @@ Modelo profesional de doblaje: **diálogo por idioma + pista común**.
 - El proyecto declara sus idiomas (`Proyecto.idiomas`); el primero es el **principal**.
 - **Edición y vista previa**: se escucha el idioma elegido en el transporte (por defecto el principal) más la pista común. Cambiar de idioma no toca el modelo; es estado de la app.
 - **Mezcla** (E8): `Capitulo.sonoros_activos_en(f, idioma)` devuelve lo común más ese idioma.
-- **Render** (E10), a elegir en el perfil:
-  - **Un archivo con varias pistas de audio** (una por idioma, con su etiqueta de idioma en los metadatos); el video se codifica una sola vez.
-  - **Un archivo por idioma**: `cap0001_completo_v002_es.mp4`, `cap0001_completo_v002_en.mp4`.
-  - **Solo audio por idioma** (WAV o AAC), para entregar a plataformas.
-- **Subtítulos por idioma**: capas T marcadas con idioma, exportables a `.srt` y como pista de subtítulos dentro del MP4 (sin quemar en la imagen), o quemados si se prefiere.
-- **Shorts**: se renderizan en el idioma principal o en todos.
+- **Render** (E10, simplificado en E21): **un archivo** con una pista de audio por idioma (etiquetada en los metadatos); el video se codifica una sola vez. Perfil "solo audio": lo mismo en `.m4a`.
+- **Subtítulos por idioma**: capas T marcadas con idioma; el render escribe un `.srt` por idioma al lado del video (sin quemar en la imagen).
+- **Shorts**: en el idioma principal, con sus subtítulos quemados.
 - **Huellas**: el audio de cada idioma tiene su propia huella; cambiar el diálogo en inglés no invalida la versión en español.
 
 ---
@@ -1973,15 +1997,13 @@ ruido, estiramiento de audio que **conserve el tono** (velocidad y conformar).
 
 ### Fase G — Entrega
 
-**E21. Render y exportación** — lista de trabajos de render (hoy: barra de
-tareas y entregables), perfiles en el estándar (YouTube 1080p, 720p, 4K, solo
-audio), subtítulos `.srt` y en pista, capítulos de YouTube desde marcadores,
-H.265 / 10 bits, NVENC; VAAPI con PyAV compilado contra el FFmpeg del sistema
-(15.4).
+**E21. Render y exportación** ✅ (revisión 13) — perfiles video 720p y solo
+audio, `.srt` por idioma, capítulos de YouTube desde marcadores. Descartado por
+el enfoque 720p: 1080p/4K, H.265/10 bits, lista de trabajos aparte. VAAPI queda
+como opción de instalación (15.4).
 
-**E22. Shorts verticales 9:16** — modelo y comandos ya listos (E4, E6); servicio
-de recomposición a 720×1280; espacio de trabajo Shorts sobre `asas.VistaLienzo` y
-`Lienzo.ventana_vertical`; `main.py --shorts`.
+**E22. Shorts verticales 9:16** ✅ (revisión 13) — servicio a 720×1280 con
+estados por huella, espacio de trabajo Shorts y `main.py --shorts`.
 
 ### Fase H — Extensión y cierre
 
@@ -2034,8 +2056,10 @@ Las revisiones 1–9 usan la numeración vieja de las épicas pendientes:
 | E18 | ✅ | Proyecto, idiomas y mantenimiento; un capítulo en memoria |
 | E19 | ✅ | Efectos, transiciones y texto; rampas; monitores de señal (revisión 12) |
 | E20 | ✅ | Audio avanzado: ducking, medidores, −14 LUFS, reducción de ruido, conservar tono |
-| E21 | **Siguiente** | Render y exportación |
-| E22–E24 | Pendiente | |
+| E21 | ✅ | Render: perfiles 720p y solo audio, `.srt` por idioma, capítulos de YouTube (revisión 13) |
+| E22 | ✅ | Shorts 720×1280: servicio, espacio de trabajo, `--shorts` |
+| E23 | **Siguiente** | Plugins y plantillas |
+| E24 | Pendiente | |
 
 ### Decisiones tomadas al implementar la Fase B
 

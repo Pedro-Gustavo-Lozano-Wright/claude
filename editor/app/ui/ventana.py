@@ -30,9 +30,10 @@ from editor.app.ui.inspector import Inspector
 from editor.app.ui.mapa_capitulo import MapaCapitulo
 from editor.app.ui.monitor import Monitor
 from editor.app.ui.navegador import Navegador
+from editor.app.ui.shorts import PanelShorts
 from editor.app.ui.taller import Taller
 from editor.app.ui.teclado import Teclado
-from editor.app.ui.tema import TEMA, texto, texto_suave
+from editor.app.ui.tema import TEMA, texto
 from editor.app.ui.widgets import actualizar
 from editor.app.ui.timeline import Timeline
 from editor.core.estandar import FOTOGRAMAS_POR_CAPITULO, FOTOGRAMAS_POR_MINUTO, FPS, MINUTOS_POR_CAPITULO
@@ -52,7 +53,7 @@ from editor.core.eventos import (
 if TYPE_CHECKING:
     from editor.app.aplicacion import Aplicacion
 
-TODAS = ("barra", "navegador", "monitor", "inspector", "mapa", "timeline", "taller", "render", "tareas")
+TODAS = ("barra", "navegador", "monitor", "inspector", "mapa", "timeline", "taller", "render", "shorts", "tareas")
 NOMBRES_ESPACIO = {"taller": "Taller", "minuto": "Minuto", "capitulo": "Capítulo", "shorts": "Shorts", "render": "Render"}
 ESPERA_PRERENDER = 3.0      # segundos sin editar antes de preparar la vista previa del minuto
 INTERVALO_AUTOSAVE = 10.0   # cada cuánto se consulta si toca autoguardar
@@ -83,10 +84,12 @@ class Ventana:
         self.timeline = Timeline(self)
         self.taller = Taller(self)
         self.cola_render = ColaRender(self)
+        self.shorts = PanelShorts(self)
         self.barra_tareas = BarraTareas(self)
         self._paneles = {
             "navegador": self.navegador, "monitor": self.monitor, "inspector": self.inspector, "mapa": self.mapa,
-            "timeline": self.timeline, "taller": self.taller, "render": self.cola_render, "tareas": self.barra_tareas,
+            "timeline": self.timeline, "taller": self.taller, "render": self.cola_render, "shorts": self.shorts,
+            "tareas": self.barra_tareas,
         }
 
         self.teclado = Teclado(lambda: self.sesion.estado.foco)
@@ -205,7 +208,7 @@ class Ventana:
             return
         if "barra" in partes:
             self._barra()
-        for nombre in ("navegador", "mapa", "timeline", "inspector", "taller", "render", "tareas", "monitor"):
+        for nombre in ("navegador", "mapa", "timeline", "inspector", "taller", "render", "shorts", "tareas", "monitor"):
             if nombre in partes:
                 try:
                     self._paneles[nombre].refrescar()
@@ -260,11 +263,8 @@ class Ventana:
             superior: ft.Control = ft.Row([ft.Container(self.taller.control, expand=True),
                                            ft.Container(self.monitor.control, expand=True)], spacing=4, expand=True)
         elif nombre == "shorts":
-            superior = ft.Column([
-                ft.Container(self.monitor.control, expand=True),
-                texto_suave("Espacio Shorts: la ventana 9:16 y su vista previa vertical llegan en la épica E22. "
-                            "La guía 9:16 del monitor ya muestra qué entra en un Short."),
-            ], expand=True)
+            superior = ft.Row([ft.Container(self.shorts.control, expand=3),
+                               ft.Container(self.monitor.control, expand=2)], spacing=4, expand=True)
         else:
             superior = self.monitor.control
         centro: list[ft.Control] = [ft.Container(superior, expand=True)]

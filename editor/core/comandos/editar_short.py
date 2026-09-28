@@ -79,6 +79,9 @@ class MoverVentanaShort(_EdicionShort):
         self.x = x
         self.zoom = zoom
 
+    def clave_fusion(self) -> tuple | None:
+        return ("ventana", self.id_short)
+
     def aplicar(self, capitulo: Capitulo) -> Afectados:
         short = capitulo.shorts.get(self.id_short)
         if short is None:

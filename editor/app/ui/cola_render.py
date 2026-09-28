@@ -1,10 +1,11 @@
-"""Tareas de fondo y renders (básico; perfiles y exportación completa en E21).
+"""Tareas de fondo y renders (E10, E21).
 
 - `BarraTareas`: franja inferior de la ventana con la tarea en curso, su
-  progreso y cuántas quedan; siempre visible.
+  progreso y cuántas quedan; siempre visible. Varios renders pedidos seguidos
+  esperan su turno ahí.
 - `ColaRender`: panel del espacio Render: renderizar el minuto, el rango I–O
-  (en minutos) o el capítulo, en pistas o un archivo por idioma, y la lista
-  de entregables del capítulo.
+  (en minutos) o el capítulo como video 720p o solo audio, y la lista de
+  entregables del capítulo (video, `.srt` por idioma y capítulos de YouTube).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from editor.app.controladores import render as ctl_render
 from editor.app.ui.tema import TEMA, texto_suave, titulo_panel
 from editor.core.eventos import TareaProgreso, TareaTerminada
 from editor.core.tiempo.granularidad import minuto_de
+from editor.core.servicios import render as servicio_render
 from editor.core.tiempo.nomenclatura import carpeta_render
 
 if TYPE_CHECKING:
@@ -79,7 +81,9 @@ class BarraTareas:
 class ColaRender:
     def __init__(self, app: "Ventana") -> None:
         self.app = app
-        self.por_idioma = ft.Checkbox(label="Un archivo por idioma", value=False)
+        self.perfil = ft.Dropdown(
+            value=servicio_render.VIDEO, dense=True, width=210, text_size=12,
+            options=[ft.DropdownOption(key=k, text=v) for k, v in servicio_render.PERFILES.items()])
         self.normalizar = ft.Checkbox(label="Sonoridad −14 LUFS (YouTube)", value=True,
                                       tooltip="Cada pista de idioma a −14 LUFS integrados, pico ≤ −1 dBFS")
         self.sonoridad = texto_suave("")
@@ -92,13 +96,17 @@ class ColaRender:
                         ft.FilledButton("Minuto actual", icon=ft.Icons.MOVIE, on_click=lambda _: self._minuto()),
                         ft.OutlinedButton("Rango I–O", on_click=lambda _: self._rango()),
                         ft.OutlinedButton("Capítulo completo", on_click=lambda _: self._capitulo()),
-                        self.por_idioma,
+                        self.perfil,
                         self.normalizar,
                     ], wrap=True),
+                    texto_suave("Un archivo con una pista de audio por idioma; al lado, un .srt por idioma con los "
+                                "textos de sus capas T y los capítulos de YouTube de los marcadores (.txt)."),
                     ft.Row([ft.TextButton("Medir sonoridad del minuto", icon=ft.Icons.EQUALIZER,
                                           on_click=lambda _: self._medir(False)),
                             ft.TextButton("…del capítulo", on_click=lambda _: self._medir(True)),
-                            self.sonoridad], wrap=True),
+                            self.sonoridad,
+                            ft.TextButton("Capítulos de YouTube", icon=ft.Icons.LIST,
+                                          on_click=lambda _: self._capitulos_youtube())], wrap=True),
                     texto_suave("Los minutos al día se reutilizan: solo se renderiza lo que cambió."),
                     ft.Divider(),
                     titulo_panel("Entregables del capítulo"),
@@ -119,9 +127,11 @@ class ColaRender:
         for registro in sorted(capitulo.renders, key=lambda r: (r.nombre.desde is None, r.nombre.desde or 0,
                                                                  r.nombre.version)):
             ruta = carpeta / registro.nombre.archivo
+            icono = {"srt": ft.Icons.SUBTITLES, "txt": ft.Icons.LIST, "m4a": ft.Icons.AUDIOTRACK}.get(
+                registro.nombre.extension, ft.Icons.MOVIE)
             filas.append(ft.ListTile(
                 dense=True,
-                leading=ft.Icon(ft.Icons.MOVIE, size=16,
+                leading=ft.Icon(icono, size=16,
                                 color=TEMA.render_al_dia if ruta.exists() else TEMA.error),
                 title=ft.Text(registro.nombre.archivo, size=12),
                 subtitle=ft.Text("en disco" if ruta.exists() else "falta el archivo", size=10, color=TEMA.texto_suave),
@@ -144,7 +154,7 @@ class ColaRender:
 
     def _minuto(self) -> None:
         minuto = self.app.sesion.estado.minuto
-        ctl_render.renderizar(self.app.sesion, minuto, minuto, self.por_idioma.value, self.normalizar.value)
+        ctl_render.renderizar(self.app.sesion, minuto, minuto, self.perfil.value or servicio_render.VIDEO, self.normalizar.value)
         self.app.aviso_breve(f"Render del minuto {minuto:02d} en cola.")
 
     def _rango(self) -> None:
@@ -153,12 +163,27 @@ class ColaRender:
             self.app.avisar("Marque entrada (I) y salida (O) en la timeline: se renderizan los minutos que cubren.")
             return
         desde, hasta = minuto_de(estado.entrada), min(23, minuto_de(max(estado.entrada, estado.salida - 1)))
-        ctl_render.renderizar(self.app.sesion, desde, hasta, self.por_idioma.value, self.normalizar.value)
+        ctl_render.renderizar(self.app.sesion, desde, hasta, self.perfil.value or servicio_render.VIDEO, self.normalizar.value)
         self.app.aviso_breve(f"Render de los minutos {desde:02d}–{hasta:02d} en cola.")
 
     def _capitulo(self) -> None:
-        ctl_render.renderizar(self.app.sesion, None, None, self.por_idioma.value, self.normalizar.value)
+        ctl_render.renderizar(self.app.sesion, None, None, self.perfil.value or servicio_render.VIDEO, self.normalizar.value)
         self.app.aviso_breve("Render del capítulo completo en cola.")
+
+
+    def _capitulos_youtube(self) -> None:
+        texto_capitulos, avisos = ctl_render.capitulos_de_youtube(self.app.sesion)
+        if not texto_capitulos:
+            self.app.avisar("No hay marcadores en el capítulo: cada marcador (M) es un capítulo de YouTube.")
+            return
+        campo = ft.TextField(value=texto_capitulos, multiline=True, read_only=True, min_lines=6, max_lines=16,
+                             text_size=12)
+        contenido = ft.Column([
+            texto_suave("Copie esto en la descripción del video (el render del capítulo también lo guarda en un .txt)."),
+            campo,
+            *[ft.Text(a, size=12, color=TEMA.error) for a in avisos],
+        ], tight=True, width=440)
+        self.app.raiz.dialogo("Capítulos de YouTube", contenido, [("Cerrar", None)])
 
 
 def _texto_sonoridad(lufs: float, pico: float) -> str:

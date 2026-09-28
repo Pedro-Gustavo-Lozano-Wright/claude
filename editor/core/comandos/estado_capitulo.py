@@ -50,3 +50,19 @@ class EdicionEstadoCapitulo(Comando):
 
     def afectados(self) -> list[Afectados]:
         return [self._afectados]
+
+    def clave_fusion(self) -> tuple | None:
+        """Como en `EdicionCapitulo`: pasos de un mismo gesto con valores absolutos."""
+        return None
+
+    def fusionar(self, siguiente: Comando) -> bool:
+        clave = self.clave_fusion()
+        if clave is None or type(siguiente) is not type(self):
+            return False
+        assert isinstance(siguiente, EdicionEstadoCapitulo)
+        if siguiente.clave_fusion() != clave:
+            return False
+        antes, minutos_antes = self._antes, self._minutos_antes
+        self.__dict__.update({k: v for k, v in siguiente.__dict__.items() if k not in ("_antes", "_minutos_antes")})
+        self._antes, self._minutos_antes = antes, minutos_antes
+        return True

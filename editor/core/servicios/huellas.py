@@ -50,7 +50,8 @@ def _elementos(capitulo: Capitulo, elementos: list[Elemento], resolver: Resoluto
 
 
 def huella_video_minuto(capitulo: Capitulo, numero: int, estandar: Estandar, resolver: Resolutor) -> str:
-    visuales = [e for e in capitulo.que_afecta_al_minuto(numero) if e.es_visual]
+    # Los subtítulos (textos de capas T con idioma) no se dibujan en el video común: van en `.srt`.
+    visuales = [e for e in capitulo.que_afecta_al_minuto(numero) if e.es_visual and capitulo.se_ve_en_idioma(e, None)]
     return huella({
         "tipo": "video",
         "minuto": numero,
